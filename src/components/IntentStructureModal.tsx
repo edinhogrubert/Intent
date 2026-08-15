@@ -43,13 +43,17 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
   intent,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'questions' | 'lifecycle' | 'tree' | 'json'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'lifecycle' | 'people' | 'api' | 'tree' | 'json'>('questions');
 
   if (!isOpen || !intent) return null;
 
   const normalized = normalizeIntent(intent);
   const answers = answerIntentQuestions(normalized);
   const evaluation = evaluateIntentConditions(normalized);
+
+  const approvers = normalized.people?.approvers || [];
+  const recipients = normalized.people?.recipients || [];
+  const participants = normalized.people?.participants || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -64,12 +68,12 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-bold uppercase tracking-wider">
-                  Etapa 2 & 3 — Intent & Tempo
+                  Etapas 2, 3 & 4 — Intent, Tempo & Pessoas
                 </span>
                 <span className="text-xs font-mono text-slate-400">ID: {normalized.id}</span>
               </div>
               <h3 className="text-xl font-black text-white tracking-tight mt-0.5">
-                Arquitetura & Ciclo de Vida da Intent
+                Arquitetura & Tríplice de Pessoas
               </h3>
             </div>
           </div>
@@ -106,6 +110,30 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
           >
             <Activity className="w-4 h-4" />
             <span>Motor de Tempo & Eventos (Etapa 3)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('people')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'people'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Pessoas & Papéis (Etapa 4)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('api')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'api'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span>Conectores & API Ready</span>
           </button>
 
           <button
@@ -330,6 +358,222 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
             </div>
           )}
 
+          {activeTab === 'people' && (
+            <div className="space-y-6">
+              {/* Painel Informativo da Separação Tripla */}
+              <div className="p-4 rounded-2xl bg-[#0055FF]/5 border border-[#0055FF]/20 flex items-start gap-3">
+                <Users className="w-5 h-5 text-[#0055FF] shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-700 leading-relaxed space-y-1">
+                  <strong>Tríplice de Pessoas (Etapa 4):</strong> Uma mesma Intent separa com clareza três papéis fundamentais:
+                  <ul className="list-disc pl-4 space-y-0.5 mt-1 text-[11px] text-slate-600">
+                    <li><strong className="text-amber-700">Aprovadores (Approvers):</strong> Têm poder de voto/decisão para satisfazer a condição e desbloquear a intenção.</li>
+                    <li><strong className="text-emerald-700">Destinatários (Recipients):</strong> Entidades autorizadas a receber/descriptografar a revelação do segredo.</li>
+                    <li><strong className="text-blue-700">Participantes (Participants):</strong> Envolvidos, observadores ou colaboradores da Intent.</li>
+                  </ul>
+                  <p className="text-[11px] font-medium text-slate-500 pt-1">
+                    * Uma mesma pessoa (ex: Flávio) pode ter múltiplos papéis, mas o sistema os trata de forma independente. Ex: 2 de 3 aprovadores liberam o documento, mas apenas o destinatário João poderá lê-lo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Grid dos 3 Papéis */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. Criador & Aprovadores */}
+                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-amber-200/60">
+                    <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <span>Aprovadores (Guardians)</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200/60 text-amber-900 font-mono text-[10px] font-bold">
+                      {approvers.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {approvers.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic">Nenhum aprovador atribuído (Liberado apenas por tempo ou criador).</p>
+                    ) : (
+                      approvers.map((appr) => (
+                        <div key={appr.id} className="p-2.5 rounded-xl bg-white border border-amber-200/60 flex items-center justify-between text-xs shadow-2xs">
+                          <div>
+                            <span className="font-bold text-slate-800 block">{appr.name}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">{appr.email || appr.id}</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            appr.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {appr.status === 'approved' ? 'Aprovado' : 'Pendente'}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Destinatários da Revelação */}
+                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-emerald-600" />
+                      <span>Destinatários da Revelação</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-200/60 text-emerald-900 font-mono text-[10px] font-bold">
+                      {recipients.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {recipients.length === 0 ? (
+                      <div className="p-2.5 rounded-xl bg-white border border-emerald-200/60 text-xs text-slate-700">
+                        <span className="font-bold block text-slate-800">
+                          {normalized.visibility === 'public' ? 'Público Geral' : `Apenas o Criador (${normalized.creator?.name})`}
+                        </span>
+                        <span className="text-[10px] text-slate-500 italic">Disponível ao público ou exclusivo do criador.</span>
+                      </div>
+                    ) : (
+                      recipients.map((rec) => (
+                        <div key={rec.id} className="p-2.5 rounded-xl bg-white border border-emerald-200/60 flex items-center justify-between text-xs shadow-2xs">
+                          <div>
+                            <span className="font-bold text-slate-800 block">{rec.name}</span>
+                            <span className="text-[10px] text-slate-500 font-mono">{rec.email || rec.id}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            Alvo Seguro
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Participantes Gerais */}
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      <span>Participantes & Criador</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-200/60 text-blue-900 font-mono text-[10px] font-bold">
+                      {participants.length + 1}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-white border border-blue-200/60 flex items-center justify-between shadow-2xs">
+                      <div>
+                        <span className="font-bold text-slate-900 block">{normalized.creator?.name} (Criador)</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{normalized.creator?.email || normalized.creator?.username}</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                        Autor
+                      </span>
+                    </div>
+
+                    {participants.map((part) => (
+                      <div key={part.id} className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between shadow-2xs">
+                        <div>
+                          <span className="font-bold text-slate-800 block">{part.name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">{part.email || part.id}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono">
+                          {part.role}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'api' && (
+            <div className="space-y-6">
+              {/* Header de Preparação de API & Princípio de Independência */}
+              <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-700 leading-relaxed space-y-1">
+                  <strong className="text-purple-900 block font-bold">Princípio de Independência (Contrato Universal):</strong>
+                  <p className="text-[11px] text-slate-600">
+                    <em>&quot;A plataforma não se especializa no domínio que utiliza sua infraestrutura. Ela fornece um contrato universal de Intents; sistemas externos adaptam seus eventos a esse contrato.&quot;</em>
+                  </p>
+                  <p className="text-[11px] text-slate-500 pt-1">
+                    Internamente, não existem <code className="text-purple-700">SchoolIntent</code> ou <code className="text-purple-700">ContestIntent</code>. Existe apenas o <strong>Core de Intent</strong> recebendo eventos padronizados emitidos por Adaptadores externos.
+                  </p>
+                </div>
+              </div>
+
+              {/* 5 Garantias de Arquitetura */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 font-mono">1. content_source</span>
+                    <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold font-mono">
+                      {normalized.content?.source || 'UPLOAD'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Aceita fontes: <code className="text-purple-700 font-bold">UPLOAD | API | WEBHOOK | LINK | MANUAL</code>.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 font-mono">2. content_version</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold font-mono">
+                      v{normalized.content?.current_version || 1} ({normalized.content?.versions?.length || 1} registro(s))
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Auditabilidade imutável sem sobrescrita silenciosa do conteúdo original.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 font-mono">3. release_stages</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold font-mono">
+                      {normalized.content?.release_stages?.length || 1} Etapa(s)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Suporta fluxos progressivos (ex: Edital ➔ Homologação ➔ Resultado Final).
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 font-mono">4. Eventos Estendidos</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold font-mono">
+                      API / Webhook Event
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Suporte aos eventos <code className="text-amber-700 font-bold">API_CONTENT_RECEIVED</code> e <code className="text-amber-700 font-bold">STAGE_ADVANCED</code>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Exemplo Prático Escolas/Concursos */}
+              <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 border border-slate-800 space-y-2 font-mono text-xs">
+                <span className="text-purple-400 font-bold block">// Exemplo Payload Futuro de Integração (Escolas / Concursos):</span>
+                <pre className="text-[10px] text-emerald-400 overflow-x-auto leading-relaxed">
+{JSON.stringify({
+  intent_id: normalized.id,
+  content_source: "API",
+  event: "API_CONTENT_RECEIVED",
+  stage: 2,
+  payload: {
+    title: "Notas Finais do Concurso 2027",
+    target_recipient: "usr-aluno-123",
+    version: 2
+  }
+}, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'tree' && (
             <div className="space-y-4">
               <div className="p-5 bg-slate-900 text-slate-200 rounded-2xl font-mono text-xs leading-relaxed overflow-x-auto space-y-2 border border-slate-800 shadow-inner">
@@ -355,12 +599,12 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
                   type: {normalized.audience?.type} | visibility: {normalized.audience?.visibility}
                 </div>
 
-                <div className="pl-4 text-cyan-400">├── Participants (Quem pode participar?)</div>
+                <div className="pl-4 text-cyan-400">├── People (Tríplice de Pessoas - Etapa 4)</div>
                 <div className="pl-8 text-slate-300">
-                  count: {normalized.participants?.length || 0} (Guardiões & Destinatários)
+                  approvers: {approvers.length} | recipients: {recipients.length} | participants: {participants.length}
                 </div>
 
-                <div className="pl-4 text-rose-400">├── Permissions (Permissões de acesso)</div>
+                <div className="pl-4 text-rose-400">├── Permissions (Permissões de Acesso)</div>
                 <div className="pl-8 text-slate-300">
                   can_view: [{normalized.permissions?.can_view?.join(', ')}] | can_reveal: [{normalized.permissions?.can_reveal?.join(', ')}]
                 </div>
@@ -381,8 +625,8 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
           {activeTab === 'json' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                <span>ESTRUTURA DE OBJETO DECLARATIVA (ETAPA 3):</span>
-                <span className="text-emerald-600 font-bold">✓ Condição Declarativa Validada</span>
+                <span>ESTRUTURA DE OBJETO DECLARATIVA (ETAPA 4):</span>
+                <span className="text-emerald-600 font-bold">✓ Separação de Pessoas Validada</span>
               </div>
               <pre className="p-4 bg-slate-950 text-emerald-400 rounded-2xl font-mono text-[11px] leading-relaxed overflow-x-auto max-h-[350px] border border-slate-800">
                 {JSON.stringify(
@@ -395,6 +639,7 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
                       operator: evaluation.timeResult.operator,
                       value: evaluation.timeResult.isoValue,
                     },
+                    people: normalized.people,
                     current_lifecycle_event: evaluation.currentLifecycleStage,
                     audience: normalized.audience,
                     permissions: normalized.permissions,
@@ -413,7 +658,7 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>Etapa 3 Validada — Motor de tempo declarativo e auditoria de ciclo de vida.</span>
+            <span>Etapa 4 Validada — Separação entre Aprovadores, Destinatários e Participantes.</span>
           </div>
 
           <button

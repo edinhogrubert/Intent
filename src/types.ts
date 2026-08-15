@@ -1,3 +1,14 @@
+/**
+ * ARCHITECTURAL MANIFESTO & CORE CONTRACT (INTENT ENGINE)
+ * 
+ * PRINCÍPIO DE INDEPENDÊNCIA:
+ * A plataforma não se especializa no domínio que utiliza sua infraestrutura.
+ * Ela fornece um contrato universal (Interface) de Intents; sistemas externos (escolas,
+ * bancas de concurso, ERPs, IoT, redes sociais, gateways) adaptam seus eventos a este contrato.
+ * 
+ * Nunca criar "SchoolIntent" ou "ContestIntent". Existe apenas INTENT e seus Adaptadores Externos.
+ */
+
 export interface UserAccount {
   id: string;
   name: string; // nome
@@ -34,14 +45,16 @@ export interface UserAccount {
   };
 }
 
-export type ParticipantRole = 'recipient' | 'guardian' | 'viewer';
+export type ParticipantRole = 'recipient' | 'guardian' | 'approver' | 'participant' | 'viewer';
+export type PersonRole = 'recipient' | 'approver' | 'participant' | 'guardian';
 export type ParticipantStatus = 'pending' | 'approved' | 'declined';
 
 export interface Participant {
   id: string;
   name: string;
   email: string;
-  role: ParticipantRole; // 'recipient' (Destinatário), 'guardian' (Guardião/Aprovador), 'viewer' (Observador)
+  role: ParticipantRole; // 'recipient' (Destinatário), 'approver'/'guardian' (Aprovador), 'participant'/'viewer' (Participante)
+  roles?: PersonRole[]; // Suporte a múltiplos papéis (ex: Aprovador + Destinatário)
   status: ParticipantStatus; // 'pending' | 'approved' | 'declined'
   approved_at?: string;
   avatar_url?: string;
@@ -64,9 +77,31 @@ export interface SocialInteraction {
 
 export type TimeOperator = '>=' | '<=' | 'BETWEEN' | 'WINDOW';
 
+export type ContentSource = 'UPLOAD' | 'API' | 'WEBHOOK' | 'LINK' | 'MANUAL';
+
+export interface ContentVersion {
+  version: number;
+  created_at: string;
+  source: ContentSource;
+  payload_summary?: string;
+  author_or_system: string;
+  protected_payload_id?: string;
+}
+
+export interface ReleaseStage {
+  stage_index: number;
+  title: string;
+  description?: string;
+  conditions?: IntentConditions;
+  status: 'locked' | 'satisfied' | 'revealed' | 'expired';
+  content_version?: number;
+  revealed_at?: string;
+}
+
 export type IntentEventType =
   | 'INTENT_CREATED'
   | 'CONTENT_ATTACHED'
+  | 'CONTENT_UPDATED'
   | 'CONDITION_CREATED'
   | 'CONDITION_SATISFIED'
   | 'REVEAL_STARTED'
@@ -74,7 +109,10 @@ export type IntentEventType =
   | 'REVEAL_EXPIRED'
   | 'SUPPORT_RECEIVED'
   | 'GUARDIAN_APPROVED'
-  | 'GUARDIAN_DECLINED';
+  | 'GUARDIAN_DECLINED'
+  | 'API_CONTENT_RECEIVED'
+  | 'STAGE_ADVANCED'
+  | 'WEBHOOK_RECEIVED';
 
 export interface HistoryLogEntry {
   id: string;
@@ -111,6 +149,10 @@ export interface IntentContent {
   description: string;
   objective?: string;
   reveal_content?: string;
+  source?: ContentSource; // 'UPLOAD' | 'API' | 'WEBHOOK' | 'LINK' | 'MANUAL'
+  current_version?: number; // v1, v2, v3
+  versions?: ContentVersion[]; // Histórico imutável de edições/versões de conteúdo
+  release_stages?: ReleaseStage[]; // Suporte a revelações em etapas (ex: Edital -> Homologação -> Aprovados)
   protected_payload?: {
     id: string;
     fileName: string;
@@ -151,6 +193,12 @@ export interface IntentPermissions {
   can_reveal?: string[];
 }
 
+export interface IntentPeople {
+  approvers: Participant[];   // Aprovadores / Guardiões com poder de voto/satisfação da condição
+  recipients: Participant[];  // Destinatários que receberão a revelação do segredo
+  participants: Participant[]; // Participantes e envolvidos gerais
+}
+
 export interface Intent {
   id: string;
   creator_id: string;
@@ -167,6 +215,7 @@ export interface Intent {
   conditions?: IntentConditions;
   audience?: IntentAudience;
   permissions?: IntentPermissions;
+  people?: IntentPeople; // ETAPA 4 — Separação Tripla de Pessoas (Approvers, Recipients, Participants)
   
   // Etapa 3: Condições Temporais
   condition_type?: ConditionType;
@@ -177,6 +226,8 @@ export interface Intent {
 
   // Etapa 4 & 5: Pessoas, Guardiões, Quórum & Aprovação (Revelação)
   participants?: Participant[];
+  approvers?: Participant[]; // Aprovadores específicos
+  recipients?: Participant[]; // Destinatários específicos
   required_approvals?: number; // Quórum de aprovações de guardiões necessário para liberação (ex: 2/3)
   revealed_by?: string; // Usuário ou processo que acionou a revelação
   approval_status?: 'pending_quorum' | 'ready_to_reveal' | 'revealed';

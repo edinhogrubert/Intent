@@ -45,17 +45,25 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
   const targetDateStr = intent.conditions?.target_date || intent.conditions?.value || intent.target_date;
   const expirationDateStr = intent.conditions?.expiration_date;
 
-  const participants = intent.participants || [];
+  const participants = intent.people?.participants || intent.participants || [];
   
-  const recipients = participants.filter((p) => p.role === 'recipient');
-  const guardians = participants.filter((p) => p.role === 'guardian');
-  const viewers = participants.filter((p) => p.role === 'viewer');
+  const approvers = intent.people?.approvers || intent.approvers || participants.filter((p) => 
+    p.role === 'approver' || p.role === 'guardian' || (p.roles && p.roles.includes('approver'))
+  );
+
+  const recipients = intent.people?.recipients || intent.recipients || intent.audience?.recipients || participants.filter((p) => 
+    p.role === 'recipient' || (p.roles && p.roles.includes('recipient'))
+  );
+
+  const viewers = participants.filter((p) => 
+    p.role === 'viewer' || p.role === 'participant' || (p.roles && p.roles.includes('participant'))
+  );
   
-  const approvedGuardians = guardians.filter((g) => g.status === 'approved');
-  const pendingGuardians = guardians.filter((g) => g.status === 'pending');
-  const declinedGuardians = guardians.filter((g) => g.status === 'declined');
+  const approvedGuardians = approvers.filter((g) => g.status === 'approved');
+  const pendingGuardians = approvers.filter((g) => g.status === 'pending');
+  const declinedGuardians = approvers.filter((g) => g.status === 'declined');
   
-  const totalGuardians = guardians.length;
+  const totalGuardians = approvers.length;
   const approvedGuardiansCount = approvedGuardians.length;
   const pendingGuardiansCount = pendingGuardians.length;
   const declinedGuardiansCount = declinedGuardians.length;
@@ -196,7 +204,7 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
     quorumRatioText,
     quorumPercentage,
     recipients,
-    guardians,
+    guardians: approvers,
     viewers,
     statusSummary,
     badgeLabel,

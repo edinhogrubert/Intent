@@ -31,8 +31,25 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
     (visibility === 'public' ? 'PUBLIC' : 'PRIVATE');
 
   const participants: Participant[] = raw.participants || [];
-  const recipients = participants.filter((p) => p.role === 'recipient');
-  const guardians = participants.filter((p) => p.role === 'guardian');
+  
+  // Etapa 4: Separação conceitual das 3 personas (Aprovadores, Destinatários, Participantes)
+  const approvers = raw.people?.approvers || raw.approvers || participants.filter((p) => 
+    p.role === 'approver' || p.role === 'guardian' || (p.roles && p.roles.includes('approver'))
+  );
+  
+  const recipients = raw.people?.recipients || raw.recipients || raw.audience?.recipients || participants.filter((p) => 
+    p.role === 'recipient' || (p.roles && p.roles.includes('recipient'))
+  );
+
+  const generalParticipants = raw.people?.participants || participants.filter((p) => 
+    p.role === 'participant' || p.role === 'viewer' || (p.roles && p.roles.includes('participant'))
+  );
+
+  const peopleObj = {
+    approvers,
+    recipients,
+    participants: generalParticipants.length > 0 ? generalParticipants : participants,
+  };
 
   const creatorObj = {
     id: creatorId,
@@ -42,11 +59,37 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
     avatar_url: raw.creator?.avatar_url || currentUser?.avatarUrl,
   };
 
+  const source = raw.content?.source || 'UPLOAD';
+  const currentVersion = raw.content?.current_version || 1;
+  const versions = raw.content?.versions || [
+    {
+      version: currentVersion,
+      created_at: raw.created_at || new Date().toISOString(),
+      source,
+      author_or_system: creatorName,
+      payload_summary: protectedPayload?.fileName || (revealContent ? 'Texto Seguro' : 'Intenção Inicial'),
+    },
+  ];
+  const releaseStages = raw.content?.release_stages || [
+    {
+      stage_index: 1,
+      title: 'Etapa Única / Inicial',
+      description: 'Liberação de conteúdo da Intent.',
+      status: raw.revealed_at ? 'revealed' : 'locked',
+      content_version: currentVersion,
+      revealed_at: raw.revealed_at,
+    },
+  ];
+
   const contentObj = {
     title,
     description,
     objective: raw.content?.objective || description,
     reveal_content: revealContent,
+    source,
+    current_version: currentVersion,
+    versions,
+    release_stages: releaseStages,
     protected_payload: protectedPayload,
   };
 
@@ -65,13 +108,13 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
   const audienceObj = {
     type: audienceType,
     visibility,
-    recipients: raw.audience?.recipients || recipients,
+    recipients,
   };
 
   const permissionsObj = raw.permissions || {
     can_view: audienceType === 'PUBLIC' ? ['*'] : [creatorId, ...recipients.map((r) => r.id)],
     can_edit: [creatorId],
-    can_reveal: [creatorId, ...guardians.map((g) => g.id)],
+    can_reveal: [creatorId, ...approvers.map((g) => g.id)],
   };
 
   return {
@@ -85,12 +128,13 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
     visibility,
     audience_type: audienceType,
     
-    // Sub-estruturas da Etapa 2
+    // Sub-estruturas da Etapa 2, 3 & 4
     creator: creatorObj,
     content: contentObj,
     conditions: conditionsObj,
     audience: audienceObj,
     permissions: permissionsObj,
+    people: peopleObj,
 
     // Compatibilidade com vias de atalho no topo do objeto
     condition_type: conditionType,
@@ -98,6 +142,8 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
     reveal_content: revealContent,
     is_locked: isLocked,
     participants,
+    approvers,
+    recipients,
     required_approvals: requiredApprovals,
     protected_payload: protectedPayload,
     target_supports: targetSupports,
@@ -149,15 +195,15 @@ export function answerIntentQuestions(intent: Intent): IntentAnswers {
     conditionText = `Condição Híbrida: Tempo + Guardiões (${norm.conditions.required_approvals} aprovações até ${norm.conditions.target_date || 'data alvo'})`;
   }
 
-  const guardians = norm.participants?.filter((p) => p.role === 'guardian') || [];
-  const participantsText = guardians.length > 0
-    ? `${guardians.length} Guardião(ões): ${guardians.map((g) => g.name).join(', ')}`
-    : 'Nenhum guardião atribuído';
+  const approvers = norm.people?.approvers || norm.approvers || norm.participants?.filter((p) => p.role === 'approver' || p.role === 'guardian') || [];
+  const participantsText = approvers.length > 0
+    ? `${approvers.length} Aprovador(es) / Guardião(ões): ${approvers.map((g) => g.name).join(', ')}`
+    : 'Nenhum aprovador estipulado';
 
-  const recipients = norm.audience?.recipients || norm.participants?.filter((p) => p.role === 'recipient') || [];
+  const recipients = norm.people?.recipients || norm.recipients || norm.audience?.recipients || norm.participants?.filter((p) => p.role === 'recipient') || [];
   const recipientsText = recipients.length > 0
-    ? `${recipients.length} Destinatário(s): ${recipients.map((r) => r.name).join(', ')}`
-    : norm.visibility === 'public' ? 'Público Geral' : 'Apenas o Criador';
+    ? `${recipients.length} Destinatário(s) da Revelação: ${recipients.map((r) => r.name).join(', ')}`
+    : norm.visibility === 'public' ? 'Público Geral' : `Apenas o Criador (${norm.creator?.name || norm.creator_id})`;
 
   return {
     creatorText,
