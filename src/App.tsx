@@ -10,6 +10,7 @@ import { AccountStatusCard } from './components/AccountStatusCard';
 import { BottomCardsRow } from './components/BottomCardsRow';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { TesterProfileSwitcherBar } from './components/TesterProfileSwitcherBar';
 import { auth, signOut, onAuthStateChanged } from './utils/firebase';
 
 export default function App() {
@@ -109,6 +110,12 @@ export default function App() {
 
       {/* Main Content View (Index) */}
       <main className="flex-1 flex flex-col p-6 md:p-10 max-w-7xl mx-auto overflow-y-auto space-y-8">
+        {/* Quick Profile Switcher Bar for Testers */}
+        <TesterProfileSwitcherBar
+          currentUser={currentUser}
+          onUserChanged={(newUser) => setCurrentUser(newUser)}
+        />
+
         {/* Top Greeting Header matching the screenshot ("Bom dia, Rafael.") */}
         <header>
           <div className="flex items-center justify-between">

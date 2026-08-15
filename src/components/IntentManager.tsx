@@ -139,8 +139,98 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [editRequiredApprovals, setEditRequiredApprovals] = useState<number>(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Helper: Default 3-people preset intents for Etapa 5
+  // Helper: Default 3-people preset intents for Etapa 4 & 5
   const getInitialDefaultIntents = (): Intent[] => [
+    {
+      id: 'intent-stage4-joao-conselho-demo',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 4 — Documento Privado com Quórum de Aprovadores (Caso João & Conselho)',
+      description: '2 de 3 Aprovadores (Flávio, Fernando, Maria) autorizam a liberação, mas a revelação é direcionada estritamente ao Destinatário (João).',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'PEOPLE',
+      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+      reveal_content: '🔒 REVELAÇÃO EXCLUSIVA DE JOÃO:\n• Documento de Concessão & Cláusulas Restritas\n• Aprovado por: Flávio (✓) e Fernando (✓)\n• Destinatário Autorizado a Leitura: João (joao@silva.com)',
+      is_locked: true,
+      required_approvals: 2,
+      people: {
+        approvers: [
+          {
+            id: 'app-1',
+            name: 'Flávio',
+            email: 'flavio@conselho.org',
+            role: 'approver',
+            status: 'approved',
+            approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+            notes: 'Aprovador do Conselho (✓ Aprovado)',
+          },
+          {
+            id: 'app-2',
+            name: 'Fernando',
+            email: 'fernando@conselho.org',
+            role: 'approver',
+            status: 'approved',
+            approved_at: new Date(Date.now() - 3600000).toISOString(),
+            notes: 'Aprovador de Compliance (✓ Aprovado)',
+          },
+          {
+            id: 'app-3',
+            name: 'Maria',
+            email: 'maria@conselho.org',
+            role: 'approver',
+            status: 'pending',
+            notes: 'Aprovadora Jurídica (— Pendente)',
+          },
+        ],
+        recipients: [
+          {
+            id: 'rec-1',
+            name: 'João Silva',
+            email: 'joao@silva.com',
+            role: 'recipient',
+            status: 'pending',
+            notes: 'Destinatário Exclusivo do Conteúdo Revelado',
+          },
+        ],
+        participants: [],
+      },
+      participants: [
+        {
+          id: 'app-1',
+          name: 'Flávio',
+          email: 'flavio@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          notes: 'Aprovador do Conselho (✓ Aprovado)',
+        },
+        {
+          id: 'app-2',
+          name: 'Fernando',
+          email: 'fernando@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000).toISOString(),
+          notes: 'Aprovador de Compliance (✓ Aprovado)',
+        },
+        {
+          id: 'app-3',
+          name: 'Maria',
+          email: 'maria@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovadora Jurídica (— Pendente)',
+        },
+        {
+          id: 'rec-1',
+          name: 'João Silva',
+          email: 'joao@silva.com',
+          role: 'recipient',
+          status: 'pending',
+          notes: 'Destinatário Exclusivo do Conteúdo Revelado',
+        },
+      ],
+    },
     {
       id: 'intent-stage5-approval-demo',
       creator_id: user.id || user.email || 'usr-1',
