@@ -1,0 +1,429 @@
+import React, { useState } from 'react';
+import {
+  Layers,
+  User,
+  FileText,
+  Lock,
+  Clock,
+  ShieldCheck,
+  Users,
+  Eye,
+  CheckCircle2,
+  X,
+  Code,
+  Sparkles,
+  HelpCircle,
+  Network,
+  Activity,
+  ArrowRight,
+  AlertTriangle,
+} from 'lucide-react';
+import { Intent, IntentEventType } from '../types';
+import { answerIntentQuestions, normalizeIntent } from '../utils/intentSchema';
+import { evaluateIntentConditions } from '../utils/conditionEvaluator';
+
+interface IntentStructureModalProps {
+  isOpen: boolean;
+  intent: Intent | null;
+  onClose: () => void;
+}
+
+const LIFECYCLE_STEPS: { type: IntentEventType; label: string; desc: string }[] = [
+  { type: 'INTENT_CREATED', label: '1. INTENT_CREATED', desc: 'Registo inicial da intenção autônoma pelo criador.' },
+  { type: 'CONTENT_ATTACHED', label: '2. CONTENT_ATTACHED', desc: 'Anexo de conteúdo criptografado/cofre de revelação.' },
+  { type: 'CONDITION_CREATED', label: '3. CONDITION_CREATED', desc: 'Estipulação de regras declarativas (Tempo >=, Quórum).' },
+  { type: 'CONDITION_SATISFIED', label: '4. CONDITION_SATISFIED', desc: 'Disparo de tempo atingido ou aprovações recebidas.' },
+  { type: 'REVEAL_STARTED', label: '5. REVEAL_STARTED', desc: 'Início da janela de liberação e notificação.' },
+  { type: 'CONTENT_REVEALED', label: '6. CONTENT_REVEALED', desc: 'Segredo exposto e entregue aos destinatários.' },
+  { type: 'REVEAL_EXPIRED', label: 'X. REVEAL_EXPIRED', desc: 'Janela de tempo limite ultrapassada sem revelação.' },
+];
+
+export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
+  isOpen,
+  intent,
+  onClose,
+}) => {
+  const [activeTab, setActiveTab] = useState<'questions' | 'lifecycle' | 'tree' | 'json'>('questions');
+
+  if (!isOpen || !intent) return null;
+
+  const normalized = normalizeIntent(intent);
+  const answers = answerIntentQuestions(normalized);
+  const evaluation = evaluateIntentConditions(normalized);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-6 bg-slate-900 text-white flex items-center justify-between relative overflow-hidden shrink-0">
+          <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-blue-600/20 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3 z-10">
+            <div className="p-2.5 rounded-2xl bg-blue-600 text-white shadow-lg">
+              <Layers className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-bold uppercase tracking-wider">
+                  Etapa 2 & 3 — Intent & Tempo
+                </span>
+                <span className="text-xs font-mono text-slate-400">ID: {normalized.id}</span>
+              </div>
+              <h3 className="text-xl font-black text-white tracking-tight mt-0.5">
+                Arquitetura & Ciclo de Vida da Intent
+              </h3>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors z-10 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="px-6 pt-4 bg-slate-50 border-b border-slate-200 flex items-center gap-2 shrink-0 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('questions')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'questions'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>7 Perguntas Chave</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('lifecycle')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'lifecycle'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Motor de Tempo & Eventos (Etapa 3)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tree')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'tree'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Network className="w-4 h-4" />
+            <span>Árvore Conceitual</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('json')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'json'
+                ? 'bg-white text-[#0055FF] border-t-2 border-t-[#0055FF] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Code className="w-4 h-4" />
+            <span>JSON Declarativo</span>
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {activeTab === 'questions' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-[#0055FF] shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  <strong>A Intent como contrato autônomo:</strong> Na Etapa 2, a Intent separa rigorosamente{' '}
+                  <strong>Creator</strong>, <strong>Content</strong>, <strong>Conditions</strong>, <strong>Audience</strong> e{' '}
+                  <strong>Participants</strong>. Abaixo estão as respostas estruturadas para esta Intent específica.
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. Quem criou? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-blue-100 text-[#0055FF]">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <span>1. Quem criou? (Creator)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.creatorText}</p>
+                </div>
+
+                {/* 2. O que pretende? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <span>2. O que pretende? (Content)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.objectiveText}</p>
+                </div>
+
+                {/* 3. Para quem? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-purple-100 text-purple-600">
+                      <Eye className="w-4 h-4" />
+                    </div>
+                    <span>3. Para quem? (Audience)</span>
+                  </div>
+                  <div className="pl-8 space-y-1">
+                    <p className="text-xs text-slate-700 font-medium">{answers.audienceText}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {['PRIVATE', 'SELECTED', 'PUBLIC', 'FOLLOWERS', 'LINK', 'GROUP'].map((type) => (
+                        <span
+                          key={type}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${
+                            normalized.audience?.type === type
+                              ? 'bg-[#0055FF] text-white'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {type}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. O que será revelado? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <span>4. O que será revelado? (Content Payload)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.revealText}</p>
+                </div>
+
+                {/* 5. O que precisa acontecer? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <span>5. O que precisa acontecer? (Conditions & Declarative Time)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.conditionText}</p>
+                </div>
+
+                {/* 6. Quem pode participar? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-cyan-100 text-cyan-600">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <span>6. Quem pode participar? (Guardiões)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.participantsText}</p>
+                </div>
+
+                {/* 7. Quem poderá receber? */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                    <div className="p-1.5 rounded-lg bg-rose-100 text-rose-600">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span>7. Quem poderá receber? (Recipients)</span>
+                  </div>
+                  <p className="text-xs text-slate-700 font-medium pl-8">{answers.recipientsText}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'lifecycle' && (
+            <div className="space-y-6">
+              {/* Painel do Motor Declarativo de Tempo */}
+              <div className="p-5 rounded-2xl bg-slate-900 text-slate-100 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-amber-400" />
+                    <span className="text-sm font-bold text-white">Motor Declarativo de Tempo (Etapa 3)</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold uppercase">
+                    Operator: {evaluation.timeResult.operator}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Condição Declarativa de Valor:</span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                      value: {evaluation.timeResult.isoValue}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Estado Atual de Revelação / Expiração:</span>
+                    <span className="font-mono text-amber-300 font-bold">
+                      {evaluation.timeResult.formattedCountdown}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Maquina de Estados de Ciclo de Vida */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-[#0055FF]" />
+                    <span>Linha de Vida de Eventos Auditoriais</span>
+                  </h4>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Estágio Atual: <strong className="text-[#0055FF]">{evaluation.currentLifecycleStage}</strong>
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {LIFECYCLE_STEPS.map((step) => {
+                    const isCurrent = evaluation.currentLifecycleStage === step.type;
+                    const isExpired = step.type === 'REVEAL_EXPIRED' && evaluation.isExpired;
+
+                    return (
+                      <div
+                        key={step.type}
+                        className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between ${
+                          isCurrent
+                            ? 'bg-blue-50/80 border-[#0055FF] shadow-xs'
+                            : isExpired
+                            ? 'bg-rose-50 border-rose-300'
+                            : 'bg-slate-50 border-slate-200 opacity-75'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              isCurrent
+                                ? 'bg-[#0055FF] animate-pulse ring-4 ring-blue-100'
+                                : isExpired
+                                ? 'bg-rose-500'
+                                : 'bg-slate-300'
+                            }`}
+                          />
+                          <div>
+                            <span className="text-xs font-bold font-mono text-slate-900">{step.label}</span>
+                            <p className="text-[11px] text-slate-600 mt-0.5">{step.desc}</p>
+                          </div>
+                        </div>
+
+                        {isCurrent && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#0055FF] text-white text-[10px] font-bold">
+                            Ativo Agora
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'tree' && (
+            <div className="space-y-4">
+              <div className="p-5 bg-slate-900 text-slate-200 rounded-2xl font-mono text-xs leading-relaxed overflow-x-auto space-y-2 border border-slate-800 shadow-inner">
+                <div className="text-blue-400 font-bold text-sm">INTENT</div>
+                <div className="pl-4 text-slate-400">│</div>
+                <div className="pl-4 text-emerald-400">├── Creator (Quem criou?)</div>
+                <div className="pl-8 text-slate-300">
+                  id: &quot;{normalized.creator?.id}&quot; | name: &quot;{normalized.creator?.name}&quot;
+                </div>
+                
+                <div className="pl-4 text-indigo-400">├── Content (O que pretende / O que será revelado?)</div>
+                <div className="pl-8 text-slate-300">
+                  title: &quot;{normalized.content?.title}&quot; | objective: &quot;{normalized.content?.objective}&quot;
+                </div>
+
+                <div className="pl-4 text-amber-400">├── Conditions (Motor Declarativo de Tempo - Etapa 3)</div>
+                <div className="pl-8 text-slate-300">
+                  type: {normalized.conditions?.condition_type} | operator: &quot;{evaluation.timeResult.operator}&quot; | value: &quot;{evaluation.timeResult.isoValue}&quot;
+                </div>
+
+                <div className="pl-4 text-purple-400">├── Audience (Para quem?)</div>
+                <div className="pl-8 text-slate-300">
+                  type: {normalized.audience?.type} | visibility: {normalized.audience?.visibility}
+                </div>
+
+                <div className="pl-4 text-cyan-400">├── Participants (Quem pode participar?)</div>
+                <div className="pl-8 text-slate-300">
+                  count: {normalized.participants?.length || 0} (Guardiões & Destinatários)
+                </div>
+
+                <div className="pl-4 text-rose-400">├── Permissions (Permissões de acesso)</div>
+                <div className="pl-8 text-slate-300">
+                  can_view: [{normalized.permissions?.can_view?.join(', ')}] | can_reveal: [{normalized.permissions?.can_reveal?.join(', ')}]
+                </div>
+
+                <div className="pl-4 text-teal-400">├── Status (Estado autônomo)</div>
+                <div className="pl-8 text-slate-300">
+                  status: &quot;{normalized.status}&quot; | created_at: &quot;{normalized.created_at}&quot;
+                </div>
+
+                <div className="pl-4 text-yellow-400">└── History (Eventos & Auditoria Imutável)</div>
+                <div className="pl-8 text-slate-300">
+                  logs: {normalized.history_logs?.length || 0} eventos de ciclo de vida gravados
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'json' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                <span>ESTRUTURA DE OBJETO DECLARATIVA (ETAPA 3):</span>
+                <span className="text-emerald-600 font-bold">✓ Condição Declarativa Validada</span>
+              </div>
+              <pre className="p-4 bg-slate-950 text-emerald-400 rounded-2xl font-mono text-[11px] leading-relaxed overflow-x-auto max-h-[350px] border border-slate-800">
+                {JSON.stringify(
+                  {
+                    id: normalized.id,
+                    creator: normalized.creator,
+                    content: normalized.content,
+                    conditions: {
+                      ...normalized.conditions,
+                      operator: evaluation.timeResult.operator,
+                      value: evaluation.timeResult.isoValue,
+                    },
+                    current_lifecycle_event: evaluation.currentLifecycleStage,
+                    audience: normalized.audience,
+                    permissions: normalized.permissions,
+                    participants: normalized.participants,
+                    status: normalized.status,
+                  },
+                  null,
+                  2
+                )}
+              </pre>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>Etapa 3 Validada — Motor de tempo declarativo e auditoria de ciclo de vida.</span>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            Fechar Inspeção
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

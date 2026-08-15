@@ -62,13 +62,29 @@ export interface SocialInteraction {
   created_at: string;
 }
 
+export type TimeOperator = '>=' | '<=' | 'BETWEEN' | 'WINDOW';
+
+export type IntentEventType =
+  | 'INTENT_CREATED'
+  | 'CONTENT_ATTACHED'
+  | 'CONDITION_CREATED'
+  | 'CONDITION_SATISFIED'
+  | 'REVEAL_STARTED'
+  | 'CONTENT_REVEALED'
+  | 'REVEAL_EXPIRED'
+  | 'SUPPORT_RECEIVED'
+  | 'GUARDIAN_APPROVED'
+  | 'GUARDIAN_DECLINED';
+
 export interface HistoryLogEntry {
   id: string;
   timestamp: string;
-  action_type: 'CREATED' | 'UPDATED' | 'ENCRYPTED' | 'GUARDIAN_APPROVED' | 'GUARDIAN_DECLINED' | 'SUPPORTED' | 'REVEALED' | 'SOCIAL_OPINION';
+  action_type: 'CREATED' | 'UPDATED' | 'ENCRYPTED' | 'GUARDIAN_APPROVED' | 'GUARDIAN_DECLINED' | 'SUPPORTED' | 'REVEALED' | 'SOCIAL_OPINION' | IntentEventType;
   actor_name: string;
   description: string;
   badge?: string;
+  event_type?: IntentEventType;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Supporter {
@@ -80,6 +96,61 @@ export interface Supporter {
   comment?: string;
 }
 
+export type AudienceType = 'PRIVATE' | 'SELECTED' | 'PUBLIC' | 'FOLLOWERS' | 'LINK' | 'GROUP';
+
+export interface IntentCreator {
+  id: string;
+  name: string;
+  username?: string;
+  email?: string;
+  avatar_url?: string;
+}
+
+export interface IntentContent {
+  title: string;
+  description: string;
+  objective?: string;
+  reveal_content?: string;
+  protected_payload?: {
+    id: string;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    cipherText: string;
+    cipherAlg: 'AES-256-GCM';
+    salt: string;
+    iv: string;
+    fingerprint: string;
+    encryptedAt: string;
+    isEncrypted: boolean;
+    decryptedContent?: string;
+  };
+}
+
+export interface IntentConditions {
+  condition_type: ConditionType;
+  operator?: TimeOperator; // '>=' | '<=' | 'BETWEEN'
+  value?: string; // ISO string UTC do alvo (ex: 2030-12-25T00:00:00.000Z)
+  target_date?: string; // Data/hora do disparo/revelação (ISO string)
+  expiration_date?: string; // Data limite de expiração da janela de revelação
+  required_approvals?: number; // Quórum de aprovações de guardiões (ex: 2)
+  target_supports?: number; // Meta de apoios (ex: 100)
+  current_supports?: number; // Apoios acumulados
+  is_locked?: boolean; // Bloqueio atual do conteúdo
+}
+
+export interface IntentAudience {
+  type: AudienceType; // PRIVATE | SELECTED | PUBLIC | FOLLOWERS | LINK | GROUP
+  visibility: 'private' | 'public';
+  recipients?: Participant[];
+}
+
+export interface IntentPermissions {
+  can_view?: string[];
+  can_edit?: string[];
+  can_reveal?: string[];
+}
+
 export interface Intent {
   id: string;
   creator_id: string;
@@ -88,6 +159,14 @@ export interface Intent {
   status: 'draft' | 'active' | 'completed' | 'cancelled';
   created_at: string;
   visibility: 'private' | 'public';
+  audience_type?: AudienceType;
+
+  // ETAPA 2 — Estrutura Modular Separada
+  creator?: IntentCreator;
+  content?: IntentContent;
+  conditions?: IntentConditions;
+  audience?: IntentAudience;
+  permissions?: IntentPermissions;
   
   // Etapa 3: Condições Temporais
   condition_type?: ConditionType;

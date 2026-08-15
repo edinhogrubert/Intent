@@ -1,9 +1,11 @@
-import { Intent, Participant } from '../types';
+import { Intent, Participant, IntentEventType } from '../types';
 import { calculateTimeRemaining, TimeRemainingResult } from './timeCondition';
 
 export interface ConditionEvaluationResult {
   isConditionSatisfied: boolean;
   timeResult: TimeRemainingResult;
+  isExpired: boolean;
+  currentLifecycleStage: IntentEventType;
   
   // People stats & Etapa 5 Quorum
   totalParticipants: number;
@@ -38,7 +40,11 @@ export interface ConditionEvaluationResult {
 }
 
 export function evaluateIntentConditions(intent: Intent): ConditionEvaluationResult {
-  const conditionType = intent.condition_type || 'NONE';
+  const conditionType = intent.conditions?.condition_type || intent.condition_type || 'NONE';
+  const operator = intent.conditions?.operator || '>=';
+  const targetDateStr = intent.conditions?.target_date || intent.conditions?.value || intent.target_date;
+  const expirationDateStr = intent.conditions?.expiration_date;
+
   const participants = intent.participants || [];
   
   const recipients = participants.filter((p) => p.role === 'recipient');
@@ -55,20 +61,21 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
   const declinedGuardiansCount = declinedGuardians.length;
   
   const requiredApprovals =
-    intent.required_approvals !== undefined && intent.required_approvals > 0
+    intent.conditions?.required_approvals ??
+    (intent.required_approvals !== undefined && intent.required_approvals > 0
       ? intent.required_approvals
-      : Math.max(1, totalGuardians);
+      : Math.max(1, totalGuardians));
 
   const isPeopleConditionSatisfied =
     totalGuardians === 0 || approvedGuardiansCount >= requiredApprovals;
 
   // Etapa 7 Public Support calculations
-  const currentSupports = intent.current_supports ?? 10;
-  const targetSupports = intent.target_supports ?? 100;
+  const currentSupports = intent.conditions?.current_supports ?? intent.current_supports ?? 10;
+  const targetSupports = intent.conditions?.target_supports ?? intent.target_supports ?? 100;
   const supportPercentage = Math.min(100, Math.round((currentSupports / targetSupports) * 100));
   const isSupportConditionSatisfied = currentSupports >= targetSupports;
 
-  const timeResult = calculateTimeRemaining(intent.created_at, intent.target_date);
+  const timeResult = calculateTimeRemaining(intent.created_at, targetDateStr, operator, expirationDateStr);
 
   let isConditionSatisfied = false;
   let statusSummary = '';
@@ -85,13 +92,17 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
 
     case 'TIME':
       isConditionSatisfied = timeResult.isMatured;
-      if (timeResult.isMatured) {
-        statusSummary = 'Condição de tempo atingida. Conteúdo desbloqueado.';
+      if (timeResult.isExpired) {
+        statusSummary = 'A janela de revelação expirou. Conteúdo bloqueado permanentemente.';
+        badgeLabel = 'Janela Expirada';
+        badgeColor = 'rose';
+      } else if (timeResult.isMatured) {
+        statusSummary = 'Condição de tempo declarativa atingida (operator: ' + operator + '). Conteúdo pronto para revelar.';
         badgeLabel = 'Tempo Atingido';
         badgeColor = 'emerald';
       } else {
-        statusSummary = `Bloqueado por tempo (${timeResult.formattedCountdown} restantes).`;
-        badgeLabel = 'Trava de Tempo';
+        statusSummary = `Bloqueado por tempo (${operator} ${timeResult.formattedCountdown} restantes).`;
+        badgeLabel = `Tempo (${operator})`;
         badgeColor = 'amber';
       }
       break;
@@ -126,7 +137,11 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
 
     case 'HYBRID':
       isConditionSatisfied = timeResult.isMatured && isPeopleConditionSatisfied && isSupportConditionSatisfied;
-      if (isConditionSatisfied) {
+      if (timeResult.isExpired) {
+        statusSummary = 'Janela expirada no ciclo híbrido.';
+        badgeLabel = 'Expirado';
+        badgeColor = 'rose';
+      } else if (isConditionSatisfied) {
         statusSummary = 'Tempo, quórum de guardiões e meta de apoios públicos atingidos.';
         badgeLabel = 'Condições Cumpridas';
         badgeColor = 'emerald';
@@ -139,14 +154,32 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
   }
 
   const isRevealed = !!intent.revealed_at || (conditionType === 'NONE' && !intent.is_locked);
-  const isReadyToReveal = isConditionSatisfied && !isRevealed;
+  const isReadyToReveal = isConditionSatisfied && !isRevealed && !timeResult.isExpired;
   const quorumRatioText = `${approvedGuardiansCount}/${requiredApprovals}`;
   const quorumPercentage =
     requiredApprovals > 0 ? Math.min(100, Math.round((approvedGuardiansCount / requiredApprovals) * 100)) : 100;
 
+  // Mapeamento do estágio atual do ciclo de vida de eventos (Lifecycle Motor)
+  let currentLifecycleStage: IntentEventType = 'CONDITION_CREATED';
+  if (timeResult.isExpired) {
+    currentLifecycleStage = 'REVEAL_EXPIRED';
+  } else if (isRevealed) {
+    currentLifecycleStage = 'CONTENT_REVEALED';
+  } else if (isReadyToReveal) {
+    currentLifecycleStage = 'REVEAL_STARTED';
+  } else if (isConditionSatisfied) {
+    currentLifecycleStage = 'CONDITION_SATISFIED';
+  } else if (intent.content?.protected_payload || intent.reveal_content) {
+    currentLifecycleStage = 'CONTENT_ATTACHED';
+  } else {
+    currentLifecycleStage = 'INTENT_CREATED';
+  }
+
   return {
     isConditionSatisfied,
     timeResult,
+    isExpired: timeResult.isExpired,
+    currentLifecycleStage,
     totalParticipants: participants.length,
     totalGuardians,
     approvedGuardiansCount,

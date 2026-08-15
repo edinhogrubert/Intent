@@ -53,6 +53,8 @@ import { ApprovalWorkflow } from './ApprovalWorkflow';
 import { ProtectedVaultPipeline } from './ProtectedVaultPipeline';
 import { PublicSupportWorkflow } from './PublicSupportWorkflow';
 import { SocialHistoryWorkflow } from './SocialHistoryWorkflow';
+import { IntentStructureModal } from './IntentStructureModal';
+import { normalizeIntent } from '../utils/intentSchema';
 import { ProtectedPayload, SAMPLE_PROTECTED_FILES } from '../utils/cryptoVault';
 
 interface IntentManagerProps {
@@ -66,6 +68,7 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
+  const [inspectingIntent, setInspectingIntent] = useState<Intent | null>(null);
 
   // Time ticker state to update active countdowns every second
   const [, setTicker] = useState(0);
@@ -242,26 +245,30 @@ export function IntentManager({ user }: IntentManagerProps) {
   const getLocalIntents = (): Intent[] => {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_INTENTS_KEY);
+      let listToReturn: Intent[] = [];
       if (!raw) {
         const defaults = getInitialDefaultIntents();
         saveLocalIntents(defaults);
-        return defaults;
+        listToReturn = defaults;
+      } else {
+        const parsed: Intent[] = JSON.parse(raw);
+        if (parsed.length === 0) {
+          const defaults = getInitialDefaultIntents();
+          saveLocalIntents(defaults);
+          listToReturn = defaults;
+        } else {
+          listToReturn = parsed.filter(
+            (i) =>
+              !i.creator_id ||
+              i.creator_id === user.id ||
+              i.creator_id === 'usr-1' ||
+              i.creator_id === user.email
+          );
+        }
       }
-      const parsed: Intent[] = JSON.parse(raw);
-      if (parsed.length === 0) {
-        const defaults = getInitialDefaultIntents();
-        saveLocalIntents(defaults);
-        return defaults;
-      }
-      return parsed.filter(
-        (i) =>
-          !i.creator_id ||
-          i.creator_id === user.id ||
-          i.creator_id === 'usr-1' ||
-          i.creator_id === user.email
-      );
+      return listToReturn.map((item) => normalizeIntent(item, user));
     } catch {
-      return getInitialDefaultIntents();
+      return getInitialDefaultIntents().map((item) => normalizeIntent(item, user));
     }
   };
 
@@ -285,10 +292,15 @@ export function IntentManager({ user }: IntentManagerProps) {
         unsubscribe = onSnapshot(
           q,
           (snapshot) => {
-            const items: Intent[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...(docSnap.data() as Omit<Intent, 'id'>),
-            }));
+            const items: Intent[] = snapshot.docs.map((docSnap) =>
+              normalizeIntent(
+                {
+                  id: docSnap.id,
+                  ...(docSnap.data() as Omit<Intent, 'id'>),
+                },
+                user
+              )
+            );
 
             // Sort by created_at descending
             items.sort(
@@ -1519,6 +1531,16 @@ export function IntentManager({ user }: IntentManagerProps) {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      title="Inspecionar Separação Arquitetural da Intent (Etapa 2)"
+                      onClick={() => setInspectingIntent(intent)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="hidden sm:inline">Etapa 2</span>
+                    </button>
+
+                    <button
+                      type="button"
                       title="Visualizar Detalhes, Pessoas e Assinaturas"
                       onClick={() => handleOpenDetails(intent)}
                       className="px-3 py-1.5 rounded-lg bg-[#F0F5FD] hover:bg-[#E2EDFF] text-[#0055FF] text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
@@ -1880,6 +1902,13 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
         </div>
       )}
+
+      {/* Modal: Etapa 2 — Intent Conceptual Architecture Inspector */}
+      <IntentStructureModal
+        isOpen={!!inspectingIntent}
+        intent={inspectingIntent}
+        onClose={() => setInspectingIntent(null)}
+      />
     </div>
   );
 }

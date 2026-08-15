@@ -1,17 +1,25 @@
+import { TimeOperator } from '../types';
+
 export interface TimeRemainingResult {
   days: number;
   hours: number;
   minutes: number;
   seconds: number;
   isMatured: boolean;
+  isExpired: boolean;
   totalSecondsRemaining: number;
   progressPercent: number;
   formattedCountdown: string;
+  formattedExpiration: string;
+  operator: TimeOperator;
+  isoValue: string;
 }
 
 export function calculateTimeRemaining(
   createdDateStr?: string,
-  targetDateStr?: string
+  targetDateStr?: string,
+  operator: TimeOperator = '>=',
+  expirationDateStr?: string
 ): TimeRemainingResult {
   if (!targetDateStr) {
     return {
@@ -20,28 +28,64 @@ export function calculateTimeRemaining(
       minutes: 0,
       seconds: 0,
       isMatured: true,
+      isExpired: false,
       totalSecondsRemaining: 0,
       progressPercent: 100,
       formattedCountdown: 'Sem trava de tempo',
+      formattedExpiration: 'Sem expiração',
+      operator: '>=',
+      isoValue: new Date().toISOString(),
     };
   }
 
-  const now = new Date().getTime();
-  const target = new Date(targetDateStr).getTime();
+  const now = Date.now();
+  const targetDateObj = new Date(targetDateStr);
+  const target = targetDateObj.getTime();
   const created = createdDateStr ? new Date(createdDateStr).getTime() : now;
+  const isoValue = isNaN(target) ? targetDateStr : targetDateObj.toISOString();
+
+  // Verificar se a intenção expirou por extrapolar a janela de revelação (ex: expirationDateStr)
+  let isExpired = false;
+  let formattedExpiration = 'Sem expiração estipulada';
+  if (expirationDateStr) {
+    const expiration = new Date(expirationDateStr).getTime();
+    if (!isNaN(expiration) && now > expiration) {
+      isExpired = true;
+      formattedExpiration = 'REVEAL_EXPIRED (Janela Expirada)';
+    } else if (!isNaN(expiration)) {
+      const expDiffSec = Math.floor((expiration - now) / 1000);
+      const expDays = Math.floor(expDiffSec / (3600 * 24));
+      const expHours = Math.floor((expDiffSec % (3600 * 24)) / 3600);
+      formattedExpiration = `Expira em ${expDays}d ${expHours}h (${new Date(expirationDateStr).toLocaleDateString('pt-BR')})`;
+    }
+  }
 
   const diffMs = target - now;
+  let isMatured = false;
 
-  if (diffMs <= 0) {
+  // Avaliação baseada no operador declarativo
+  if (operator === '>=') {
+    isMatured = diffMs <= 0;
+  } else if (operator === '<=') {
+    isMatured = diffMs >= 0;
+  } else {
+    isMatured = diffMs <= 0;
+  }
+
+  if (isMatured) {
     return {
       days: 0,
       hours: 0,
       minutes: 0,
       seconds: 0,
       isMatured: true,
+      isExpired,
       totalSecondsRemaining: 0,
       progressPercent: 100,
-      formattedCountdown: 'Condição de Tempo Atingida (Revelado)',
+      formattedCountdown: isExpired ? 'EXPIRADO (Janela Ultrapassada)' : 'CONDIÇÃO SATISFEITA (Tempo Atingido)',
+      formattedExpiration,
+      operator,
+      isoValue,
     };
   }
 
@@ -49,7 +93,7 @@ export function calculateTimeRemaining(
   const elapsed = Math.max(0, now - created);
   const progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
 
-  const totalSecondsRemaining = Math.floor(diffMs / 1000);
+  const totalSecondsRemaining = Math.floor(Math.abs(diffMs) / 1000);
   const days = Math.floor(totalSecondsRemaining / (3600 * 24));
   const hours = Math.floor((totalSecondsRemaining % (3600 * 24)) / 3600);
   const minutes = Math.floor((totalSecondsRemaining % 3600) / 60);
@@ -70,9 +114,13 @@ export function calculateTimeRemaining(
     minutes,
     seconds,
     isMatured: false,
+    isExpired,
     totalSecondsRemaining,
     progressPercent,
     formattedCountdown: formatted,
+    formattedExpiration,
+    operator,
+    isoValue,
   };
 }
 
