@@ -13,9 +13,15 @@ export interface ConditionEvaluationResult {
   declinedGuardiansCount: number;
   requiredApprovals: number;
   isPeopleConditionSatisfied: boolean;
+
+  // Etapa 7: Public Support stats
+  currentSupports: number;
+  targetSupports: number;
+  supportPercentage: number;
+  isSupportConditionSatisfied: boolean;
   
   // Etapa 5 Revelation state
-  isReadyToReveal: boolean; // Quórum e/ou tempo atingido, pronto para disparar revelação
+  isReadyToReveal: boolean; // Quórum, tempo ou apoios públicos atingidos, pronto para disparar revelação
   isRevealed: boolean; // Se o conteúdo já foi ativamente revelado
   quorumRatioText: string; // "2/3"
   quorumPercentage: number; // 67%
@@ -28,7 +34,7 @@ export interface ConditionEvaluationResult {
   // Human readable description
   statusSummary: string;
   badgeLabel: string;
-  badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose';
+  badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose' | 'indigo';
 }
 
 export function evaluateIntentConditions(intent: Intent): ConditionEvaluationResult {
@@ -56,12 +62,18 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
   const isPeopleConditionSatisfied =
     totalGuardians === 0 || approvedGuardiansCount >= requiredApprovals;
 
+  // Etapa 7 Public Support calculations
+  const currentSupports = intent.current_supports ?? 10;
+  const targetSupports = intent.target_supports ?? 100;
+  const supportPercentage = Math.min(100, Math.round((currentSupports / targetSupports) * 100));
+  const isSupportConditionSatisfied = currentSupports >= targetSupports;
+
   const timeResult = calculateTimeRemaining(intent.created_at, intent.target_date);
 
   let isConditionSatisfied = false;
   let statusSummary = '';
   let badgeLabel = 'Sem trava';
-  let badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose' = 'slate';
+  let badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose' | 'indigo' = 'slate';
 
   switch (conditionType) {
     case 'NONE':
@@ -98,24 +110,30 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
       }
       break;
 
+    case 'PUBLIC_SUPPORT':
+      isConditionSatisfied = isSupportConditionSatisfied;
+      if (isSupportConditionSatisfied) {
+        statusSummary = `Meta de apoio público atingida (${currentSupports}/${targetSupports} apoios). Desbloqueio autorizado!`;
+        badgeLabel = `Meta Cumprida (${currentSupports}/${targetSupports})`;
+        badgeColor = 'emerald';
+      } else {
+        const remaining = targetSupports - currentSupports;
+        statusSummary = `Faltam ${remaining} apoio(s) público(s) para atingir a meta (${currentSupports}/${targetSupports}).`;
+        badgeLabel = `Apoios (${currentSupports}/${targetSupports})`;
+        badgeColor = 'indigo';
+      }
+      break;
+
     case 'HYBRID':
-      isConditionSatisfied = timeResult.isMatured && isPeopleConditionSatisfied;
+      isConditionSatisfied = timeResult.isMatured && isPeopleConditionSatisfied && isSupportConditionSatisfied;
       if (isConditionSatisfied) {
-        statusSummary = 'Tempo decorrido e quórum de guardiões atingido.';
+        statusSummary = 'Tempo, quórum de guardiões e meta de apoios públicos atingidos.';
         badgeLabel = 'Condições Cumpridas';
         badgeColor = 'emerald';
-      } else if (!timeResult.isMatured && !isPeopleConditionSatisfied) {
-        statusSummary = `Aguardando tempo (${timeResult.formattedCountdown}) e guardiões (${approvedGuardiansCount}/${requiredApprovals}).`;
-        badgeLabel = 'Tempo + Guardiões';
-        badgeColor = 'amber';
-      } else if (!timeResult.isMatured) {
-        statusSummary = `Guardiões aprovaram! Aguardando apenas o tempo (${timeResult.formattedCountdown}).`;
-        badgeLabel = 'Aguardando Tempo';
-        badgeColor = 'amber';
       } else {
-        statusSummary = `Tempo atingido! Aguardando guardiões (${approvedGuardiansCount}/${requiredApprovals}).`;
-        badgeLabel = 'Aguardando Guardiões';
-        badgeColor = 'blue';
+        statusSummary = `Aguardando condições híbridas (Tempo: ${timeResult.isMatured ? '✓' : '⏳'}, Guardiões: ${isPeopleConditionSatisfied ? '✓' : '⏳'}, Apoios: ${currentSupports}/${targetSupports}).`;
+        badgeLabel = 'Condições Múltiplas';
+        badgeColor = 'amber';
       }
       break;
   }
@@ -136,6 +154,10 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
     declinedGuardiansCount,
     requiredApprovals,
     isPeopleConditionSatisfied,
+    currentSupports,
+    targetSupports,
+    supportPercentage,
+    isSupportConditionSatisfied,
     isReadyToReveal,
     isRevealed,
     quorumRatioText,

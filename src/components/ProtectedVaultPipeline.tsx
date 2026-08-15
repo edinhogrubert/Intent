@@ -29,6 +29,7 @@ import {
   SAMPLE_PROTECTED_FILES,
 } from '../utils/cryptoVault';
 import { Intent } from '../types';
+import { evaluateIntentConditions } from '../utils/conditionEvaluator';
 
 interface ProtectedVaultPipelineProps {
   intent?: Intent;
@@ -73,16 +74,36 @@ export function ProtectedVaultPipeline({
   );
   const [copied, setCopied] = useState(false);
   const [passphrase, setPassphrase] = useState<string>('INTENT_VAULT_DEFAULT_SECRET_KEY_2026');
+  const [simulatedConditionOverride, setSimulatedConditionOverride] = useState<boolean | null>(null);
 
-  // Sync if intent changes
+  // Evaluate conditions if intent is available
+  const condEval = intent ? evaluateIntentConditions(intent) : null;
+  const effectiveConditionSatisfied =
+    simulatedConditionOverride !== null
+      ? simulatedConditionOverride
+      : condEval
+      ? condEval.isConditionSatisfied
+      : isConditionSatisfied;
+
+  // Track last loaded intent ID to prevent overwriting active step when parent re-renders
+  const lastLoadedIntentIdRef = React.useRef<string | null>(null);
+
+  // Sync if intent changes (only when switching to a different intent ID)
   useEffect(() => {
-    if (intent?.protected_payload) {
-      setPayload(intent.protected_payload as ProtectedPayload);
-      if (intent.revealed_at && intent.reveal_content) {
-        setDecryptedResult(intent.reveal_content);
-        setActivePipelineStep(5);
+    if (intent && intent.id !== lastLoadedIntentIdRef.current) {
+      lastLoadedIntentIdRef.current = intent.id;
+      if (intent.protected_payload) {
+        setPayload(intent.protected_payload as ProtectedPayload);
+        if (intent.revealed_at && intent.reveal_content) {
+          setDecryptedResult(intent.reveal_content);
+          setActivePipelineStep(5);
+        } else {
+          setActivePipelineStep(3);
+        }
       } else {
-        setActivePipelineStep(3);
+        setPayload(null);
+        setDecryptedResult(null);
+        setActivePipelineStep(1);
       }
     }
   }, [intent]);
@@ -288,14 +309,16 @@ export function ProtectedVaultPipeline({
           const isPassed = activePipelineStep > step.num;
 
           return (
-            <div
+            <button
               key={step.num}
-              className={`p-3 rounded-xl border transition-all flex flex-col justify-between ${
+              type="button"
+              onClick={() => setActivePipelineStep(step.num)}
+              className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
                 isActive
                   ? 'bg-blue-950/80 border-[#0055FF] shadow-md shadow-blue-500/10 ring-1 ring-[#0055FF]'
                   : isPassed
-                  ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-200'
-                  : 'bg-slate-900/40 border-slate-800 text-slate-500'
+                  ? 'bg-emerald-950/40 border-emerald-800/50 text-emerald-200 hover:border-emerald-600'
+                  : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -316,7 +339,7 @@ export function ProtectedVaultPipeline({
                 </p>
                 <p className="text-[10px] text-slate-500 truncate mt-0.5">{step.desc}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -463,38 +486,122 @@ export function ProtectedVaultPipeline({
         <div className="space-y-4">
           
           {/* Stage 4: Condition Check Status */}
-          <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div
+            id="stage-4-condition-panel"
+            className={`p-4 rounded-2xl transition-all space-y-3 ${
+              activePipelineStep === 4
+                ? 'bg-slate-900 border-2 border-amber-400 shadow-xl shadow-amber-500/10 ring-2 ring-amber-400/30'
+                : 'bg-slate-900/90 border border-slate-800'
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
                 <CheckCircle2 className="w-4 h-4 text-amber-400" />
                 <span>4. Checagem de Condição</span>
               </span>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                  isConditionSatisfied
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}
-              >
-                {isConditionSatisfied ? '✓ Satisfeita' : '⏳ Aguardando'}
-              </span>
+              <div className="flex items-center gap-2">
+                {condEval && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {condEval.badgeLabel}
+                  </span>
+                )}
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    effectiveConditionSatisfied
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}
+                >
+                  {effectiveConditionSatisfied ? '✓ Satisfeita' : '⏳ Aguardando'}
+                </span>
+              </div>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {isConditionSatisfied
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {condEval
+                ? condEval.statusSummary
+                : effectiveConditionSatisfied
                 ? 'Condição temporal e/ou quórum de guardiões atingido. Descriptografia e revelação autorizadas pelo protocolo.'
-                : 'O conteúdo permanece criptografado no cofre até que o quórum de guardiões ou o tempo estipulado seja atingido.'}
+                : 'O conteúdo permanece criptografado no cofre até que a condição definida (tempo, guardiões ou apoio público) seja cumprida.'}
             </p>
+
+            {/* Detailed Condition Evaluation Breakdown */}
+            {condEval && (
+              <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2 text-xs">
+                <div className="flex justify-between items-center text-slate-400 font-mono text-[11px]">
+                  <span>Tipo de Trava:</span>
+                  <span className="font-bold text-amber-300 uppercase">
+                    {intent?.condition_type === 'TIME'
+                      ? '⏳ Tempo'
+                      : intent?.condition_type === 'PEOPLE'
+                      ? '👥 Guardiões'
+                      : intent?.condition_type === 'PUBLIC_SUPPORT'
+                      ? '❤️ Apoio Público'
+                      : intent?.condition_type === 'HYBRID'
+                      ? '⚡ Híbrida'
+                      : 'Nenhuma'}
+                  </span>
+                </div>
+
+                {intent?.condition_type === 'PUBLIC_SUPPORT' && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                      <span>Progresso de Apoios:</span>
+                      <span className="text-indigo-300 font-bold">
+                        {condEval.currentSupports} / {condEval.targetSupports} ({condEval.supportPercentage}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full"
+                        style={{ width: `${condEval.supportPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {intent?.condition_type === 'PEOPLE' && (
+                  <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                    <span>Aprovações de Guardiões:</span>
+                    <span className="text-blue-300 font-bold">
+                      {condEval.approvedGuardiansCount} / {condEval.requiredApprovals}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Condition Simulation Override Toggle */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setSimulatedConditionOverride((prev) => (prev === true ? null : true))
+                }
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  simulatedConditionOverride === true
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {simulatedConditionOverride === true
+                    ? 'Simulação Ativa (Restaurar Real)'
+                    : 'Simular Condição Cumprida'}
+                </span>
+              </button>
+            </div>
 
             {/* Decryption Action Trigger */}
             <button
               type="button"
-              disabled={!payload || !isConditionSatisfied || isDecrypting || !!decryptedResult}
+              disabled={!payload || !effectiveConditionSatisfied || isDecrypting || !!decryptedResult}
               onClick={handleRunDecryption}
               className={`w-full py-3.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 decryptedResult
                   ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 cursor-default'
-                  : isConditionSatisfied && payload
+                  : effectiveConditionSatisfied && payload
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/20 active:scale-98'
                   : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
               }`}
@@ -509,7 +616,7 @@ export function ProtectedVaultPipeline({
                   <Unlock className="w-4 h-4 text-emerald-400" />
                   <span>5. Revelação Autorizada Concluída ✓</span>
                 </>
-              ) : isConditionSatisfied ? (
+              ) : effectiveConditionSatisfied ? (
                 <>
                   <Unlock className="w-4 h-4 text-white" />
                   <span>Descriptografar & Revelar Conteúdo →</span>
@@ -567,8 +674,12 @@ export function ProtectedVaultPipeline({
 
               {/* Download simulated file button */}
               <a
-                href={`data:${inputFileType};charset=utf-8,${encodeURIComponent(decryptedResult)}`}
-                download={inputFileName}
+                href={
+                  decryptedResult.startsWith('data:')
+                    ? decryptedResult
+                    : `data:${inputFileType || 'text/plain'};charset=utf-8,${encodeURIComponent(decryptedResult)}`
+                }
+                download={inputFileName || 'arquivo_revelado.txt'}
                 className="w-full py-2 px-3 rounded-xl bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-200 border border-emerald-700/60 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-400" />

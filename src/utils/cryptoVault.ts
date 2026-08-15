@@ -52,7 +52,7 @@ async function deriveKey(passphrase: string, saltBytes: Uint8Array): Promise<Cry
       hash: 'SHA-256',
     },
     passphraseKey,
-    { name: 'AES-256-GCM', length: 256 },
+    { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt']
   );
@@ -83,7 +83,7 @@ export async function encryptPayload(
   // Derive key & encrypt
   const key = await deriveKey(passphrase, salt);
   const encryptedBuffer = await window.crypto.subtle.encrypt(
-    { name: 'AES-256-GCM', iv },
+    { name: 'AES-GCM', iv },
     key,
     encodedContent
   );
@@ -118,7 +118,7 @@ export async function decryptPayload(
 
     const key = await deriveKey(passphrase, salt);
     const decryptedBuffer = await window.crypto.subtle.decrypt(
-      { name: 'AES-256-GCM', iv },
+      { name: 'AES-GCM', iv },
       key,
       cipherBuffer
     );

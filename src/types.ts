@@ -22,7 +22,37 @@ export interface Participant {
   notes?: string;
 }
 
-export type ConditionType = 'NONE' | 'TIME' | 'PEOPLE' | 'HYBRID';
+export type ConditionType = 'NONE' | 'TIME' | 'PEOPLE' | 'PUBLIC_SUPPORT' | 'HYBRID';
+
+export type SocialOpinionType = 'AGREE' | 'DISAGREE' | 'COMMENT' | 'PREDICTION';
+
+export interface SocialInteraction {
+  id: string;
+  user_name: string;
+  user_avatar?: string;
+  type: SocialOpinionType;
+  text?: string;
+  prediction_val?: string;
+  created_at: string;
+}
+
+export interface HistoryLogEntry {
+  id: string;
+  timestamp: string;
+  action_type: 'CREATED' | 'UPDATED' | 'ENCRYPTED' | 'GUARDIAN_APPROVED' | 'GUARDIAN_DECLINED' | 'SUPPORTED' | 'REVEALED' | 'SOCIAL_OPINION';
+  actor_name: string;
+  description: string;
+  badge?: string;
+}
+
+export interface Supporter {
+  id: string;
+  name: string;
+  email?: string;
+  avatar_url?: string;
+  supported_at: string;
+  comment?: string;
+}
 
 export interface Intent {
   id: string;
@@ -61,6 +91,18 @@ export interface Intent {
     isEncrypted: boolean;
     decryptedContent?: string;
   };
+
+  // Etapa 7: Participação Pública & Meta de Apoios (Intent -> Apoios -> 10 / 100 -> 100 / 100 -> REVELAR)
+  target_supports?: number; // Meta de apoios (ex: 100)
+  current_supports?: number; // Apoios atuais acumulados (ex: 10)
+  supporters?: Supporter[]; // Lista de apoiadores públicos
+
+  // Etapa 8: Camada Social & Histórico (Intent, Histórico, Opinião, Concordo, Discordo, Comentário, Previsão)
+  history_logs?: HistoryLogEntry[];
+  social_interactions?: SocialInteraction[];
+  agree_count?: number;
+  disagree_count?: number;
+  predictions_count?: number;
 }
 
 export type TimeOfDay = 'morning' | 'afternoon' | 'night';

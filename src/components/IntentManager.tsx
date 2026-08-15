@@ -51,6 +51,8 @@ import { evaluateIntentConditions, SAMPLE_PEOPLE_PRESETS } from '../utils/condit
 import { ParticipantManager } from './ParticipantManager';
 import { ApprovalWorkflow } from './ApprovalWorkflow';
 import { ProtectedVaultPipeline } from './ProtectedVaultPipeline';
+import { PublicSupportWorkflow } from './PublicSupportWorkflow';
+import { SocialHistoryWorkflow } from './SocialHistoryWorkflow';
 import { ProtectedPayload, SAMPLE_PROTECTED_FILES } from '../utils/cryptoVault';
 
 interface IntentManagerProps {
@@ -174,6 +176,40 @@ export function IntentManager({ user }: IntentManagerProps) {
           role: 'guardian',
           status: 'pending',
           notes: 'Representante de Compliance (—)',
+        },
+      ],
+    },
+    {
+      id: 'intent-stage7-public-support-demo',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 7 — Mobilização e Petição de Transparência',
+      description: 'Intenção com trava de participação pública coletiva (Meta de 100 Apoios): Intent ➔ Apoios ➔ 10 / 100 ➔ 100 / 100 ➔ REVELAR.',
+      status: 'active',
+      visibility: 'public',
+      condition_type: 'PUBLIC_SUPPORT',
+      created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+      target_supports: 100,
+      current_supports: 10,
+      reveal_content: '🔓 RELATÓRIO PÚBLICO REVELADO:\n• Meta Coletiva de 100/100 Apoios Atingida!\n• Chave de Acesso Comunitária: 0xCOMMUNITY_MANIFESTO_2026\n• Dados e auditorias liberados para a comunidade.',
+      is_locked: true,
+      supporters: [
+        {
+          id: 'sup-1',
+          name: 'Ana Souza',
+          supported_at: new Date(Date.now() - 60000 * 12).toISOString(),
+          comment: 'Causa essencial! Total apoio para revelação dos dados.',
+        },
+        {
+          id: 'sup-2',
+          name: 'Lucas Viana',
+          supported_at: new Date(Date.now() - 60000 * 35).toISOString(),
+          comment: 'Assinado e compartilhado com a rede.',
+        },
+        {
+          id: 'sup-3',
+          name: 'Beatriz Lima',
+          supported_at: new Date(Date.now() - 60000 * 120).toISOString(),
+          comment: 'Pela transparência e impacto comunitário!',
         },
       ],
     },
@@ -566,6 +602,141 @@ export function IntentManager({ user }: IntentManagerProps) {
     }
   };
 
+  // Etapa 7: Update supports or add new supporter on intent
+  const handleUpdateSupportsOnIntent = async (
+    intentId: string,
+    newSupportsCount: number,
+    supporterName?: string,
+    comment?: string
+  ) => {
+    const targetIntent = intents.find((i) => i.id === intentId) || (selectedIntent?.id === intentId ? selectedIntent : null);
+    if (!targetIntent) return;
+
+    const currentSupporters = targetIntent.supporters || [];
+    let updatedSupporters = [...currentSupporters];
+
+    if (supporterName) {
+      updatedSupporters.unshift({
+        id: 'sup-' + Date.now(),
+        name: supporterName,
+        supported_at: new Date().toISOString(),
+        comment,
+      });
+    }
+
+    const updatedFields: Partial<Intent> = {
+      current_supports: Math.max(0, newSupportsCount),
+      supporters: updatedSupporters,
+    };
+
+    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    if (isFirebase) {
+      try {
+        await updateDoc(doc(db, 'intents', targetIntent.id), updatedFields);
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = intents.map((i) =>
+        i.id === targetIntent.id ? { ...i, ...updatedFields } : i
+      );
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    if (selectedIntent && selectedIntent.id === targetIntent.id) {
+      setSelectedIntent({
+        ...selectedIntent,
+        ...updatedFields,
+      });
+    }
+  };
+
+  // Etapa 8: Add social opinion/comment/prediction/agree/disagree to intent
+  const handleAddSocialInteractionOnIntent = async (
+    intentId: string,
+    interaction: {
+      user_name: string;
+      type: 'AGREE' | 'DISAGREE' | 'COMMENT' | 'PREDICTION';
+      text?: string;
+      prediction_val?: string;
+    }
+  ) => {
+    const targetIntent = intents.find((i) => i.id === intentId) || (selectedIntent?.id === intentId ? selectedIntent : null);
+    if (!targetIntent) return;
+
+    const currentInteractions = targetIntent.social_interactions || [];
+    const currentLogs = targetIntent.history_logs || [];
+
+    const newSocialItem = {
+      id: 'soc-' + Date.now(),
+      user_name: interaction.user_name,
+      type: interaction.type,
+      text: interaction.text,
+      prediction_val: interaction.prediction_val,
+      created_at: 'Agora',
+    };
+
+    const actionLabel =
+      interaction.type === 'AGREE'
+        ? 'Registrou voto [Concordo]'
+        : interaction.type === 'DISAGREE'
+        ? 'Registrou voto [Discordo]'
+        : interaction.type === 'PREDICTION'
+        ? `Registrou Previsão: "${interaction.prediction_val || interaction.text}"`
+        : 'Registrou um Comentário';
+
+    const newLogItem = {
+      id: 'log-' + Date.now(),
+      timestamp: 'Agora',
+      action_type: 'SOCIAL_OPINION' as const,
+      actor_name: interaction.user_name,
+      description: actionLabel,
+      badge: 'Etapa 8 — Social',
+    };
+
+    const updatedInteractions = [newSocialItem, ...currentInteractions];
+    const updatedLogs = [newLogItem, ...currentLogs];
+
+    let newAgree = targetIntent.agree_count ?? currentInteractions.filter((s) => s.type === 'AGREE').length;
+    let newDisagree = targetIntent.disagree_count ?? currentInteractions.filter((s) => s.type === 'DISAGREE').length;
+    let newPredictions = targetIntent.predictions_count ?? currentInteractions.filter((s) => s.type === 'PREDICTION').length;
+
+    if (interaction.type === 'AGREE') newAgree += 1;
+    if (interaction.type === 'DISAGREE') newDisagree += 1;
+    if (interaction.type === 'PREDICTION') newPredictions += 1;
+
+    const updatedFields: Partial<Intent> = {
+      social_interactions: updatedInteractions,
+      history_logs: updatedLogs,
+      agree_count: newAgree,
+      disagree_count: newDisagree,
+      predictions_count: newPredictions,
+    };
+
+    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    if (isFirebase) {
+      try {
+        await updateDoc(doc(db, 'intents', targetIntent.id), updatedFields);
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = intents.map((i) =>
+        i.id === targetIntent.id ? { ...i, ...updatedFields } : i
+      );
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    if (selectedIntent && selectedIntent.id === targetIntent.id) {
+      setSelectedIntent({
+        ...selectedIntent,
+        ...updatedFields,
+      });
+    }
+  };
+
   // Etapa 5: Reveal Ceremony Trigger
   const handleRevealIntent = async (targetIntent: Intent) => {
     const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
@@ -794,10 +965,10 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Etapa 6: Conteúdo Protegido & Pipeline de Criptografia
+            Etapa 7: Participação Pública & Meta de Apoios
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-            Fluxo completo de proteção de dados: Arquivo → Criptografia (AES-256-GCM) → Armazenamento (Firestore/Local) → Condição satisfeita (Tempo/Guardiões) → Descriptografia & Revelação autorizada.
+            Fluxo de mobilização coletiva: Intent ➔ Apoios ➔ 10 / 100 ➔ 100 / 100 ➔ REVELAR. Liberando a revelação e criptografia com engajamento público.
           </p>
         </div>
 
@@ -815,36 +986,70 @@ export function IntentManager({ user }: IntentManagerProps) {
         </button>
       </div>
 
-      {/* Etapa 5 & 6 Live Interactive Showcase Cards */}
-      {intents.length > 0 && (
-        <div className="space-y-6">
-          <ApprovalWorkflow
-            intent={intents[0]}
-            participants={intents[0].participants || []}
-            requiredApprovals={intents[0].required_approvals || 2}
-            onToggleParticipantStatus={(participantId) =>
-              handleToggleParticipantStatusOnIntent(intents[0].id, participantId)
-            }
-            onReveal={() => handleRevealIntent(intents[0])}
-            isRevealed={!!intents[0].revealed_at}
-            revealContent={intents[0].reveal_content}
-            variant="interactive_hero"
-          />
+      {/* Etapa 5, 6 & 7 Live Interactive Showcase Cards */}
+      {intents.length > 0 && (() => {
+        const publicIntent = intents.find((i) => i.condition_type === 'PUBLIC_SUPPORT') || intents[0];
 
-          {/* Etapa 6 Pipeline Showcase */}
-          <ProtectedVaultPipeline
-            intent={intents[0]}
-            isConditionSatisfied={evaluateIntentConditions(intents[0]).isConditionSatisfied}
-            onPayloadEncrypted={(payload) => {
-              const updatedIntents = intents.map((i) =>
-                i.id === intents[0].id ? { ...i, protected_payload: payload } : i
-              );
-              setIntents(updatedIntents);
-              saveLocalIntents(updatedIntents);
-            }}
-          />
-        </div>
-      )}
+        return (
+          <div className="space-y-6">
+            {/* Etapa 7 Showcase Component */}
+            <PublicSupportWorkflow
+              intent={publicIntent}
+              currentSupports={publicIntent.current_supports ?? 10}
+              targetSupports={publicIntent.target_supports ?? 100}
+              supporters={publicIntent.supporters}
+              onAddSupport={(amount, name, comment) =>
+                handleUpdateSupportsOnIntent(
+                  publicIntent.id,
+                  (publicIntent.current_supports ?? 10) + amount,
+                  name,
+                  comment
+                )
+              }
+              onSetSupports={(val) => handleUpdateSupportsOnIntent(publicIntent.id, val)}
+              onReveal={() => handleRevealIntent(publicIntent)}
+              isRevealed={!!publicIntent.revealed_at}
+              revealContent={publicIntent.reveal_content}
+              variant="interactive_hero"
+            />
+
+            <ApprovalWorkflow
+              intent={intents[0]}
+              participants={intents[0].participants || []}
+              requiredApprovals={intents[0].required_approvals || 2}
+              onToggleParticipantStatus={(participantId) =>
+                handleToggleParticipantStatusOnIntent(intents[0].id, participantId)
+              }
+              onReveal={() => handleRevealIntent(intents[0])}
+              isRevealed={!!intents[0].revealed_at}
+              revealContent={intents[0].reveal_content}
+              variant="interactive_hero"
+            />
+
+            {/* Etapa 6 Pipeline Showcase */}
+            <ProtectedVaultPipeline
+              intent={intents[0]}
+              isConditionSatisfied={evaluateIntentConditions(intents[0]).isConditionSatisfied}
+              onPayloadEncrypted={(payload) => {
+                const updatedIntents = intents.map((i) =>
+                  i.id === intents[0].id ? { ...i, protected_payload: payload } : i
+                );
+                setIntents(updatedIntents);
+                saveLocalIntents(updatedIntents);
+              }}
+            />
+
+            {/* Etapa 8 — Histórico & Camada Social Showcase */}
+            <SocialHistoryWorkflow
+              intent={intents[0]}
+              onAddInteraction={(intentId, interaction) =>
+                handleAddSocialInteractionOnIntent(intentId, interaction)
+              }
+              variant="interactive_hero"
+            />
+          </div>
+        );
+      })()}
 
       {/* Error Alert */}
       {errorMsg && (
@@ -1225,8 +1430,30 @@ export function IntentManager({ user }: IntentManagerProps) {
                     {intent.description || 'Sem descrição informada.'}
                   </p>
 
-                  {/* Etapa 4 & 5: Approval Workflow & Quórum UI on Card */}
-                  {evalResult.totalGuardians > 0 ? (
+                  {/* Etapa 7: Public Support Workflow on Card if condition is PUBLIC_SUPPORT */}
+                  {conditionType === 'PUBLIC_SUPPORT' ? (
+                    <div className="mt-3.5">
+                      <PublicSupportWorkflow
+                        intent={intent}
+                        currentSupports={intent.current_supports ?? 10}
+                        targetSupports={intent.target_supports ?? 100}
+                        supporters={intent.supporters}
+                        onAddSupport={(amount, name, comment) =>
+                          handleUpdateSupportsOnIntent(
+                            intent.id,
+                            (intent.current_supports ?? 10) + amount,
+                            name,
+                            comment
+                          )
+                        }
+                        onSetSupports={(val) => handleUpdateSupportsOnIntent(intent.id, val)}
+                        onReveal={() => handleRevealIntent(intent)}
+                        isRevealed={!!intent.revealed_at}
+                        revealContent={intent.reveal_content}
+                        variant="compact"
+                      />
+                    </div>
+                  ) : evalResult.totalGuardians > 0 ? (
                     <div className="mt-3.5">
                       <ApprovalWorkflow
                         intent={intent}
@@ -1478,6 +1705,29 @@ export function IntentManager({ user }: IntentManagerProps) {
                       </p>
                     </div>
 
+                    {/* Etapa 7: Public Support Workflow in Modal */}
+                    {conditionType === 'PUBLIC_SUPPORT' && (
+                      <PublicSupportWorkflow
+                        intent={selectedIntent}
+                        currentSupports={selectedIntent.current_supports ?? 10}
+                        targetSupports={selectedIntent.target_supports ?? 100}
+                        supporters={selectedIntent.supporters}
+                        onAddSupport={(amount, name, comment) =>
+                          handleUpdateSupportsOnIntent(
+                            selectedIntent.id,
+                            (selectedIntent.current_supports ?? 10) + amount,
+                            name,
+                            comment
+                          )
+                        }
+                        onSetSupports={(val) => handleUpdateSupportsOnIntent(selectedIntent.id, val)}
+                        onReveal={() => handleRevealIntent(selectedIntent)}
+                        isRevealed={!!selectedIntent.revealed_at}
+                        revealContent={selectedIntent.reveal_content}
+                        variant="full"
+                      />
+                    )}
+
                     {/* Etapa 5: Full Approval Workflow Component */}
                     <ApprovalWorkflow
                       intent={selectedIntent}
@@ -1508,6 +1758,15 @@ export function IntentManager({ user }: IntentManagerProps) {
                         setIntents(updatedIntents);
                         saveLocalIntents(updatedIntents);
                       }}
+                    />
+
+                    {/* Etapa 8: Histórico & Camada Social */}
+                    <SocialHistoryWorkflow
+                      intent={selectedIntent}
+                      onAddInteraction={(intentId, interaction) =>
+                        handleAddSocialInteractionOnIntent(intentId, interaction)
+                      }
+                      variant="interactive_hero"
                     />
 
                     {/* Participant Configuration Manager */}
