@@ -1,0 +1,6 @@
+{
+  "name": "Intent",
+  "description": "Portal com autenticação, saudação dinâmica e gerenciamento de conta.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
