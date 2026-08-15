@@ -7,7 +7,6 @@ export function getStoredUsers(): UserAccount[] {
   try {
     const raw = localStorage.getItem(STORAGE_USERS_KEY);
     if (!raw) {
-      // Default demo account matching the screenshot name "Rafael"
       const defaultUser: UserAccount = {
         id: 'usr-1',
         name: 'Rafael',
@@ -38,18 +37,20 @@ export function getCurrentSessionUser(): UserAccount | null {
 export function setCurrentSessionUser(user: UserAccount | null): void {
   if (user) {
     localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(user));
-    // Also update last login time in users list
     const users = getStoredUsers();
-    const updated = users.map((u) =>
-      u.id === user.id ? { ...u, lastLoginAt: new Date().toISOString() } : u
-    );
-    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(updated));
+    const existingIndex = users.findIndex((u) => u.email.toLowerCase() === user.email.toLowerCase() || u.id === user.id);
+    if (existingIndex >= 0) {
+      users[existingIndex] = { ...users[existingIndex], ...user, lastLoginAt: new Date().toISOString() };
+    } else {
+      users.push(user);
+    }
+    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
   } else {
     localStorage.removeItem(STORAGE_CURRENT_USER_KEY);
   }
 }
 
-export function registerNewUser(name: string, email: string, password?: string): UserAccount {
+export function registerNewUser(name: string, email: string, password?: string, firebaseUid?: string): UserAccount {
   const users = getStoredUsers();
   const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
   
@@ -58,7 +59,7 @@ export function registerNewUser(name: string, email: string, password?: string):
   }
 
   const newUser: UserAccount = {
-    id: 'usr-' + Date.now(),
+    id: firebaseUid || 'usr-' + Date.now(),
     name: name.trim(),
     email: email.trim().toLowerCase(),
     password: password || '123',
@@ -72,12 +73,24 @@ export function registerNewUser(name: string, email: string, password?: string):
   return newUser;
 }
 
-export function loginUser(email: string, password?: string): UserAccount {
+export function loginUser(email: string, password?: string, firebaseUid?: string): UserAccount {
   const users = getStoredUsers();
   const found = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
   
   if (!found) {
-    throw new Error('Conta não encontrada. Verifique o e-mail ou realize o cadastro.');
+    // If not found, automatically register for a smooth dev experience
+    const newUser: UserAccount = {
+      id: firebaseUid || 'usr-' + Date.now(),
+      name: email.split('@')[0] || 'Usuário',
+      email: email.trim().toLowerCase(),
+      password: password || '123',
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    users.push(newUser);
+    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+    setCurrentSessionUser(newUser);
+    return newUser;
   }
 
   if (password && found.password && found.password !== password) {
@@ -86,6 +99,7 @@ export function loginUser(email: string, password?: string): UserAccount {
 
   const updatedUser = {
     ...found,
+    id: firebaseUid || found.id,
     lastLoginAt: new Date().toISOString(),
   };
   setCurrentSessionUser(updatedUser);

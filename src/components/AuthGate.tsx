@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, ArrowRight, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
+import { LogIn, UserPlus, ArrowRight, ShieldCheck, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { UserAccount } from '../types';
-import { loginUser, registerNewUser, getStoredUsers } from '../utils/storage';
+import { auth, googleProvider, signInWithPopup, signInAnonymously } from '../utils/firebase';
+import { setCurrentSessionUser, registerNewUser, loginUser, getStoredUsers } from '../utils/storage';
 
 interface AuthGateProps {
   onAuthenticated: (user: UserAccount) => void;
@@ -14,23 +15,81 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Helper to ensure Firebase Auth session is active
+  const ensureFirebaseAuth = async (displayName?: string, userEmail?: string): Promise<string> => {
+    if (auth.currentUser) {
+      return auth.currentUser.uid;
+    }
+    const cred = await signInAnonymously(auth);
+    return cred.user.uid;
+  };
+
+  const handleGoogleSignIn = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      const userAccount: UserAccount = {
+        id: fbUser.uid,
+        name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuário Intent',
+        email: fbUser.email || 'usuario@google.com',
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        avatarUrl: fbUser.photoURL || undefined,
+      };
+      setCurrentSessionUser(userAccount);
+      setSuccessMsg('Autenticado com Google com sucesso!');
+      setTimeout(() => {
+        onAuthenticated(userAccount);
+      }, 400);
+    } catch (err: unknown) {
+      console.error('Google Sign In Error:', err);
+      // If popup is blocked or closed, fall back to guest session
+      try {
+        const uid = await ensureFirebaseAuth();
+        const userAccount: UserAccount = {
+          id: uid,
+          name: 'Usuário Convidado',
+          email: 'convidado@intent.app',
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+        setCurrentSessionUser(userAccount);
+        onAuthenticated(userAccount);
+      } catch {
+        setErrorMsg('Não foi possível conectar com o Google. Tente pelo formulário abaixo.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+    setIsLoading(true);
 
     try {
+      // Authenticate with Firebase first to obtain a valid Firebase Auth UID
+      const fbUid = await ensureFirebaseAuth(name, email);
+
       if (isRegisterMode) {
         if (!name.trim()) {
           setErrorMsg('Por favor, informe seu nome.');
+          setIsLoading(false);
           return;
         }
         if (!email.trim()) {
           setErrorMsg('Por favor, informe seu e-mail.');
+          setIsLoading(false);
           return;
         }
-        const user = registerNewUser(name, email, password);
+        const user = registerNewUser(name, email, password, fbUid);
         setSuccessMsg('Cadastro realizado com sucesso! Redirecionando...');
         setTimeout(() => {
           onAuthenticated(user);
@@ -38,9 +97,10 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
       } else {
         if (!email.trim()) {
           setErrorMsg('Por favor, informe seu e-mail cadastrado.');
+          setIsLoading(false);
           return;
         }
-        const user = loginUser(email, password);
+        const user = loginUser(email, password, fbUid);
         setSuccessMsg('Login realizado com sucesso! Acessando...');
         setTimeout(() => {
           onAuthenticated(user);
@@ -52,15 +112,27 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
       } else {
         setErrorMsg('Ocorreu um erro. Tente novamente.');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleQuickDemoLogin = () => {
+  const handleQuickDemoLogin = async () => {
     setErrorMsg(null);
-    const users = getStoredUsers();
-    const demo = users[0] || registerNewUser('Rafael', 'rafael@exemplo.com', '123');
-    const user = loginUser(demo.email, demo.password);
-    onAuthenticated(user);
+    setIsLoading(true);
+    try {
+      const fbUid = await ensureFirebaseAuth('Rafael', 'rafael@exemplo.com');
+      const users = getStoredUsers();
+      const demo = users[0] || registerNewUser('Rafael', 'rafael@exemplo.com', '123', fbUid);
+      demo.id = fbUid;
+      setCurrentSessionUser(demo);
+      onAuthenticated(demo);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Erro ao iniciar demonstração.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -100,23 +172,58 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           <div className="mt-8 pt-6 border-t border-white/10 space-y-3 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#0055FF]" />
+              <span>Sincronização com Firebase Firestore</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#0055FF]" />
               <span>Saudação inteligente por horário</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#0055FF]" />
               <span>Persistência contínua de sessão</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#0055FF]" />
-              <span>Opção de cancelamento a qualquer momento</span>
-            </div>
           </div>
         </div>
 
         {/* Right Side: Authentication Form */}
         <div className="md:col-span-7 p-8 md:p-12 flex flex-col justify-center bg-white">
+          {/* Google Sign In Quick Button */}
+          <button
+            id="google-signin-btn"
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+            className="w-full py-3 px-4 mb-6 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer hover:border-slate-300 disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>Continuar com Google</span>
+          </button>
+
+          <div className="relative flex py-2 items-center mb-6">
+            <div className="grow border-t border-slate-200"></div>
+            <span className="shrink mx-4 text-xs text-slate-400 font-medium uppercase tracking-wider">ou com e-mail</span>
+            <div className="grow border-t border-slate-200"></div>
+          </div>
+
           {/* Tabs: Entrar vs Cadastrar */}
-          <div className="flex bg-[#F0F5FD] p-1.5 rounded-2xl mb-8 border border-[#DCE7F6]">
+          <div className="flex bg-[#F0F5FD] p-1.5 rounded-2xl mb-6 border border-[#DCE7F6]">
             <button
               id="tab-login"
               type="button"
@@ -153,15 +260,15 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="mb-6 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Success Banner */}
           {successMsg && (
-            <div className="mb-6 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl font-medium flex items-center gap-2">
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl font-medium flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{successMsg}</span>
             </div>
@@ -200,7 +307,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Senha (opcional)
+                Senha (opcional para teste)
               </label>
               <input
                 id="input-password"
@@ -215,21 +322,23 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             <button
               id="submit-auth-btn"
               type="submit"
-              className="w-full py-3.5 px-6 rounded-xl bg-[#0055FF] hover:bg-[#0047E0] text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-6 active:scale-[0.99] cursor-pointer"
+              disabled={isLoading}
+              className="w-full py-3.5 px-6 rounded-xl bg-[#0055FF] hover:bg-[#0047E0] disabled:opacity-60 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-6 active:scale-[0.99] cursor-pointer"
             >
-              <span>{isRegisterMode ? 'Concluir Cadastro e Entrar' : 'Entrar no Index'}</span>
+              <span>{isLoading ? 'Conectando...' : isRegisterMode ? 'Concluir Cadastro e Entrar' : 'Entrar no Index'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
           {/* Demo account quick login helper */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <span className="text-xs text-slate-400">Conta de demonstração:</span>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-xs text-slate-400">Acesso rápido:</span>
             <button
               id="quick-demo-btn"
               type="button"
               onClick={handleQuickDemoLogin}
-              className="text-xs font-semibold text-[#0055FF] hover:text-[#0040CC] bg-[#EAF2FF] hover:bg-[#DCE9FF] px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              disabled={isLoading}
+              className="text-xs font-semibold text-[#0055FF] hover:text-[#0040CC] bg-[#EAF2FF] hover:bg-[#DCE9FF] px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Entrar como Rafael (Demonstração)</span>
