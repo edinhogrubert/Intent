@@ -1,6 +1,6 @@
 {
   "name": "Intent",
-  "description": "Portal com autenticação, saudação dinâmica e gerenciamento de conta.",
+  "description": "Portal de Intenções com travas temporais, rede de guardiões, quórum de aprovação (Etapa 5) e revelação segura.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

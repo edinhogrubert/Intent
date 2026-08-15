@@ -162,10 +162,16 @@ export function ParticipantManager({
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-slate-500">
-            <span>
-              {isQuorumReached
-                ? '✅ Quórum atingido! Condição de pessoas cumprida.'
-                : `Aguardando ${Math.max(0, quorumNeeded - approvedGuardians.length)} assinatura(s) para liberar.`}
+            <span className="flex items-center gap-1">
+              {isQuorumReached ? (
+                <span className="text-emerald-700 font-bold">
+                  ✓ Quórum atingido ({approvedGuardians.length}/{quorumNeeded})! Condição pronta para revelar.
+                </span>
+              ) : (
+                <span className="text-amber-700 font-bold">
+                  — Aguardando {Math.max(0, quorumNeeded - approvedGuardians.length)} assinatura(s) para atingir {quorumNeeded}/{guardians.length || 3}.
+                </span>
+              )}
             </span>
             {onRequiredApprovalsChange && !isReadOnly && (
               <div className="flex items-center gap-1.5">
@@ -173,17 +179,67 @@ export function ParticipantManager({
                 <select
                   value={quorumNeeded}
                   onChange={(e) => onRequiredApprovalsChange(Number(e.target.value))}
-                  className="bg-[#F8FAFC] border border-slate-200 rounded-md text-[11px] px-1.5 py-0.5 font-bold"
+                  className="bg-[#F8FAFC] border border-slate-200 rounded-md text-[11px] px-1.5 py-0.5 font-bold text-[#0055FF]"
                 >
-                  {Array.from({ length: guardians.length || 1 }, (_, i) => i + 1).map((n) => (
+                  {Array.from({ length: guardians.length || 3 }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={n}>
-                      {n} {n === 1 ? 'Guardião' : 'Guardiões'}
+                      {n}/{guardians.length || 3} ({n === (guardians.length || 3) ? 'Unânime' : `${n} aprovações`})
                     </option>
                   ))}
                 </select>
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Preset Etapa 5 Setup Button */}
+      {!isReadOnly && (
+        <div className="flex items-center justify-between p-2.5 bg-[#F0F5FD] rounded-xl border border-[#DCE7F6]">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#0055FF]" />
+            <span className="text-xs font-bold text-slate-800">
+              Preset Etapa 5: 3 Pessoas (2/3 Quórum)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const p1: Participant = {
+                id: 'p-stage5-1',
+                name: 'Dra. Helena Voss',
+                email: 'helena.voss@curadoria.org',
+                role: 'guardian',
+                status: 'approved',
+                approved_at: new Date().toISOString(),
+                notes: 'Guardiã Institucional (✓ Aprovado)',
+              };
+              const p2: Participant = {
+                id: 'p-stage5-2',
+                name: 'Carlos Mendez',
+                email: 'carlos.m@fintech.io',
+                role: 'guardian',
+                status: 'approved',
+                approved_at: new Date().toISOString(),
+                notes: 'Co-fundador & Testemunha (✓ Aprovado)',
+              };
+              const p3: Participant = {
+                id: 'p-stage5-3',
+                name: 'Dra. Amanda Ribeiro',
+                email: 'amanda.ribeiro@conselho.gov',
+                role: 'guardian',
+                status: 'pending',
+                notes: 'Compliance (— Pendente)',
+              };
+              onChange([p1, p2, p3]);
+              if (onRequiredApprovalsChange) {
+                onRequiredApprovalsChange(2);
+              }
+            }}
+            className="px-2.5 py-1 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          >
+            Carregar 3 Pessoas (✓ ✓ —)
+          </button>
         </div>
       )}
 

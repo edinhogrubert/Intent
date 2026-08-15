@@ -49,6 +49,9 @@ import {
 } from '../utils/timeCondition';
 import { evaluateIntentConditions, SAMPLE_PEOPLE_PRESETS } from '../utils/conditionEvaluator';
 import { ParticipantManager } from './ParticipantManager';
+import { ApprovalWorkflow } from './ApprovalWorkflow';
+import { ProtectedVaultPipeline } from './ProtectedVaultPipeline';
+import { ProtectedPayload, SAMPLE_PROTECTED_FILES } from '../utils/cryptoVault';
 
 interface IntentManagerProps {
   user: UserAccount;
@@ -78,29 +81,39 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [newVisibility, setNewVisibility] = useState<'private' | 'public'>('private');
   const [newStatus, setNewStatus] = useState<'draft' | 'active'>('active');
 
-  // Condition State (Etapa 3 Tempo + Etapa 4 Pessoas)
+  // Condition State (Etapa 3 Tempo + Etapa 4 Pessoas + Etapa 5 Aprovação)
   const [newConditionType, setNewConditionType] = useState<ConditionType>('PEOPLE');
   const [newTargetDate, setNewTargetDate] = useState<string>('');
-  const [newRevealContent, setNewRevealContent] = useState<string>('');
+  const [newRevealContent, setNewRevealContent] = useState<string>('🔑 PROTOCOLO ALFA DESBLOQUEADO: Acesso ao cofre concedido com sucesso após quórum de guardiões.');
   const [newParticipants, setNewParticipants] = useState<Participant[]>([
     {
       id: 'p-init-1',
       name: 'Dra. Helena Voss',
       email: 'helena.voss@curadoria.org',
       role: 'guardian',
-      status: 'pending',
-      notes: 'Guardiã de Validação',
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+      notes: 'Guardiã Institucional (✓ Aprovado)',
     },
     {
       id: 'p-init-2',
-      name: 'Mariana Duarte',
-      email: 'mariana.duarte@equipe.com',
-      role: 'recipient',
+      name: 'Carlos Mendez',
+      email: 'carlos.m@fintech.io',
+      role: 'guardian',
+      status: 'approved',
+      approved_at: new Date().toISOString(),
+      notes: 'Co-fundador & Testemunha (✓ Aprovado)',
+    },
+    {
+      id: 'p-init-3',
+      name: 'Dra. Amanda Ribeiro',
+      email: 'amanda.ribeiro@conselho.gov',
+      role: 'guardian',
       status: 'pending',
-      notes: 'Destinatária Final',
+      notes: 'Compliance (— Pendente)',
     },
   ]);
-  const [newRequiredApprovals, setNewRequiredApprovals] = useState<number>(1);
+  const [newRequiredApprovals, setNewRequiredApprovals] = useState<number>(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter & Search State
@@ -121,12 +134,89 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [editRequiredApprovals, setEditRequiredApprovals] = useState<number>(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Helper: Default 3-people preset intents for Etapa 5
+  const getInitialDefaultIntents = (): Intent[] => [
+    {
+      id: 'intent-stage5-approval-demo',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 5 — Acordo de Liberação do Cofre Alfa',
+      description: 'Acordo com 3 pessoas exigindo quórum de 2/3 de aprovações de guardiões para autorizar o botão REVELAR.',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'PEOPLE',
+      created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+      reveal_content: '🔒 COFRE SECRETO DESBLOQUEADO:\n• Chave Privada: pk_live_9823091823091823\n• Assinaturas Coletadas: 2/3 Guardiões (Dra. Helena Voss & Carlos Mendez)\n• Hash de Verificação: 0x9f8e7d6c5b4a3f2e1d0c',
+      is_locked: true,
+      required_approvals: 2,
+      participants: [
+        {
+          id: 'p-1',
+          name: 'Dra. Helena Voss',
+          email: 'helena.voss@curadoria.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          notes: 'Guardiã Institucional & Validação (✓)',
+        },
+        {
+          id: 'p-2',
+          name: 'Carlos Mendez',
+          email: 'carlos.m@fintech.io',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000).toISOString(),
+          notes: 'Co-fundador e Testemunha (✓)',
+        },
+        {
+          id: 'p-3',
+          name: 'Dra. Amanda Ribeiro',
+          email: 'amanda.ribeiro@conselho.gov',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Representante de Compliance (—)',
+        },
+      ],
+    },
+    {
+      id: 'intent-time-demo',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Distribuição de Dividendos e Relatório Trimestral',
+      description: 'Trava temporal agendada para distribuição de demonstrativos contábeis aos acionistas.',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'TIME',
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      target_date: new Date(Date.now() + 86400000 * 2).toISOString(),
+      reveal_content: 'LINK DE ACESSO AO RELATÓRIO: https://relatorio.portal.app/q3-2026-audit.pdf',
+      is_locked: true,
+      participants: [
+        {
+          id: 'p-rec-1',
+          name: 'Mariana Duarte',
+          email: 'mariana.duarte@equipe.com',
+          role: 'recipient',
+          status: 'pending',
+          notes: 'Diretoria Financeira',
+        },
+      ],
+    },
+  ];
+
   // Helper: Local fallback
   const getLocalIntents = (): Intent[] => {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_INTENTS_KEY);
-      if (!raw) return [];
+      if (!raw) {
+        const defaults = getInitialDefaultIntents();
+        saveLocalIntents(defaults);
+        return defaults;
+      }
       const parsed: Intent[] = JSON.parse(raw);
+      if (parsed.length === 0) {
+        const defaults = getInitialDefaultIntents();
+        saveLocalIntents(defaults);
+        return defaults;
+      }
       return parsed.filter(
         (i) =>
           !i.creator_id ||
@@ -135,7 +225,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           i.creator_id === user.email
       );
     } catch {
-      return [];
+      return getInitialDefaultIntents();
     }
   };
 
@@ -433,6 +523,81 @@ export function IntentManager({ user }: IntentManagerProps) {
     setSelectedIntent(updatedIntent);
   };
 
+  // Etapa 5: Toggle single participant status (✓ vs —) directly on any intent
+  const handleToggleParticipantStatusOnIntent = async (intentId: string, participantId: string) => {
+    const targetIntent = intents.find((i) => i.id === intentId) || (selectedIntent?.id === intentId ? selectedIntent : null);
+    if (!targetIntent) return;
+
+    const currentParticipants = targetIntent.participants || [];
+    const updatedParticipants = currentParticipants.map((p) => {
+      if (p.id === participantId) {
+        const isApproved = p.status === 'approved';
+        return {
+          ...p,
+          status: (isApproved ? 'pending' : 'approved') as 'approved' | 'pending',
+          approved_at: isApproved ? undefined : new Date().toISOString(),
+        };
+      }
+      return p;
+    });
+
+    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    if (isFirebase) {
+      try {
+        await updateDoc(doc(db, 'intents', targetIntent.id), {
+          participants: updatedParticipants,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = intents.map((i) =>
+        i.id === targetIntent.id ? { ...i, participants: updatedParticipants } : i
+      );
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    if (selectedIntent && selectedIntent.id === targetIntent.id) {
+      setSelectedIntent({
+        ...selectedIntent,
+        participants: updatedParticipants,
+      });
+    }
+  };
+
+  // Etapa 5: Reveal Ceremony Trigger
+  const handleRevealIntent = async (targetIntent: Intent) => {
+    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const updatedFields: Partial<Intent> = {
+      is_locked: false,
+      revealed_at: new Date().toISOString(),
+      revealed_by: user.name || user.email || 'Usuário Autorizado',
+      status: 'completed',
+    };
+
+    if (isFirebase) {
+      try {
+        await updateDoc(doc(db, 'intents', targetIntent.id), updatedFields);
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = intents.map((i) =>
+        i.id === targetIntent.id ? { ...i, ...updatedFields } : i
+      );
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    if (selectedIntent && selectedIntent.id === targetIntent.id) {
+      setSelectedIntent({
+        ...selectedIntent,
+        ...updatedFields,
+      });
+    }
+  };
+
   // Instant simulation helper: Trigger immediate reveal for testing
   const handleSimulateInstantReveal = async (intent: Intent) => {
     const isFirebase = !!auth.currentUser && !intent.id.startsWith('intent-');
@@ -599,15 +764,15 @@ export function IntentManager({ user }: IntentManagerProps) {
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EDFF] text-[#0055FF] text-xs font-bold">
-              <Users className="w-3.5 h-3.5" />
-              <span>Etapa 4 — Pessoas & Guardiões</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EDFF] text-[#0055FF] text-xs font-black">
+              <Shield className="w-3.5 h-3.5" />
+              <span>Etapa 6 — Conteúdo Protegido</span>
             </div>
 
             {totalAwaitingSignatures > 0 && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                <Shield className="w-3 h-3 text-amber-600" />
-                <span>{totalAwaitingSignatures} aguardando assinaturas</span>
+                <Shield className="w-3.5 h-3.5 text-amber-600" />
+                <span>{totalAwaitingSignatures} quórum pendente</span>
               </span>
             )}
 
@@ -629,11 +794,10 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Rede de Intenções: Pessoas, Guardiões & Quórum
+            Etapa 6: Conteúdo Protegido & Pipeline de Criptografia
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-            Vincule pessoas às intenções, delegue papéis de guardiões para aprovação descentralizada,
-            designe destinatários finais e estabeleça quóruns de consenso.
+            Fluxo completo de proteção de dados: Arquivo → Criptografia (AES-256-GCM) → Armazenamento (Firestore/Local) → Condição satisfeita (Tempo/Guardiões) → Descriptografia & Revelação autorizada.
           </p>
         </div>
 
@@ -650,6 +814,37 @@ export function IntentManager({ user }: IntentManagerProps) {
           <span>{isCreating ? 'Fechar Formulário' : 'Nova Intent com Pessoas'}</span>
         </button>
       </div>
+
+      {/* Etapa 5 & 6 Live Interactive Showcase Cards */}
+      {intents.length > 0 && (
+        <div className="space-y-6">
+          <ApprovalWorkflow
+            intent={intents[0]}
+            participants={intents[0].participants || []}
+            requiredApprovals={intents[0].required_approvals || 2}
+            onToggleParticipantStatus={(participantId) =>
+              handleToggleParticipantStatusOnIntent(intents[0].id, participantId)
+            }
+            onReveal={() => handleRevealIntent(intents[0])}
+            isRevealed={!!intents[0].revealed_at}
+            revealContent={intents[0].reveal_content}
+            variant="interactive_hero"
+          />
+
+          {/* Etapa 6 Pipeline Showcase */}
+          <ProtectedVaultPipeline
+            intent={intents[0]}
+            isConditionSatisfied={evaluateIntentConditions(intents[0]).isConditionSatisfied}
+            onPayloadEncrypted={(payload) => {
+              const updatedIntents = intents.map((i) =>
+                i.id === intents[0].id ? { ...i, protected_payload: payload } : i
+              );
+              setIntents(updatedIntents);
+              saveLocalIntents(updatedIntents);
+            }}
+          />
+        </div>
+      )}
 
       {/* Error Alert */}
       {errorMsg && (
@@ -1030,28 +1225,31 @@ export function IntentManager({ user }: IntentManagerProps) {
                     {intent.description || 'Sem descrição informada.'}
                   </p>
 
-                  {/* Etapa 4: Participants Avatars & Summary Badge */}
-                  {evalResult.totalParticipants > 0 && (
+                  {/* Etapa 4 & 5: Approval Workflow & Quórum UI on Card */}
+                  {evalResult.totalGuardians > 0 ? (
+                    <div className="mt-3.5">
+                      <ApprovalWorkflow
+                        intent={intent}
+                        participants={intent.participants || []}
+                        requiredApprovals={intent.required_approvals || 2}
+                        onToggleParticipantStatus={(participantId) =>
+                          handleToggleParticipantStatusOnIntent(intent.id, participantId)
+                        }
+                        onReveal={() => handleRevealIntent(intent)}
+                        isRevealed={!!intent.revealed_at}
+                        revealContent={intent.reveal_content}
+                        variant="compact"
+                      />
+                    </div>
+                  ) : evalResult.totalParticipants > 0 ? (
                     <div className="mt-3.5 p-3 rounded-xl bg-[#F0F5FD] border border-[#DCE7F6] space-y-2">
                       <div className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-[#0055FF]" />
                           <span className="font-semibold text-slate-700">
-                            {evalResult.totalGuardians} Guardião(ões) • {evalResult.recipients.length} Destinatário(s)
+                            {evalResult.recipients.length} Destinatário(s)
                           </span>
                         </div>
-
-                        {hasGuardians && (
-                          <span
-                            className={`font-mono font-bold text-[10px] px-2 py-0.2 rounded-full ${
-                              evalResult.isPeopleConditionSatisfied
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {evalResult.approvedGuardiansCount}/{evalResult.requiredApprovals} assinaturas
-                          </span>
-                        )}
                       </div>
 
                       {/* Small avatar row */}
@@ -1059,35 +1257,16 @@ export function IntentManager({ user }: IntentManagerProps) {
                         {(intent.participants || []).slice(0, 4).map((p) => (
                           <div
                             key={p.id}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium ${
-                              p.role === 'guardian'
-                                ? p.status === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-                                : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
-                            }`}
-                            title={`${p.name} (${p.role}) - ${p.status === 'approved' ? 'Assinado' : 'Pendente'}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200"
+                            title={`${p.name} (${p.role})`}
                           >
-                            {p.role === 'guardian' && (
-                              <Shield className="w-2.5 h-2.5 text-amber-600" />
-                            )}
-                            {p.role === 'recipient' && (
-                              <Send className="w-2.5 h-2.5 text-indigo-600" />
-                            )}
+                            <Send className="w-2.5 h-2.5 text-indigo-600" />
                             <span className="truncate max-w-[80px]">{p.name.split(' ')[0]}</span>
-                            {p.status === 'approved' && (
-                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                            )}
                           </div>
                         ))}
-                        {(intent.participants || []).length > 4 && (
-                          <span className="text-[10px] text-slate-400 font-bold">
-                            +{(intent.participants || []).length - 4}
-                          </span>
-                        )}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Time Condition summary if configured */}
                   {(conditionType === 'TIME' || conditionType === 'HYBRID') && intent.target_date && (
@@ -1118,7 +1297,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                       className="px-3 py-1.5 rounded-lg bg-[#F0F5FD] hover:bg-[#E2EDFF] text-[#0055FF] text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>Abrir</span>
+                      <span>Abrir Detalhes</span>
                     </button>
 
                     <button
@@ -1137,7 +1316,7 @@ export function IntentManager({ user }: IntentManagerProps) {
         </div>
       )}
 
-      {/* Modal: View & Edit Intent Details (with full Etapa 3 Time & Etapa 4 People support) */}
+      {/* Modal: View & Edit Intent Details (with full Etapa 5 Approval & Reveal support) */}
       {selectedIntent && (() => {
         const evalResult = evaluateIntentConditions(selectedIntent);
         const conditionType = selectedIntent.condition_type || 'NONE';
@@ -1275,7 +1454,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                     </div>
                   </div>
                 ) : (
-                  /* View Mode */
+                  /* View Mode with Etapa 5 Workflow */
                   <div className="space-y-6">
                     {/* Status overview bar */}
                     <div className="flex items-center justify-between gap-2 p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200">
@@ -1299,15 +1478,44 @@ export function IntentManager({ user }: IntentManagerProps) {
                       </p>
                     </div>
 
-                    {/* Etapa 4: Interactive Participants & Guardians Section */}
+                    {/* Etapa 5: Full Approval Workflow Component */}
+                    <ApprovalWorkflow
+                      intent={selectedIntent}
+                      participants={selectedIntent.participants || []}
+                      requiredApprovals={selectedIntent.required_approvals || 2}
+                      onToggleParticipantStatus={(participantId) =>
+                        handleToggleParticipantStatusOnIntent(selectedIntent.id, participantId)
+                      }
+                      onReveal={() => handleRevealIntent(selectedIntent)}
+                      isRevealed={!!selectedIntent.revealed_at}
+                      revealContent={selectedIntent.reveal_content}
+                      variant="full"
+                    />
+
+                    {/* Etapa 6: Protected Content Vault Pipeline */}
+                    <ProtectedVaultPipeline
+                      intent={selectedIntent}
+                      isConditionSatisfied={evalResult.isConditionSatisfied}
+                      onPayloadEncrypted={(payload) => {
+                        const updatedIntent = {
+                          ...selectedIntent,
+                          protected_payload: payload,
+                        };
+                        setSelectedIntent(updatedIntent);
+                        const updatedIntents = intents.map((i) =>
+                          i.id === selectedIntent.id ? updatedIntent : i
+                        );
+                        setIntents(updatedIntents);
+                        saveLocalIntents(updatedIntents);
+                      }}
+                    />
+
+                    {/* Participant Configuration Manager */}
                     <div className="p-4 bg-[#F0F5FD] rounded-2xl border border-[#DCE7F6] space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                           <Users className="w-4 h-4 text-[#0055FF]" />
-                          <span>Pessoas & Guardiões Associados</span>
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          Clique em "Assinar" para simular a validação
+                          <span>Gerenciar Participantes & Guardiões</span>
                         </span>
                       </div>
 
@@ -1318,74 +1526,6 @@ export function IntentManager({ user }: IntentManagerProps) {
                         canSimulateSignatures={true}
                         isReadOnly={false}
                       />
-                    </div>
-
-                    {/* Etapa 3: Time Widget if applicable */}
-                    {(conditionType === 'TIME' || conditionType === 'HYBRID') && selectedIntent.target_date && (
-                      <div className="p-4 bg-[#FFFBF0] rounded-2xl border border-[#FDE68A] space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-amber-900 flex items-center gap-1.5">
-                            <Timer className="w-4 h-4 text-amber-700" />
-                            <span>Condição Temporal:</span>
-                          </span>
-                          <span className="font-mono font-bold text-amber-800">
-                            {evalResult.timeResult.formattedCountdown}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-amber-700">
-                          Data alvo: {formatTargetDateTime(selectedIntent.target_date)}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Protected Content Revelation Box */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          {evalResult.isConditionSatisfied ? (
-                            <Unlock className="w-4 h-4 text-emerald-600" />
-                          ) : (
-                            <Lock className="w-4 h-4 text-amber-600" />
-                          )}
-                          <span>Conteúdo Revelado / Selado</span>
-                        </span>
-
-                        {!evalResult.isConditionSatisfied && (
-                          <button
-                            type="button"
-                            onClick={() => handleSimulateInstantReveal(selectedIntent)}
-                            className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            <Zap className="w-3 h-3 text-amber-700" />
-                            <span>Simular Revelação Imediata</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {evalResult.isConditionSatisfied ? (
-                        <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl space-y-2 animate-in zoom-in-95 duration-200">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span>Condições Satisfeitas! Mensagem Liberada:</span>
-                          </div>
-                          <div className="p-3 bg-white rounded-xl border border-emerald-100 text-sm font-mono text-emerald-950 whitespace-pre-wrap">
-                            {selectedIntent.reveal_content || 'Nenhum texto protegido configurado.'}
-                          </div>
-                          <p className="text-[10px] text-emerald-600">
-                            Acesso autorizado para os destinatários vinculados a esta intenção.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl text-center space-y-2">
-                          <Lock className="w-6 h-6 text-slate-400 mx-auto" />
-                          <p className="text-xs font-bold text-slate-700">
-                            Conteúdo Protegido por Trava
-                          </p>
-                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                            {evalResult.statusSummary}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}

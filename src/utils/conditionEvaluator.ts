@@ -5,7 +5,7 @@ export interface ConditionEvaluationResult {
   isConditionSatisfied: boolean;
   timeResult: TimeRemainingResult;
   
-  // People stats
+  // People stats & Etapa 5 Quorum
   totalParticipants: number;
   totalGuardians: number;
   approvedGuardiansCount: number;
@@ -13,6 +13,12 @@ export interface ConditionEvaluationResult {
   declinedGuardiansCount: number;
   requiredApprovals: number;
   isPeopleConditionSatisfied: boolean;
+  
+  // Etapa 5 Revelation state
+  isReadyToReveal: boolean; // Quórum e/ou tempo atingido, pronto para disparar revelação
+  isRevealed: boolean; // Se o conteúdo já foi ativamente revelado
+  quorumRatioText: string; // "2/3"
+  quorumPercentage: number; // 67%
   
   // Lists
   recipients: Participant[];
@@ -51,8 +57,6 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
     totalGuardians === 0 || approvedGuardiansCount >= requiredApprovals;
 
   const timeResult = calculateTimeRemaining(intent.created_at, intent.target_date);
-  const isTimeConditionSatisfied =
-    conditionType === 'PEOPLE' || conditionType === 'NONE' || timeResult.isMatured;
 
   let isConditionSatisfied = false;
   let statusSummary = '';
@@ -83,13 +87,13 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
     case 'PEOPLE':
       isConditionSatisfied = isPeopleConditionSatisfied;
       if (isPeopleConditionSatisfied) {
-        statusSummary = `Quórum de aprovação atingido (${approvedGuardiansCount}/${requiredApprovals} guardiões).`;
-        badgeLabel = 'Guardiões Aprovaram';
+        statusSummary = `Quórum de aprovação atingido (${approvedGuardiansCount}/${requiredApprovals} guardiões). Pronto para revelar.`;
+        badgeLabel = `Quórum Atingido (${approvedGuardiansCount}/${requiredApprovals})`;
         badgeColor = 'emerald';
       } else {
         const remaining = Math.max(0, requiredApprovals - approvedGuardiansCount);
         statusSummary = `Aguardando ${remaining} assinatura(s) de guardiões (${approvedGuardiansCount}/${requiredApprovals} aprovados).`;
-        badgeLabel = `Guardiões (${approvedGuardiansCount}/${requiredApprovals})`;
+        badgeLabel = `Aprovação (${approvedGuardiansCount}/${requiredApprovals})`;
         badgeColor = 'blue';
       }
       break;
@@ -116,6 +120,12 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
       break;
   }
 
+  const isRevealed = !!intent.revealed_at || (conditionType === 'NONE' && !intent.is_locked);
+  const isReadyToReveal = isConditionSatisfied && !isRevealed;
+  const quorumRatioText = `${approvedGuardiansCount}/${requiredApprovals}`;
+  const quorumPercentage =
+    requiredApprovals > 0 ? Math.min(100, Math.round((approvedGuardiansCount / requiredApprovals) * 100)) : 100;
+
   return {
     isConditionSatisfied,
     timeResult,
@@ -126,6 +136,10 @@ export function evaluateIntentConditions(intent: Intent): ConditionEvaluationRes
     declinedGuardiansCount,
     requiredApprovals,
     isPeopleConditionSatisfied,
+    isReadyToReveal,
+    isRevealed,
+    quorumRatioText,
+    quorumPercentage,
     recipients,
     guardians,
     viewers,
@@ -140,7 +154,8 @@ export const SAMPLE_PEOPLE_PRESETS: Omit<Participant, 'id'>[] = [
     name: 'Dra. Helena Voss',
     email: 'helena.voss@curadoria.org',
     role: 'guardian',
-    status: 'pending',
+    status: 'approved',
+    approved_at: new Date().toISOString(),
     notes: 'Guardiã Institucional & Validação',
   },
   {
@@ -150,6 +165,13 @@ export const SAMPLE_PEOPLE_PRESETS: Omit<Participant, 'id'>[] = [
     status: 'approved',
     approved_at: new Date().toISOString(),
     notes: 'Co-fundador e Testemunha',
+  },
+  {
+    name: 'Dra. Amanda Ribeiro',
+    email: 'amanda.ribeiro@conselho.gov',
+    role: 'guardian',
+    status: 'pending',
+    notes: 'Representante de Compliance',
   },
   {
     name: 'Mariana Duarte',
