@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { LogIn, UserPlus, ArrowRight, ShieldCheck, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { UserAccount } from '../types';
 import { auth, googleProvider, signInWithPopup } from '../utils/firebase';
-import { setCurrentSessionUser, registerNewUser, loginUser, getStoredUsers } from '../utils/storage';
+import { setCurrentSessionUser, registerNewUser, loginUser, getStoredUsers, createDefaultUserFields } from '../utils/storage';
 
 interface AuthGateProps {
   onAuthenticated: (user: UserAccount) => void;
@@ -24,14 +24,12 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
-      const userAccount: UserAccount = {
+      const userAccount = createDefaultUserFields({
         id: fbUser.uid,
         name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuário Intent',
         email: fbUser.email || 'usuario@google.com',
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
         avatarUrl: fbUser.photoURL || undefined,
-      };
+      });
       setCurrentSessionUser(userAccount);
       setSuccessMsg('Autenticado com Google com sucesso!');
       setTimeout(() => {

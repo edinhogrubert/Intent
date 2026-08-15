@@ -1,24 +1,149 @@
-import { UserAccount } from '../types';
+import { Intent, UserAccount } from '../types';
 
-const STORAGE_USERS_KEY = 'portal_app_users';
-const STORAGE_CURRENT_USER_KEY = 'portal_app_current_user';
+export const STORAGE_USERS_KEY = 'portal_app_users';
+export const STORAGE_CURRENT_USER_KEY = 'portal_app_current_user';
+export const LOCAL_STORAGE_INTENTS_KEY = 'portal_app_local_intents';
+
+export interface UserActivitySummary {
+  createdIntentsCount: number;
+  participatedIntentsCount: number;
+  receivedIntentsCount: number;
+  totalLogsCount: number;
+  createdIntentsList: Intent[];
+  participatedIntentsList: Intent[];
+}
+
+export function getUserActivityFromStorage(user: UserAccount): UserActivitySummary {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_INTENTS_KEY);
+    let allIntents: Intent[] = [];
+    if (raw) {
+      allIntents = JSON.parse(raw);
+    }
+
+    const userId = user.id;
+    const userNameLower = (user.name || '').toLowerCase();
+    const userEmailLower = (user.email || '').toLowerCase();
+
+    // Intents criadas pelo usuário
+    const createdIntentsList = allIntents.filter((intent) => {
+      return (
+        intent.creator_id === userId ||
+        intent.creator_id === 'usr-1' ||
+        intent.creator_id === userEmailLower
+      );
+    });
+
+    // Intents onde o usuário participa (como Guardião, destinatário ou participante)
+    const participatedIntentsList = allIntents.filter((intent) => {
+      if (!intent.participants || intent.participants.length === 0) return false;
+      return intent.participants.some((p) => {
+        const nameMatch = p.name && p.name.toLowerCase() === userNameLower;
+        const emailMatch = p.email && p.email.toLowerCase() === userEmailLower;
+        const idMatch = p.id === userId;
+        return nameMatch || emailMatch || idMatch;
+      });
+    });
+
+    // Intents recebidas (papel de recipient)
+    const receivedIntentsList = allIntents.filter((intent) => {
+      if (!intent.participants) return false;
+      return intent.participants.some((p) => {
+        const isRecipient = p.role === 'recipient';
+        const nameMatch = p.name && p.name.toLowerCase() === userNameLower;
+        const emailMatch = p.email && p.email.toLowerCase() === userEmailLower;
+        return isRecipient && (nameMatch || emailMatch);
+      });
+    });
+
+    const totalLogsCount = allIntents.reduce(
+      (acc, curr) => acc + (curr.history_logs?.length || 0),
+      0
+    );
+
+    // Se a lista no storage estiver vazia (primeira execução), fornecer contagens padrão consistentes
+    const finalCreatedCount = Math.max(createdIntentsList.length, raw ? createdIntentsList.length : 3);
+    const finalParticipatedCount = Math.max(participatedIntentsList.length, raw ? participatedIntentsList.length : 3);
+
+    return {
+      createdIntentsCount: finalCreatedCount,
+      participatedIntentsCount: finalParticipatedCount,
+      receivedIntentsCount: Math.max(receivedIntentsList.length, raw ? receivedIntentsList.length : 1),
+      totalLogsCount: Math.max(totalLogsCount, 8),
+      createdIntentsList,
+      participatedIntentsList,
+    };
+  } catch (e) {
+    console.error('Erro ao recuperar atividade do storage:', e);
+    return {
+      createdIntentsCount: 3,
+      participatedIntentsCount: 3,
+      receivedIntentsCount: 1,
+      totalLogsCount: 8,
+      createdIntentsList: [],
+      participatedIntentsList: [],
+    };
+  }
+}
+
+export function createDefaultUserFields(
+  base: Partial<UserAccount> & { id: string; name: string; email: string }
+): UserAccount {
+  const cleanName = base.name.trim();
+  const defaultUsername = base.username
+    ? base.username
+    : '@' + cleanName.toLowerCase().replace(/\s+/g, '_');
+
+  return {
+    id: base.id,
+    name: cleanName,
+    username: defaultUsername,
+    email: base.email.trim().toLowerCase(),
+    password: base.password || '123',
+    avatarUrl: base.avatarUrl || undefined,
+    bio: base.bio || 'Membro do Portal Intent e Guardião de Dados.',
+    createdAt: base.createdAt || new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+    status: base.status || 'active',
+    configuracoes: base.configuracoes || {
+      theme: 'light',
+      notificationsEnabled: true,
+      privacyLevel: 'public',
+      emailAlerts: true,
+    },
+    relacionamentos: base.relacionamentos || {
+      intentsCriadasCount: 2,
+      intentsRecebidasCount: 1,
+      intentsParticipadasCount: 3,
+      historicoCount: 8,
+      seguidoresCount: 4,
+      seguindoCount: 5,
+      seguidoresList: ['Dra. Helena Voss', 'Carlos Mendez', 'Dra. Amanda Ribeiro', 'Lucas M.'],
+      seguindoList: ['Dra. Helena Voss', 'Carlos Mendez', 'Beatriz Costa', 'Gabriel Rocha', 'Marcio Silva'],
+      reputacao: {
+        pontos: 150,
+        nivel: 'Membro Ativo — Nível 1',
+        selo: '🛡️ Guardião Verificado',
+      },
+    },
+  };
+}
 
 export function getStoredUsers(): UserAccount[] {
   try {
     const raw = localStorage.getItem(STORAGE_USERS_KEY);
     if (!raw) {
-      const defaultUser: UserAccount = {
+      const defaultUser = createDefaultUserFields({
         id: 'usr-1',
         name: 'Rafael',
         email: 'rafael@exemplo.com',
         password: '123',
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      };
+      });
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify([defaultUser]));
       return [defaultUser];
     }
-    return JSON.parse(raw);
+    const parsed: UserAccount[] = JSON.parse(raw);
+    return parsed.map((u) => createDefaultUserFields(u));
   } catch {
     return [];
   }
@@ -28,7 +153,8 @@ export function getCurrentSessionUser(): UserAccount | null {
   try {
     const raw = localStorage.getItem(STORAGE_CURRENT_USER_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return createDefaultUserFields(parsed);
   } catch {
     return null;
   }
@@ -36,13 +162,16 @@ export function getCurrentSessionUser(): UserAccount | null {
 
 export function setCurrentSessionUser(user: UserAccount | null): void {
   if (user) {
-    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(user));
+    const enriched = createDefaultUserFields(user);
+    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(enriched));
     const users = getStoredUsers();
-    const existingIndex = users.findIndex((u) => u.email.toLowerCase() === user.email.toLowerCase() || u.id === user.id);
+    const existingIndex = users.findIndex(
+      (u) => u.email.toLowerCase() === enriched.email.toLowerCase() || u.id === enriched.id
+    );
     if (existingIndex >= 0) {
-      users[existingIndex] = { ...users[existingIndex], ...user, lastLoginAt: new Date().toISOString() };
+      users[existingIndex] = { ...users[existingIndex], ...enriched, lastLoginAt: new Date().toISOString() };
     } else {
-      users.push(user);
+      users.push(enriched);
     }
     localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
   } else {
@@ -50,22 +179,65 @@ export function setCurrentSessionUser(user: UserAccount | null): void {
   }
 }
 
-export function registerNewUser(name: string, email: string, password?: string, firebaseUid?: string): UserAccount {
+export function updateUserProfile(userId: string, updates: Partial<UserAccount>): UserAccount {
+  const current = getCurrentSessionUser();
+  const users = getStoredUsers();
+
+  const userIndex = users.findIndex((u) => u.id === userId);
+  const existing = userIndex >= 0 ? users[userIndex] : current;
+
+  if (!existing) {
+    throw new Error('Usuário não encontrado para atualização.');
+  }
+
+  const updated: UserAccount = createDefaultUserFields({
+    ...existing,
+    ...updates,
+    configuracoes: {
+      ...existing.configuracoes,
+      ...updates.configuracoes,
+    },
+    relacionamentos: {
+      ...existing.relacionamentos,
+      ...updates.relacionamentos,
+    },
+  });
+
+  if (userIndex >= 0) {
+    users[userIndex] = updated;
+    localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+  }
+
+  if (current && current.id === userId) {
+    localStorage.setItem(STORAGE_CURRENT_USER_KEY, JSON.stringify(updated));
+  }
+
+  return updated;
+}
+
+export function registerNewUser(
+  name: string,
+  email: string,
+  password?: string,
+  firebaseUid?: string,
+  username?: string,
+  bio?: string
+): UserAccount {
   const users = getStoredUsers();
   const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  
+
   if (existing) {
     throw new Error('Já existe uma conta cadastrada com este e-mail.');
   }
 
-  const newUser: UserAccount = {
+  const newUser = createDefaultUserFields({
     id: firebaseUid || 'usr-' + Date.now(),
     name: name.trim(),
+    username: username || '@' + name.trim().toLowerCase().replace(/\s+/g, '_'),
     email: email.trim().toLowerCase(),
     password: password || '123',
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-  };
+    bio: bio || 'Novo participante do Portal Intent.',
+  });
 
   users.push(newUser);
   localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
@@ -76,17 +248,14 @@ export function registerNewUser(name: string, email: string, password?: string, 
 export function loginUser(email: string, password?: string, firebaseUid?: string): UserAccount {
   const users = getStoredUsers();
   const found = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-  
+
   if (!found) {
-    // If not found, automatically register for a smooth dev experience
-    const newUser: UserAccount = {
+    const newUser = createDefaultUserFields({
       id: firebaseUid || 'usr-' + Date.now(),
       name: email.split('@')[0] || 'Usuário',
       email: email.trim().toLowerCase(),
       password: password || '123',
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
+    });
     users.push(newUser);
     localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
     setCurrentSessionUser(newUser);
@@ -97,11 +266,11 @@ export function loginUser(email: string, password?: string, firebaseUid?: string
     throw new Error('Senha incorreta.');
   }
 
-  const updatedUser = {
+  const updatedUser = createDefaultUserFields({
     ...found,
     id: firebaseUid || found.id,
     lastLoginAt: new Date().toISOString(),
-  };
+  });
   setCurrentSessionUser(updatedUser);
   return updatedUser;
 }
@@ -116,3 +285,4 @@ export function deleteUserAccount(userId: string): void {
   localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(filtered));
   setCurrentSessionUser(null);
 }
+

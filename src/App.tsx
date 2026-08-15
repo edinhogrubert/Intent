@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserAccount } from './types';
-import { getCurrentSessionUser, logoutUser, deleteUserAccount } from './utils/storage';
+import { getCurrentSessionUser, logoutUser, deleteUserAccount, createDefaultUserFields } from './utils/storage';
 import { getGreetingConfig, formatCurrentDate } from './utils/time';
 import { AuthGate } from './components/AuthGate';
 import { IntentManager } from './components/IntentManager';
@@ -9,12 +9,14 @@ import { DynamicGreetingCard } from './components/DynamicGreetingCard';
 import { AccountStatusCard } from './components/AccountStatusCard';
 import { BottomCardsRow } from './components/BottomCardsRow';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { auth, signOut, onAuthStateChanged } from './utils/firebase';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
   // Load session & sync with Firebase Auth
@@ -35,13 +37,12 @@ export default function App() {
             id: fbUser.uid,
           });
         } else {
-          const autoUser: UserAccount = {
+          const autoUser = createDefaultUserFields({
             id: fbUser.uid,
             name: fbUser.displayName || 'Usuário Intent',
             email: fbUser.email || 'usuario@intent.app',
-            createdAt: new Date().toISOString(),
-            lastLoginAt: new Date().toISOString(),
-          };
+            avatarUrl: fbUser.photoURL || undefined,
+          });
           setCurrentUser(autoUser);
         }
       }
@@ -103,23 +104,38 @@ export default function App() {
         user={currentUser}
         onLogout={handleLogout}
         onRequestDelete={() => setShowDeleteModal(true)}
+        onOpenProfile={() => setShowProfileModal(true)}
       />
 
       {/* Main Content View (Index) */}
       <main className="flex-1 flex flex-col p-6 md:p-10 max-w-7xl mx-auto overflow-y-auto space-y-8">
         {/* Top Greeting Header matching the screenshot ("Bom dia, Rafael.") */}
         <header>
-          <h1
-            id="page-title"
-            className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight"
-          >
-            {greetingConfig.heading}, {currentUser.name}.
-          </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1.5 flex items-center gap-2">
-            <span>Hoje é {formatCurrentDate()}</span>
-            <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
-            <span>Sua sessão está ativa e sincronizada com Firebase.</span>
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1
+                id="page-title"
+                className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight"
+              >
+                {greetingConfig.heading}, {currentUser.name}.
+              </h1>
+              <p className="text-sm md:text-base text-slate-500 mt-1.5 flex items-center gap-2">
+                <span className="font-mono text-[#0055FF] font-bold">{currentUser.username}</span>
+                <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
+                <span>Hoje é {formatCurrentDate()}</span>
+                <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
+                <span>Sua sessão está ativa.</span>
+              </p>
+            </div>
+            <button
+              id="header-profile-btn"
+              onClick={() => setShowProfileModal(true)}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-[#DCE7F6] text-xs font-bold text-[#0055FF] shadow-xs transition-all cursor-pointer"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Gerenciar Perfil (Etapa 1)</span>
+            </button>
+          </div>
         </header>
 
         {/* Primary Bento / Card Grid (Top: Dynamic Greeting Card & Account Status) */}
@@ -132,6 +148,7 @@ export default function App() {
               user={currentUser}
               onLogout={handleLogout}
               onRequestDelete={() => setShowDeleteModal(true)}
+              onOpenProfile={() => setShowProfileModal(true)}
             />
           </div>
         </div>
@@ -145,6 +162,14 @@ export default function App() {
         <BottomCardsRow user={currentUser} />
       </main>
 
+      {/* User Profile & Identity Management Modal (Etapa 1) */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        user={currentUser}
+        onClose={() => setShowProfileModal(false)}
+        onUpdateUser={(updated) => setCurrentUser(updated)}
+      />
+
       {/* Account Deletion / Unsubscription Modal */}
       <DeleteAccountModal
         isOpen={showDeleteModal}
@@ -155,3 +180,4 @@ export default function App() {
     </div>
   );
 }
+

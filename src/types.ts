@@ -1,11 +1,37 @@
 export interface UserAccount {
   id: string;
-  name: string;
+  name: string; // nome
+  username: string; // @username
   email: string;
   password?: string;
-  createdAt: string;
+  createdAt: string; // created_at
   lastLoginAt: string;
-  avatarUrl?: string;
+  avatarUrl?: string; // avatar
+  bio?: string;
+  status: 'active' | 'inactive' | 'suspended';
+  configuracoes?: {
+    theme?: 'light' | 'dark';
+    notificationsEnabled?: boolean;
+    privacyLevel?: 'public' | 'private' | 'guardians_only';
+    emailAlerts?: boolean;
+  };
+  
+  // Estrutura de Relacionamentos Preparada (Etapa 1)
+  relacionamentos?: {
+    intentsCriadasCount: number;
+    intentsRecebidasCount: number;
+    intentsParticipadasCount: number;
+    historicoCount: number;
+    seguidoresCount: number;
+    seguindoCount: number;
+    seguidoresList?: string[];
+    seguindoList?: string[];
+    reputacao?: {
+      pontos: number;
+      nivel: string;
+      selo?: string;
+    };
+  };
 }
 
 export type ParticipantRole = 'recipient' | 'guardian' | 'viewer';

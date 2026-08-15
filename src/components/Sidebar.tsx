@@ -1,13 +1,14 @@
-import { Home, Compass, PlusCircle, Inbox, Bell, LogOut, Trash2 } from 'lucide-react';
+import { Home, Compass, PlusCircle, Inbox, Bell, LogOut, Trash2, User } from 'lucide-react';
 import { UserAccount } from '../types';
 
 interface SidebarProps {
   user: UserAccount;
   onLogout: () => void;
   onRequestDelete: () => void;
+  onOpenProfile?: () => void;
 }
 
-export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
+export function Sidebar({ user, onLogout, onRequestDelete, onOpenProfile }: SidebarProps) {
   return (
     <aside
       id="app-sidebar"
@@ -24,7 +25,7 @@ export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
         <button
           id="nav-inicio"
           title="Início"
-          className="w-14 h-14 rounded-2xl bg-[#D6E6FD] text-[#0055FF] flex flex-col items-center justify-center gap-1 shadow-xs transition-transform active:scale-95"
+          className="w-14 h-14 rounded-2xl bg-[#D6E6FD] text-[#0055FF] flex flex-col items-center justify-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
         >
           <Home className="w-5 h-5 stroke-[2.5]" />
           <span className="text-[10px] font-semibold tracking-tight">Início</span>
@@ -40,14 +41,15 @@ export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
           <span className="text-[9px] font-medium">Explorar</span>
         </div>
 
-        {/* Nav item: Criar */}
+        {/* Nav item: Perfil & Identidade */}
         <div
-          id="nav-criar"
-          title="Criar"
-          className="w-14 h-14 rounded-2xl border border-dashed border-[#94BFFF] text-[#4A6D9C] flex flex-col items-center justify-center gap-1 opacity-70 hover:opacity-100 hover:bg-[#E2EDFC] transition-all cursor-pointer"
+          id="nav-perfil"
+          title="Identidade (Etapa 1)"
+          onClick={onOpenProfile}
+          className="w-14 h-14 rounded-2xl border border-[#94BFFF] text-[#0055FF] bg-white flex flex-col items-center justify-center gap-1 hover:bg-[#E2EDFC] transition-all cursor-pointer shadow-2xs"
         >
-          <PlusCircle className="w-4 h-4 stroke-[2]" />
-          <span className="text-[9px] font-medium">Criar</span>
+          <User className="w-4 h-4 stroke-[2]" />
+          <span className="text-[9px] font-bold">Perfil</span>
         </div>
 
         {/* Nav item: Caixa */}
@@ -78,7 +80,8 @@ export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
           <button
             id="user-avatar-btn"
             title={`Conectado como ${user.name}`}
-            className="w-10 h-10 rounded-full bg-[#152744] text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm overflow-hidden hover:ring-2 hover:ring-[#0055FF] transition-all"
+            onClick={onOpenProfile}
+            className="w-10 h-10 rounded-full bg-[#152744] text-white flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm overflow-hidden hover:ring-2 hover:ring-[#0055FF] transition-all cursor-pointer"
           >
             {user.avatarUrl ? (
               <img
@@ -96,12 +99,22 @@ export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
           <div className="absolute left-full bottom-0 ml-3 w-48 bg-white border border-[#D5E2F3] rounded-xl shadow-lg p-2.5 hidden group-hover:block z-50 animate-in fade-in zoom-in-95">
             <div className="px-2 py-1.5 border-b border-slate-100 mb-1.5">
               <p className="text-xs font-semibold text-slate-800 truncate">{user.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+              <p className="text-[10px] text-[#0055FF] font-mono font-bold truncate">{user.username || '@' + user.name.toLowerCase()}</p>
             </div>
+            {onOpenProfile && (
+              <button
+                id="sidebar-profile-btn"
+                onClick={onOpenProfile}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
+              >
+                <User className="w-3.5 h-3.5 text-blue-500" />
+                <span>Perfil & Identidade</span>
+              </button>
+            )}
             <button
               id="sidebar-logout-btn"
               onClick={onLogout}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left mt-1"
             >
               <LogOut className="w-3.5 h-3.5 text-slate-500" />
               <span>Sair da conta</span>
@@ -120,3 +133,4 @@ export function Sidebar({ user, onLogout, onRequestDelete }: SidebarProps) {
     </aside>
   );
 }
+
