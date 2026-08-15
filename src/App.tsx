@@ -3,6 +3,7 @@ import { UserAccount } from './types';
 import { getCurrentSessionUser, logoutUser, deleteUserAccount } from './utils/storage';
 import { getGreetingConfig, getTimeOfDay, formatCurrentDate } from './utils/time';
 import { AuthGate } from './components/AuthGate';
+import { IntentManager } from './components/IntentManager';
 import { Sidebar } from './components/Sidebar';
 import { DynamicGreetingCard } from './components/DynamicGreetingCard';
 import { AccountStatusCard } from './components/AccountStatusCard';
@@ -88,14 +89,12 @@ export default function App() {
           <span>Painel Principal</span>
         </div>
 
-        {/* Primary Bento / Card Grid (Left: Dynamic Greeting Card; Right: Account & Session Card) */}
+        {/* Primary Bento / Card Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main Card with the dynamic greeting button requested by user */}
           <div className="lg:col-span-8">
-            <DynamicGreetingCard user={currentUser} />
+            <IntentManager />
           </div>
-
-          {/* Side Card matching the dark blue card from the screenshot */}
+          {/* Side Card */}
           <div className="lg:col-span-4">
             <AccountStatusCard
               user={currentUser}
