@@ -2,7 +2,7 @@
   "entities": {
     "Intent": {
       "title": "Intent",
-      "description": "Uma intenção criada pelo usuário com suporte a condições temporais.",
+      "description": "Uma intenção criada pelo usuário com suporte a condições temporais e de pessoas (guardiões e destinatários).",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -12,11 +12,29 @@
         "status": { "type": "string", "enum": ["draft", "active", "completed", "cancelled"] },
         "created_at": { "type": "string", "format": "date-time" },
         "visibility": { "type": "string", "enum": ["private", "public"] },
-        "condition_type": { "type": "string", "enum": ["NONE", "TIME"] },
+        "condition_type": { "type": "string", "enum": ["NONE", "TIME", "PEOPLE", "HYBRID"] },
         "target_date": { "type": "string", "format": "date-time" },
         "reveal_content": { "type": "string" },
         "is_locked": { "type": "boolean" },
-        "revealed_at": { "type": "string", "format": "date-time" }
+        "revealed_at": { "type": "string", "format": "date-time" },
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "email": { "type": "string" },
+              "role": { "type": "string", "enum": ["recipient", "guardian", "viewer"] },
+              "status": { "type": "string", "enum": ["pending", "approved", "declined"] },
+              "approved_at": { "type": "string", "format": "date-time" },
+              "avatar_url": { "type": "string" },
+              "notes": { "type": "string" }
+            },
+            "required": ["id", "name", "email", "role", "status"]
+          }
+        },
+        "required_approvals": { "type": "number" }
       },
       "required": ["id", "creator_id", "title", "status", "created_at"]
     }

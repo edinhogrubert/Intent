@@ -1,0 +1,161 @@
+import { Intent, Participant } from '../types';
+import { calculateTimeRemaining, TimeRemainingResult } from './timeCondition';
+
+export interface ConditionEvaluationResult {
+  isConditionSatisfied: boolean;
+  timeResult: TimeRemainingResult;
+  
+  // People stats
+  totalParticipants: number;
+  totalGuardians: number;
+  approvedGuardiansCount: number;
+  pendingGuardiansCount: number;
+  declinedGuardiansCount: number;
+  requiredApprovals: number;
+  isPeopleConditionSatisfied: boolean;
+  
+  // Lists
+  recipients: Participant[];
+  guardians: Participant[];
+  viewers: Participant[];
+  
+  // Human readable description
+  statusSummary: string;
+  badgeLabel: string;
+  badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose';
+}
+
+export function evaluateIntentConditions(intent: Intent): ConditionEvaluationResult {
+  const conditionType = intent.condition_type || 'NONE';
+  const participants = intent.participants || [];
+  
+  const recipients = participants.filter((p) => p.role === 'recipient');
+  const guardians = participants.filter((p) => p.role === 'guardian');
+  const viewers = participants.filter((p) => p.role === 'viewer');
+  
+  const approvedGuardians = guardians.filter((g) => g.status === 'approved');
+  const pendingGuardians = guardians.filter((g) => g.status === 'pending');
+  const declinedGuardians = guardians.filter((g) => g.status === 'declined');
+  
+  const totalGuardians = guardians.length;
+  const approvedGuardiansCount = approvedGuardians.length;
+  const pendingGuardiansCount = pendingGuardians.length;
+  const declinedGuardiansCount = declinedGuardians.length;
+  
+  const requiredApprovals =
+    intent.required_approvals !== undefined && intent.required_approvals > 0
+      ? intent.required_approvals
+      : Math.max(1, totalGuardians);
+
+  const isPeopleConditionSatisfied =
+    totalGuardians === 0 || approvedGuardiansCount >= requiredApprovals;
+
+  const timeResult = calculateTimeRemaining(intent.created_at, intent.target_date);
+  const isTimeConditionSatisfied =
+    conditionType === 'PEOPLE' || conditionType === 'NONE' || timeResult.isMatured;
+
+  let isConditionSatisfied = false;
+  let statusSummary = '';
+  let badgeLabel = 'Sem trava';
+  let badgeColor: 'amber' | 'emerald' | 'blue' | 'slate' | 'rose' = 'slate';
+
+  switch (conditionType) {
+    case 'NONE':
+      isConditionSatisfied = true;
+      statusSummary = 'Sem condições de trava. Conteúdo liberado.';
+      badgeLabel = 'Livre';
+      badgeColor = 'slate';
+      break;
+
+    case 'TIME':
+      isConditionSatisfied = timeResult.isMatured;
+      if (timeResult.isMatured) {
+        statusSummary = 'Condição de tempo atingida. Conteúdo desbloqueado.';
+        badgeLabel = 'Tempo Atingido';
+        badgeColor = 'emerald';
+      } else {
+        statusSummary = `Bloqueado por tempo (${timeResult.formattedCountdown} restantes).`;
+        badgeLabel = 'Trava de Tempo';
+        badgeColor = 'amber';
+      }
+      break;
+
+    case 'PEOPLE':
+      isConditionSatisfied = isPeopleConditionSatisfied;
+      if (isPeopleConditionSatisfied) {
+        statusSummary = `Quórum de aprovação atingido (${approvedGuardiansCount}/${requiredApprovals} guardiões).`;
+        badgeLabel = 'Guardiões Aprovaram';
+        badgeColor = 'emerald';
+      } else {
+        const remaining = Math.max(0, requiredApprovals - approvedGuardiansCount);
+        statusSummary = `Aguardando ${remaining} assinatura(s) de guardiões (${approvedGuardiansCount}/${requiredApprovals} aprovados).`;
+        badgeLabel = `Guardiões (${approvedGuardiansCount}/${requiredApprovals})`;
+        badgeColor = 'blue';
+      }
+      break;
+
+    case 'HYBRID':
+      isConditionSatisfied = timeResult.isMatured && isPeopleConditionSatisfied;
+      if (isConditionSatisfied) {
+        statusSummary = 'Tempo decorrido e quórum de guardiões atingido.';
+        badgeLabel = 'Condições Cumpridas';
+        badgeColor = 'emerald';
+      } else if (!timeResult.isMatured && !isPeopleConditionSatisfied) {
+        statusSummary = `Aguardando tempo (${timeResult.formattedCountdown}) e guardiões (${approvedGuardiansCount}/${requiredApprovals}).`;
+        badgeLabel = 'Tempo + Guardiões';
+        badgeColor = 'amber';
+      } else if (!timeResult.isMatured) {
+        statusSummary = `Guardiões aprovaram! Aguardando apenas o tempo (${timeResult.formattedCountdown}).`;
+        badgeLabel = 'Aguardando Tempo';
+        badgeColor = 'amber';
+      } else {
+        statusSummary = `Tempo atingido! Aguardando guardiões (${approvedGuardiansCount}/${requiredApprovals}).`;
+        badgeLabel = 'Aguardando Guardiões';
+        badgeColor = 'blue';
+      }
+      break;
+  }
+
+  return {
+    isConditionSatisfied,
+    timeResult,
+    totalParticipants: participants.length,
+    totalGuardians,
+    approvedGuardiansCount,
+    pendingGuardiansCount,
+    declinedGuardiansCount,
+    requiredApprovals,
+    isPeopleConditionSatisfied,
+    recipients,
+    guardians,
+    viewers,
+    statusSummary,
+    badgeLabel,
+    badgeColor,
+  };
+}
+
+export const SAMPLE_PEOPLE_PRESETS: Omit<Participant, 'id'>[] = [
+  {
+    name: 'Dra. Helena Voss',
+    email: 'helena.voss@curadoria.org',
+    role: 'guardian',
+    status: 'pending',
+    notes: 'Guardiã Institucional & Validação',
+  },
+  {
+    name: 'Carlos Mendez',
+    email: 'carlos.m@fintech.io',
+    role: 'guardian',
+    status: 'approved',
+    approved_at: new Date().toISOString(),
+    notes: 'Co-fundador e Testemunha',
+  },
+  {
+    name: 'Mariana Duarte',
+    email: 'mariana.duarte@equipe.com',
+    role: 'recipient',
+    status: 'pending',
+    notes: 'Destinatária da Entrega Final',
+  },
+];

@@ -34,15 +34,21 @@ import {
   Hourglass,
   Timer,
   Zap,
-  EyeOff,
+  Users,
+  Key,
+  UserCheck,
+  Send,
+  Sliders,
 } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType, signInWithPopup, googleProvider } from '../utils/firebase';
-import { Intent, UserAccount, ConditionType } from '../types';
+import { Intent, UserAccount, ConditionType, Participant } from '../types';
 import {
   calculateTimeRemaining,
   formatTargetDateTime,
   TIME_PRESETS,
 } from '../utils/timeCondition';
+import { evaluateIntentConditions, SAMPLE_PEOPLE_PRESETS } from '../utils/conditionEvaluator';
+import { ParticipantManager } from './ParticipantManager';
 
 interface IntentManagerProps {
   user: UserAccount;
@@ -72,10 +78,29 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [newVisibility, setNewVisibility] = useState<'private' | 'public'>('private');
   const [newStatus, setNewStatus] = useState<'draft' | 'active'>('active');
 
-  // Etapa 3: Time condition states in creation form
-  const [newConditionType, setNewConditionType] = useState<ConditionType>('NONE');
+  // Condition State (Etapa 3 Tempo + Etapa 4 Pessoas)
+  const [newConditionType, setNewConditionType] = useState<ConditionType>('PEOPLE');
   const [newTargetDate, setNewTargetDate] = useState<string>('');
   const [newRevealContent, setNewRevealContent] = useState<string>('');
+  const [newParticipants, setNewParticipants] = useState<Participant[]>([
+    {
+      id: 'p-init-1',
+      name: 'Dra. Helena Voss',
+      email: 'helena.voss@curadoria.org',
+      role: 'guardian',
+      status: 'pending',
+      notes: 'Guardiã de Validação',
+    },
+    {
+      id: 'p-init-2',
+      name: 'Mariana Duarte',
+      email: 'mariana.duarte@equipe.com',
+      role: 'recipient',
+      status: 'pending',
+      notes: 'Destinatária Final',
+    },
+  ]);
+  const [newRequiredApprovals, setNewRequiredApprovals] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter & Search State
@@ -92,6 +117,8 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [editConditionType, setEditConditionType] = useState<ConditionType>('NONE');
   const [editTargetDate, setEditTargetDate] = useState<string>('');
   const [editRevealContent, setEditRevealContent] = useState<string>('');
+  const [editParticipants, setEditParticipants] = useState<Participant[]>([]);
+  const [editRequiredApprovals, setEditRequiredApprovals] = useState<number>(1);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Helper: Local fallback
@@ -203,13 +230,17 @@ export function IntentManager({ user }: IntentManagerProps) {
   const handleApplyPreset = (getDate: () => string) => {
     const iso = getDate();
     setNewTargetDate(iso);
-    setNewConditionType('TIME');
+    if (newConditionType === 'NONE') {
+      setNewConditionType('TIME');
+    }
   };
 
   const handleApplyEditPreset = (getDate: () => string) => {
     const iso = getDate();
     setEditTargetDate(iso);
-    setEditConditionType('TIME');
+    if (editConditionType === 'NONE') {
+      setEditConditionType('TIME');
+    }
   };
 
   // Create new Intent
@@ -232,9 +263,21 @@ export function IntentManager({ user }: IntentManagerProps) {
       created_at: new Date().toISOString(),
       visibility: newVisibility,
       condition_type: newConditionType,
-      target_date: newConditionType === 'TIME' ? newTargetDate : undefined,
-      reveal_content: newConditionType === 'TIME' ? newRevealContent.trim() : undefined,
-      is_locked: newConditionType === 'TIME' && !!newTargetDate,
+      target_date:
+        newConditionType === 'TIME' || newConditionType === 'HYBRID'
+          ? newTargetDate
+          : undefined,
+      reveal_content:
+        newConditionType !== 'NONE' ? newRevealContent.trim() : undefined,
+      is_locked: newConditionType !== 'NONE',
+      participants:
+        newConditionType === 'PEOPLE' || newConditionType === 'HYBRID'
+          ? newParticipants
+          : [],
+      required_approvals:
+        newConditionType === 'PEOPLE' || newConditionType === 'HYBRID'
+          ? newRequiredApprovals
+          : undefined,
     };
 
     if (isFirebase) {
@@ -250,6 +293,8 @@ export function IntentManager({ user }: IntentManagerProps) {
           target_date: newIntent.target_date || null,
           reveal_content: newIntent.reveal_content || null,
           is_locked: newIntent.is_locked || false,
+          participants: newIntent.participants || [],
+          required_approvals: newIntent.required_approvals || null,
         });
       } catch (err) {
         console.error('Error creating intent in Firestore:', err);
@@ -274,7 +319,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     setNewDescription('');
     setNewStatus('active');
     setNewVisibility('private');
-    setNewConditionType('NONE');
+    setNewConditionType('PEOPLE');
     setNewTargetDate('');
     setNewRevealContent('');
     setIsCreating(false);
@@ -291,6 +336,8 @@ export function IntentManager({ user }: IntentManagerProps) {
     setEditConditionType(intent.condition_type || 'NONE');
     setEditTargetDate(intent.target_date || '');
     setEditRevealContent(intent.reveal_content || '');
+    setEditParticipants(intent.participants || []);
+    setEditRequiredApprovals(intent.required_approvals || 1);
     setIsEditing(false);
   };
 
@@ -307,9 +354,20 @@ export function IntentManager({ user }: IntentManagerProps) {
       status: editStatus,
       visibility: editVisibility,
       condition_type: editConditionType,
-      target_date: editConditionType === 'TIME' ? editTargetDate : undefined,
-      reveal_content: editConditionType === 'TIME' ? editRevealContent.trim() : undefined,
-      is_locked: editConditionType === 'TIME' && !!editTargetDate,
+      target_date:
+        editConditionType === 'TIME' || editConditionType === 'HYBRID'
+          ? editTargetDate
+          : undefined,
+      reveal_content:
+        editConditionType !== 'NONE' ? editRevealContent.trim() : undefined,
+      participants:
+        editConditionType === 'PEOPLE' || editConditionType === 'HYBRID'
+          ? editParticipants
+          : [],
+      required_approvals:
+        editConditionType === 'PEOPLE' || editConditionType === 'HYBRID'
+          ? editRequiredApprovals
+          : undefined,
     };
 
     if (isFirebase) {
@@ -346,18 +404,55 @@ export function IntentManager({ user }: IntentManagerProps) {
     setIsSubmitting(false);
   };
 
+  // Participant updates in Modal (live signature simulation or editing participants)
+  const handleUpdateParticipantsOnIntent = async (updatedParticipants: Participant[]) => {
+    if (!selectedIntent) return;
+
+    const isFirebase = !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
+    const updatedIntent: Intent = {
+      ...selectedIntent,
+      participants: updatedParticipants,
+    };
+
+    if (isFirebase) {
+      try {
+        await updateDoc(doc(db, 'intents', selectedIntent.id), {
+          participants: updatedParticipants,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = intents.map((i) =>
+        i.id === selectedIntent.id ? updatedIntent : i
+      );
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    setSelectedIntent(updatedIntent);
+  };
+
   // Instant simulation helper: Trigger immediate reveal for testing
   const handleSimulateInstantReveal = async (intent: Intent) => {
     const isFirebase = !!auth.currentUser && !intent.id.startsWith('intent-');
     const pastDate = new Date(Date.now() - 1000).toISOString();
+    const approvedParticipants = (intent.participants || []).map((p) =>
+      p.role === 'guardian'
+        ? { ...p, status: 'approved' as const, approved_at: new Date().toISOString() }
+        : p
+    );
+
+    const updatedFields: Partial<Intent> = {
+      target_date: pastDate,
+      is_locked: false,
+      revealed_at: new Date().toISOString(),
+      participants: approvedParticipants,
+    };
 
     if (isFirebase) {
       try {
-        await updateDoc(doc(db, 'intents', intent.id), {
-          target_date: pastDate,
-          is_locked: false,
-          revealed_at: new Date().toISOString(),
-        });
+        await updateDoc(doc(db, 'intents', intent.id), updatedFields);
       } catch (e) {
         console.error(e);
       }
@@ -366,9 +461,7 @@ export function IntentManager({ user }: IntentManagerProps) {
         i.id === intent.id
           ? {
               ...i,
-              target_date: pastDate,
-              is_locked: false,
-              revealed_at: new Date().toISOString(),
+              ...updatedFields,
             }
           : i
       );
@@ -379,9 +472,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     if (selectedIntent && selectedIntent.id === intent.id) {
       setSelectedIntent({
         ...selectedIntent,
-        target_date: pastDate,
-        is_locked: false,
-        revealed_at: new Date().toISOString(),
+        ...updatedFields,
       });
     }
   };
@@ -415,15 +506,19 @@ export function IntentManager({ user }: IntentManagerProps) {
 
   // Filtered intents
   const filteredIntents = intents.filter((intent) => {
+    const evalResult = evaluateIntentConditions(intent);
+
     let matchesStatus = true;
     if (filterStatus === 'time_locked') {
       matchesStatus =
-        intent.condition_type === 'TIME' &&
-        !calculateTimeRemaining(intent.created_at, intent.target_date).isMatured;
-    } else if (filterStatus === 'time_revealed') {
+        intent.condition_type === 'TIME' ||
+        (intent.condition_type === 'HYBRID' && !evalResult.timeResult.isMatured);
+    } else if (filterStatus === 'people_locked') {
       matchesStatus =
-        intent.condition_type === 'TIME' &&
-        calculateTimeRemaining(intent.created_at, intent.target_date).isMatured;
+        (intent.condition_type === 'PEOPLE' || intent.condition_type === 'HYBRID') &&
+        !evalResult.isPeopleConditionSatisfied;
+    } else if (filterStatus === 'revealed') {
+      matchesStatus = evalResult.isConditionSatisfied && intent.condition_type !== 'NONE';
     } else if (filterStatus !== 'all') {
       matchesStatus = intent.status === filterStatus;
     }
@@ -431,7 +526,12 @@ export function IntentManager({ user }: IntentManagerProps) {
     const matchesSearch =
       intent.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       intent.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      intent.reveal_content?.toLowerCase().includes(searchQuery.toLowerCase());
+      intent.reveal_content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (intent.participants || []).some(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
     return matchesStatus && matchesSearch;
   });
@@ -484,13 +584,14 @@ export function IntentManager({ user }: IntentManagerProps) {
   };
 
   // Counts
-  const totalLocked = intents.filter(
-    (i) => i.condition_type === 'TIME' && !calculateTimeRemaining(i.created_at, i.target_date).isMatured
+  const totalWithPeople = intents.filter(
+    (i) => (i.participants && i.participants.length > 0) || i.condition_type === 'PEOPLE' || i.condition_type === 'HYBRID'
   ).length;
 
-  const totalRevealed = intents.filter(
-    (i) => i.condition_type === 'TIME' && calculateTimeRemaining(i.created_at, i.target_date).isMatured
-  ).length;
+  const totalAwaitingSignatures = intents.filter((i) => {
+    const res = evaluateIntentConditions(i);
+    return (i.condition_type === 'PEOPLE' || i.condition_type === 'HYBRID') && !res.isPeopleConditionSatisfied;
+  }).length;
 
   return (
     <div id="intent-manager-container" className="space-y-6">
@@ -499,14 +600,14 @@ export function IntentManager({ user }: IntentManagerProps) {
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EDFF] text-[#0055FF] text-xs font-bold">
-              <Timer className="w-3.5 h-3.5" />
-              <span>Etapa 3 — Condição Temporal (Tempo)</span>
+              <Users className="w-3.5 h-3.5" />
+              <span>Etapa 4 — Pessoas & Guardiões</span>
             </div>
 
-            {totalLocked > 0 && (
+            {totalAwaitingSignatures > 0 && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                <Lock className="w-3 h-3 text-amber-600" />
-                <span>{totalLocked} em contagem regressiva</span>
+                <Shield className="w-3 h-3 text-amber-600" />
+                <span>{totalAwaitingSignatures} aguardando assinaturas</span>
               </span>
             )}
 
@@ -528,11 +629,11 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Rede de Intenções com Gatilho Temporal
+            Rede de Intenções: Pessoas, Guardiões & Quórum
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-            As intenções não revelam conteúdo sob demanda aleatória: elas aguardam a condição
-            temporal estabelecida para revelar a mensagem no momento exato.
+            Vincule pessoas às intenções, delegue papéis de guardiões para aprovação descentralizada,
+            designe destinatários finais e estabeleça quóruns de consenso.
           </p>
         </div>
 
@@ -546,7 +647,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           className="px-6 py-3.5 rounded-2xl bg-[#0055FF] hover:bg-[#0047E0] active:scale-98 text-white text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>{isCreating ? 'Fechar Formulário' : 'Nova Intent com Tempo'}</span>
+          <span>{isCreating ? 'Fechar Formulário' : 'Nova Intent com Pessoas'}</span>
         </button>
       </div>
 
@@ -559,14 +660,14 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
           <button
             onClick={() => setErrorMsg(null)}
-            className="text-rose-500 hover:text-rose-800 text-xs font-bold"
+            className="text-rose-500 hover:text-rose-800 text-xs font-bold cursor-pointer"
           >
             Fechar
           </button>
         </div>
       )}
 
-      {/* Expandable Form: Nova Intent com suporte à Etapa 3 (Tempo) */}
+      {/* Expandable Form: Nova Intent com suporte à Etapa 4 (Pessoas e Guardiões) */}
       {isCreating && (
         <form
           id="form-create-intent"
@@ -580,25 +681,25 @@ export function IntentManager({ user }: IntentManagerProps) {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-800">
-                  Criar Nova Intenção (Intent)
+                  Criar Nova Intenção com Guardiões e Destinatários
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Defina os objetivos e, se desejar, adicione uma trava temporal de revelação.
+                  Configure o título, o tipo de condição de disparo e as pessoas associadas.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setIsCreating(false)}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column: Basic Information */}
-            <div className="md:col-span-7 space-y-4">
+            <div className="lg:col-span-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Título da Intent *
@@ -607,7 +708,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                   id="intent-title-input"
                   type="text"
                   required
-                  placeholder="Ex: Mensagem para o Lançamento do Produto"
+                  placeholder="Ex: Acordo de Liberação de Chave de Acesso"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF] focus:border-transparent transition-all placeholder:text-slate-400"
@@ -616,15 +717,15 @@ export function IntentManager({ user }: IntentManagerProps) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Descrição Pública / Contexto
+                  Descrição Pública / Propósito
                 </label>
                 <textarea
                   id="intent-desc-input"
-                  rows={3}
-                  placeholder="Descreva o propósito da intenção (visível antes da revelação)..."
+                  rows={2}
+                  placeholder="Descreva o propósito da intenção (visível aos participantes)..."
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF] focus:border-transparent transition-all placeholder:text-slate-400"
+                  className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF] focus:border-transparent transition-all placeholder:text-slate-400"
                 />
               </div>
 
@@ -637,7 +738,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                     id="intent-status-select"
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as 'draft' | 'active')}
-                    className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                    className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
                   >
                     <option value="active">Ativa (Em andamento)</option>
                     <option value="draft">Rascunho</option>
@@ -652,121 +753,117 @@ export function IntentManager({ user }: IntentManagerProps) {
                     id="intent-visibility-select"
                     value={newVisibility}
                     onChange={(e) => setNewVisibility(e.target.value as 'private' | 'public')}
-                    className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                    className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
                   >
-                    <option value="private">Privada (Apenas você)</option>
+                    <option value="private">Privada (Apenas envolvidos)</option>
                     <option value="public">Pública (Rede Intent)</option>
                   </select>
                 </div>
               </div>
+
+              {/* Protected Content Area */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>Conteúdo Selado (Protegido até cumprimento das condições):</span>
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Mensagem, credenciais, contrato ou instrução confidencial que só será liberada aos destinatários..."
+                  value={newRevealContent}
+                  onChange={(e) => setNewRevealContent(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-[#0055FF] placeholder:text-slate-400"
+                />
+              </div>
             </div>
 
-            {/* Right Column: Etapa 3 - Temporal Condition Box */}
-            <div className="md:col-span-5 bg-[#F0F5FD] p-5 rounded-2xl border border-[#DCE7F6] space-y-4 flex flex-col justify-between">
+            {/* Right Column: Conditions & People Box */}
+            <div className="lg:col-span-6 bg-[#F0F5FD] p-5 rounded-2xl border border-[#DCE7F6] space-y-4">
+              {/* Condition Selector */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Timer className="w-4 h-4 text-[#0055FF]" />
-                    <span className="text-xs font-bold text-slate-800">
-                      Condição de Tempo (Etapa 3)
+                <label className="block text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4 text-[#0055FF]" />
+                  <span>Tipo de Trava / Condição:</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'NONE', label: 'Sem Trava', icon: Sparkles },
+                    { id: 'TIME', label: 'Tempo', icon: Timer },
+                    { id: 'PEOPLE', label: 'Pessoas / Guardiões', icon: Users },
+                    { id: 'HYBRID', label: 'Tempo + Pessoas', icon: Shield },
+                  ].map((t) => {
+                    const Icon = t.icon;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setNewConditionType(t.id as ConditionType)}
+                        className={`p-2 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                          newConditionType === t.id
+                            ? 'bg-[#0055FF] text-white shadow-xs'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="text-center">{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Time Configuration if TIME or HYBRID */}
+              {(newConditionType === 'TIME' || newConditionType === 'HYBRID') && (
+                <div className="p-3.5 bg-white rounded-xl border border-[#BFD7FE] space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Timer className="w-3.5 h-3.5 text-[#0055FF]" />
+                      <span>Configuração Temporal (Etapa 3)</span>
                     </span>
                   </div>
-
-                  {/* Toggle button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (newConditionType === 'TIME') {
-                        setNewConditionType('NONE');
-                        setNewTargetDate('');
+                  <div className="flex flex-wrap gap-1">
+                    {TIME_PRESETS.slice(0, 3).map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleApplyPreset(p.getDate)}
+                        className="px-2 py-0.5 bg-[#F0F5FD] hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded text-[10px] font-semibold"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={
+                      newTargetDate
+                        ? new Date(new Date(newTargetDate).getTime() - new Date().getTimezoneOffset() * 60000)
+                            .toISOString()
+                            .slice(0, 16)
+                        : ''
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setNewTargetDate(new Date(e.target.value).toISOString());
                       } else {
-                        setNewConditionType('TIME');
-                        setNewTargetDate(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+                        setNewTargetDate('');
                       }
                     }}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                      newConditionType === 'TIME'
-                        ? 'bg-[#0055FF] text-white shadow-xs'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {newConditionType === 'TIME' ? 'Trava Ativada' : 'Sem Trava'}
-                  </button>
+                    className="w-full px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
+                  />
                 </div>
+              )}
 
-                {newConditionType === 'TIME' ? (
-                  <div className="space-y-3.5">
-                    {/* Quick Presets */}
-                    <div>
-                      <span className="block text-[11px] font-semibold text-slate-600 mb-1.5">
-                        Atalhos de Tempo (Presets):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {TIME_PRESETS.map((preset, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleApplyPreset(preset.getDate)}
-                            className="px-2.5 py-1 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg text-[10px] font-semibold transition-all"
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* DateTime Input */}
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Data e Hora da Revelação:
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={
-                          newTargetDate
-                            ? new Date(new Date(newTargetDate).getTime() - new Date().getTimezoneOffset() * 60000)
-                                .toISOString()
-                                .slice(0, 16)
-                            : ''
-                        }
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            setNewTargetDate(new Date(e.target.value).toISOString());
-                          } else {
-                            setNewTargetDate('');
-                          }
-                        }}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
-                      />
-                    </div>
-
-                    {/* Protected Content to Reveal */}
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                        <span>Conteúdo Protegido (Mensagem Selada):</span>
-                        <Lock className="w-3 h-3 text-amber-600" />
-                      </label>
-                      <textarea
-                        rows={2}
-                        placeholder="Mensagem, link ou código que será revelado somente quando a data/hora for atingida..."
-                        value={newRevealContent}
-                        onChange={(e) => setNewRevealContent(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF] placeholder:text-slate-400"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 leading-relaxed py-2">
-                    Ative a trava temporal para selar um conteúdo ou meta que só será desbloqueado
-                    na data e hora estipuladas.
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-2 text-[11px] text-slate-400 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-[#0055FF]" />
-                <span>O conteúdo protegido permanece oculto até o disparo temporal.</span>
-              </div>
+              {/* People & Guardians Configuration if PEOPLE or HYBRID */}
+              {(newConditionType === 'PEOPLE' || newConditionType === 'HYBRID') && (
+                <ParticipantManager
+                  participants={newParticipants}
+                  onChange={setNewParticipants}
+                  requiredApprovals={newRequiredApprovals}
+                  onRequiredApprovalsChange={setNewRequiredApprovals}
+                  canSimulateSignatures={true}
+                />
+              )}
             </div>
           </div>
 
@@ -787,12 +884,12 @@ export function IntentManager({ user }: IntentManagerProps) {
               {isSubmitting ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Salvando...</span>
+                  <span>Salvando Intent...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Salvar Intent</span>
+                  <span>Salvar Intent com Pessoas</span>
                 </>
               )}
             </button>
@@ -808,20 +905,21 @@ export function IntentManager({ user }: IntentManagerProps) {
           <input
             id="search-intent-input"
             type="text"
-            placeholder="Buscar por título ou descrição..."
+            placeholder="Buscar título, guardião ou destinatário..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
           />
         </div>
 
-        {/* Status and Time Filters */}
+        {/* Status, Time and People Filters */}
         <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-1 hidden sm:block" />
           {[
             { key: 'all', label: 'Todas', count: intents.length },
-            { key: 'time_locked', label: '⏳ Trava de Tempo', count: totalLocked },
-            { key: 'time_revealed', label: '✨ Reveladas', count: totalRevealed },
+            { key: 'people_locked', label: '🛡️ Aguardando Guardiões', count: totalAwaitingSignatures },
+            { key: 'time_locked', label: '⏳ Trava de Tempo', count: intents.filter((i) => i.condition_type === 'TIME' || i.condition_type === 'HYBRID').length },
+            { key: 'revealed', label: '✨ Condições Cumpridas', count: intents.filter((i) => evaluateIntentConditions(i).isConditionSatisfied && i.condition_type !== 'NONE').length },
             { key: 'active', label: 'Ativas', count: intents.filter((i) => i.status === 'active').length },
             { key: 'draft', label: 'Rascunhos', count: intents.filter((i) => i.status === 'draft').length },
           ].map((tab) => (
@@ -852,22 +950,22 @@ export function IntentManager({ user }: IntentManagerProps) {
       {loading ? (
         <div className="bg-white rounded-3xl p-8 border border-[#DCE7F6] text-center space-y-4">
           <div className="w-8 h-8 border-3 border-[#0055FF] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-slate-500">Sincronizando intenções e condições temporais...</p>
+          <p className="text-xs text-slate-500">Sincronizando intenções, guardiões e quóruns...</p>
         </div>
       ) : filteredIntents.length === 0 ? (
         <div className="bg-white rounded-3xl p-10 border border-[#DCE7F6] text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-[#EAF2FF] text-[#0055FF] flex items-center justify-center mx-auto">
-            <Layers className="w-6 h-6" />
+            <Users className="w-6 h-6" />
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-800">
               {searchQuery || filterStatus !== 'all'
                 ? 'Nenhuma Intent encontrada com estes filtros.'
-                : 'Você ainda não possui nenhuma Intent criada.'}
+                : 'Você ainda não possui nenhuma Intent com pessoas configurada.'}
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              Experimente criar sua primeira Intent com condição temporal para testar o gatilho
-              de tempo e a revelação automática.
+              Experimente criar sua primeira Intent adicionando guardiões para aprovação descentralizada
+              e destinatários.
             </p>
           </div>
           {!isCreating && (
@@ -876,15 +974,16 @@ export function IntentManager({ user }: IntentManagerProps) {
               className="px-5 py-2.5 rounded-xl bg-[#0055FF] text-white text-xs font-bold hover:bg-[#0047E0] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Criar Intent com Tempo</span>
+              <span>Criar Intent com Pessoas & Guardiões</span>
             </button>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredIntents.map((intent) => {
-            const timeInfo = calculateTimeRemaining(intent.created_at, intent.target_date);
-            const hasTimeLock = intent.condition_type === 'TIME' && !!intent.target_date;
+            const evalResult = evaluateIntentConditions(intent);
+            const conditionType = intent.condition_type || 'NONE';
+            const hasGuardians = evalResult.totalGuardians > 0;
 
             return (
               <div
@@ -895,20 +994,25 @@ export function IntentManager({ user }: IntentManagerProps) {
                 <div>
                   {/* Top Badges */}
                   <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {getStatusBadge(intent.status)}
-                      {hasTimeLock && (
-                        timeInfo.isMatured ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+
+                      {/* Condition Badge */}
+                      {conditionType !== 'NONE' && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            evalResult.isConditionSatisfied
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}
+                        >
+                          {evalResult.isConditionSatisfied ? (
                             <Unlock className="w-3 h-3 text-emerald-600" />
-                            <span>Revelado!</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                          ) : (
                             <Lock className="w-3 h-3 text-amber-600" />
-                            <span>Selado</span>
-                          </span>
-                        )
+                          )}
+                          <span>{evalResult.badgeLabel}</span>
+                        </span>
                       )}
                     </div>
 
@@ -926,37 +1030,75 @@ export function IntentManager({ user }: IntentManagerProps) {
                     {intent.description || 'Sem descrição informada.'}
                   </p>
 
-                  {/* Etapa 3 Time Condition Widget inside Card */}
-                  {hasTimeLock && (
+                  {/* Etapa 4: Participants Avatars & Summary Badge */}
+                  {evalResult.totalParticipants > 0 && (
                     <div className="mt-3.5 p-3 rounded-xl bg-[#F0F5FD] border border-[#DCE7F6] space-y-2">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-semibold text-slate-700 flex items-center gap-1">
-                          <Timer className="w-3.5 h-3.5 text-[#0055FF]" />
-                          <span>Gatilho Temporal:</span>
-                        </span>
-                        <span
-                          className={`font-mono font-bold ${
-                            timeInfo.isMatured ? 'text-emerald-600' : 'text-amber-700'
-                          }`}
-                        >
-                          {timeInfo.formattedCountdown}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#0055FF]" />
+                          <span className="font-semibold text-slate-700">
+                            {evalResult.totalGuardians} Guardião(ões) • {evalResult.recipients.length} Destinatário(s)
+                          </span>
+                        </div>
+
+                        {hasGuardians && (
+                          <span
+                            className={`font-mono font-bold text-[10px] px-2 py-0.2 rounded-full ${
+                              evalResult.isPeopleConditionSatisfied
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {evalResult.approvedGuardiansCount}/{evalResult.requiredApprovals} assinaturas
+                          </span>
+                        )}
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-500 ${
-                            timeInfo.isMatured ? 'bg-emerald-500' : 'bg-[#0055FF]'
-                          }`}
-                          style={{ width: `${timeInfo.progressPercent}%` }}
-                        />
+                      {/* Small avatar row */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {(intent.participants || []).slice(0, 4).map((p) => (
+                          <div
+                            key={p.id}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium ${
+                              p.role === 'guardian'
+                                ? p.status === 'approved'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                            }`}
+                            title={`${p.name} (${p.role}) - ${p.status === 'approved' ? 'Assinado' : 'Pendente'}`}
+                          >
+                            {p.role === 'guardian' && (
+                              <Shield className="w-2.5 h-2.5 text-amber-600" />
+                            )}
+                            {p.role === 'recipient' && (
+                              <Send className="w-2.5 h-2.5 text-indigo-600" />
+                            )}
+                            <span className="truncate max-w-[80px]">{p.name.split(' ')[0]}</span>
+                            {p.status === 'approved' && (
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                            )}
+                          </div>
+                        ))}
+                        {(intent.participants || []).length > 4 && (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            +{(intent.participants || []).length - 4}
+                          </span>
+                        )}
                       </div>
+                    </div>
+                  )}
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  {/* Time Condition summary if configured */}
+                  {(conditionType === 'TIME' || conditionType === 'HYBRID') && intent.target_date && (
+                    <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-slate-600">
+                        <Timer className="w-3 h-3 text-[#0055FF]" />
                         <span>Alvo: {formatTargetDateTime(intent.target_date)}</span>
-                        <span>{timeInfo.progressPercent}% decorrido</span>
-                      </div>
+                      </span>
+                      <span className="font-mono font-bold text-amber-700">
+                        {evalResult.timeResult.formattedCountdown}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -971,7 +1113,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      title="Visualizar Detalhes e Condição de Tempo"
+                      title="Visualizar Detalhes, Pessoas e Assinaturas"
                       onClick={() => handleOpenDetails(intent)}
                       className="px-3 py-1.5 rounded-lg bg-[#F0F5FD] hover:bg-[#E2EDFF] text-[#0055FF] text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
                     >
@@ -995,30 +1137,30 @@ export function IntentManager({ user }: IntentManagerProps) {
         </div>
       )}
 
-      {/* Modal: View & Edit Intent Details (with full Etapa 3 Time Revelation support) */}
+      {/* Modal: View & Edit Intent Details (with full Etapa 3 Time & Etapa 4 People support) */}
       {selectedIntent && (() => {
-        const timeInfo = calculateTimeRemaining(selectedIntent.created_at, selectedIntent.target_date);
-        const hasTimeLock = selectedIntent.condition_type === 'TIME' && !!selectedIntent.target_date;
+        const evalResult = evaluateIntentConditions(selectedIntent);
+        const conditionType = selectedIntent.condition_type || 'NONE';
 
         return (
           <div
             id="intent-details-modal"
             className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <div className="bg-white rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 space-y-6">
               {/* Header */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-[#EAF2FF] text-[#0055FF] flex items-center justify-center font-bold">
-                    {hasTimeLock ? (
-                      timeInfo.isMatured ? <Unlock className="w-5 h-5 text-emerald-600" /> : <Hourglass className="w-5 h-5 text-[#0055FF]" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-[#EAF2FF] text-[#0055FF] flex items-center justify-center font-bold">
+                    {evalResult.isConditionSatisfied ? (
+                      <Unlock className="w-5 h-5 text-emerald-600" />
                     ) : (
-                      <Layers className="w-5 h-5" />
+                      <Lock className="w-5 h-5 text-amber-600" />
                     )}
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">
-                      {isEditing ? 'Editar Intent' : 'Detalhes da Intent'}
+                      {isEditing ? 'Editar Intenção' : selectedIntent.title}
                     </h3>
                     <p className="text-[11px] text-slate-400 font-mono">ID: {selectedIntent.id}</p>
                   </div>
@@ -1036,7 +1178,7 @@ export function IntentManager({ user }: IntentManagerProps) {
               </div>
 
               {/* Modal Body */}
-              <div className="py-5 space-y-4">
+              <div className="space-y-5">
                 {isEditing ? (
                   /* Edit Mode */
                   <div className="space-y-4">
@@ -1046,7 +1188,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                        className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
                       />
                     </div>
 
@@ -1056,7 +1198,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                         rows={3}
                         value={editDescription}
                         onChange={(e) => setEditDescription(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                        className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
                       />
                     </div>
 
@@ -1090,252 +1232,181 @@ export function IntentManager({ user }: IntentManagerProps) {
                       </div>
                     </div>
 
-                    {/* Edit Time Condition */}
-                    <div className="p-4 bg-[#F0F5FD] rounded-2xl border border-[#DCE7F6] space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Timer className="w-4 h-4 text-[#0055FF]" />
-                          <span>Condição Temporal:</span>
-                        </span>
+                    {/* Condition Type */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Tipo de Trava / Condição
+                      </label>
+                      <select
+                        value={editConditionType}
+                        onChange={(e) => setEditConditionType(e.target.value as ConditionType)}
+                        className="w-full px-3 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
+                      >
+                        <option value="NONE">Sem Trava (Livre)</option>
+                        <option value="TIME">Trava de Tempo (Etapa 3)</option>
+                        <option value="PEOPLE">Pessoas & Guardiões (Etapa 4)</option>
+                        <option value="HYBRID">Híbrido (Tempo + Guardiões)</option>
+                      </select>
+                    </div>
 
-                        <select
-                          value={editConditionType}
-                          onChange={(e) => setEditConditionType(e.target.value as ConditionType)}
-                          className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
-                        >
-                          <option value="NONE">Sem Trava Temporal</option>
-                          <option value="TIME">Com Trava Temporal (TIME)</option>
-                        </select>
-                      </div>
+                    {/* Protected Content */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Conteúdo Selado (Mensagem / Código):</span>
+                        <Lock className="w-3.5 h-3.5 text-amber-600" />
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editRevealContent}
+                        onChange={(e) => setEditRevealContent(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs text-slate-800"
+                      />
+                    </div>
 
-                      {editConditionType === 'TIME' && (
-                        <div className="space-y-3 pt-2">
-                          <div className="flex flex-wrap gap-1.5">
-                            {TIME_PRESETS.map((preset, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => handleApplyEditPreset(preset.getDate)}
-                                className="px-2 py-0.5 bg-white text-[#0055FF] border border-[#BFD7FE] rounded text-[10px] font-semibold"
-                              >
-                                {preset.label}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              Data e Hora Alvo:
-                            </label>
-                            <input
-                              type="datetime-local"
-                              value={
-                                editTargetDate
-                                  ? new Date(new Date(editTargetDate).getTime() - new Date().getTimezoneOffset() * 60000)
-                                      .toISOString()
-                                      .slice(0, 16)
-                                  : ''
-                              }
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  setEditTargetDate(new Date(e.target.value).toISOString());
-                                }
-                              }}
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                              Conteúdo Selado para Revelação:
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={editRevealContent}
-                              onChange={(e) => setEditRevealContent(e.target.value)}
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
-                            />
-                          </div>
-                        </div>
-                      )}
+                    {/* People section in edit */}
+                    <div className="p-4 bg-[#F0F5FD] rounded-2xl border border-[#DCE7F6]">
+                      <ParticipantManager
+                        participants={editParticipants}
+                        onChange={setEditParticipants}
+                        requiredApprovals={editRequiredApprovals}
+                        onRequiredApprovalsChange={setEditRequiredApprovals}
+                        canSimulateSignatures={true}
+                      />
                     </div>
                   </div>
                 ) : (
                   /* View Mode */
-                  <div className="space-y-5">
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="space-y-6">
+                    {/* Status overview bar */}
+                    <div className="flex items-center justify-between gap-2 p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200">
+                      <div className="flex items-center gap-2">
                         {getStatusBadge(selectedIntent.status)}
-                        <span className="text-xs text-slate-400">
-                          {selectedIntent.visibility === 'public' ? 'Visibilidade Pública' : 'Visibilidade Privada'}
+                        <span className="text-xs text-slate-500 font-medium">
+                          {selectedIntent.visibility === 'public' ? 'Pública' : 'Privada'}
                         </span>
                       </div>
-                      <h4 className="text-xl font-extrabold text-slate-900 mt-2">{selectedIntent.title}</h4>
-                      <p className="text-sm text-slate-600 mt-2 bg-[#F8FAFC] p-4 rounded-2xl border border-slate-100 whitespace-pre-wrap leading-relaxed">
-                        {selectedIntent.description || 'Nenhuma descrição fornecida.'}
+
+                      <span className="text-xs text-slate-400">
+                        Criada em {formatDate(selectedIntent.created_at)}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-700 mb-1">Descrição / Contexto:</h5>
+                      <p className="text-sm text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200 leading-relaxed">
+                        {selectedIntent.description || 'Nenhuma descrição adicionada.'}
                       </p>
                     </div>
 
-                    {/* Temporal Condition Revelation Panel (Etapa 3 Core) */}
-                    {hasTimeLock ? (
-                      <div className="p-5 rounded-2xl bg-gradient-to-br from-[#F0F5FD] to-[#E5EFFF] border-2 border-[#BFD7FE] space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Timer className="w-5 h-5 text-[#0055FF]" />
-                            <div>
-                              <h5 className="text-sm font-bold text-slate-900">
-                                Condição Temporal de Revelação
-                              </h5>
-                              <span className="text-[11px] text-slate-500">
-                                Disparo programado: {formatTargetDateTime(selectedIntent.target_date)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {timeInfo.isMatured ? (
-                            <span className="px-3 py-1 bg-emerald-500 text-white rounded-full text-xs font-bold shadow-xs flex items-center gap-1">
-                              <Unlock className="w-3.5 h-3.5" />
-                              <span>Revelado!</span>
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 bg-amber-500 text-white rounded-full text-xs font-bold shadow-xs flex items-center gap-1 animate-pulse">
-                              <Lock className="w-3.5 h-3.5" />
-                              <span>Bloqueado</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Live Countdown Clock */}
-                        <div className="bg-white p-4 rounded-xl border border-[#DCE7F6] flex flex-col items-center justify-center text-center">
-                          <span className="text-xs font-semibold text-slate-400 mb-1">
-                            Tempo Restante para Desbloqueio:
-                          </span>
-                          <span
-                            className={`text-xl md:text-2xl font-black font-mono tracking-tight ${
-                              timeInfo.isMatured ? 'text-emerald-600' : 'text-[#0055FF]'
-                            }`}
-                          >
-                            {timeInfo.formattedCountdown}
-                          </span>
-
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-3">
-                            <div
-                              className={`h-full transition-all duration-500 ${
-                                timeInfo.isMatured ? 'bg-emerald-500' : 'bg-[#0055FF]'
-                              }`}
-                              style={{ width: `${timeInfo.progressPercent}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Revealed Content vs Locked Sealed Content */}
-                        {timeInfo.isMatured ? (
-                          <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                            <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                              <Sparkles className="w-4 h-4 text-emerald-600" />
-                              <span>CONTEÚDO REVELADO COM SUCESSO:</span>
-                            </div>
-                            <p className="text-sm font-semibold text-slate-800 bg-white p-3.5 rounded-xl border border-emerald-200 whitespace-pre-wrap">
-                              {selectedIntent.reveal_content || 'Esta intenção atingiu seu momento de revelação.'}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 relative overflow-hidden">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-                                <EyeOff className="w-4 h-4" />
-                                <span>CONTEÚDO SELADO TEMPORALMENTE</span>
-                              </div>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                Proteção Ativa
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                              O conteúdo configurado pelo criador está protegido e será liberado
-                              automaticamente quando a data/hora definida for atingida.
-                            </p>
-
-                            {/* Instant Simulation Button for rapid testing */}
-                            <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                              <span className="text-[11px] text-slate-400">Deseja testar agora?</span>
-                              <button
-                                type="button"
-                                onClick={() => handleSimulateInstantReveal(selectedIntent)}
-                                className="px-3 py-1.5 bg-[#0055FF] hover:bg-[#0047E0] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
-                              >
-                                <Zap className="w-3.5 h-3.5 text-amber-300" />
-                                <span>Simular Revelação Imediata</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                    {/* Etapa 4: Interactive Participants & Guardians Section */}
+                    <div className="p-4 bg-[#F0F5FD] rounded-2xl border border-[#DCE7F6] space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-[#0055FF]" />
+                          <span>Pessoas & Guardiões Associados</span>
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Clique em "Assinar" para simular a validação
+                        </span>
                       </div>
-                    ) : (
-                      <div className="p-3.5 bg-[#F8FAFC] rounded-2xl border border-slate-200 text-xs text-slate-500 flex items-center justify-between">
-                        <span>Sem condição temporal configurada para esta Intent.</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditing(true);
-                            setEditConditionType('TIME');
-                            setEditTargetDate(new Date(Date.now() + 2 * 60 * 1000).toISOString());
-                          }}
-                          className="text-[#0055FF] font-bold hover:underline"
-                        >
-                          Adicionar Trava de Tempo
-                        </button>
+
+                      <ParticipantManager
+                        participants={selectedIntent.participants || []}
+                        onChange={handleUpdateParticipantsOnIntent}
+                        requiredApprovals={selectedIntent.required_approvals}
+                        canSimulateSignatures={true}
+                        isReadOnly={false}
+                      />
+                    </div>
+
+                    {/* Etapa 3: Time Widget if applicable */}
+                    {(conditionType === 'TIME' || conditionType === 'HYBRID') && selectedIntent.target_date && (
+                      <div className="p-4 bg-[#FFFBF0] rounded-2xl border border-[#FDE68A] space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                            <Timer className="w-4 h-4 text-amber-700" />
+                            <span>Condição Temporal:</span>
+                          </span>
+                          <span className="font-mono font-bold text-amber-800">
+                            {evalResult.timeResult.formattedCountdown}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-700">
+                          Data alvo: {formatTargetDateTime(selectedIntent.target_date)}
+                        </p>
                       </div>
                     )}
 
-                    {/* Metadata Info */}
-                    <div className="bg-[#F0F5FD] rounded-2xl p-4 border border-[#DCE7F6] space-y-2.5 text-xs text-slate-600">
+                    {/* Protected Content Revelation Box */}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 font-medium text-slate-500">
-                          <User className="w-3.5 h-3.5 text-[#0055FF]" />
-                          <span>Criador:</span>
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          {evalResult.isConditionSatisfied ? (
+                            <Unlock className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <Lock className="w-4 h-4 text-amber-600" />
+                          )}
+                          <span>Conteúdo Revelado / Selado</span>
                         </span>
-                        <span className="font-semibold text-slate-800">{user.name}</span>
+
+                        {!evalResult.isConditionSatisfied && (
+                          <button
+                            type="button"
+                            onClick={() => handleSimulateInstantReveal(selectedIntent)}
+                            className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <Zap className="w-3 h-3 text-amber-700" />
+                            <span>Simular Revelação Imediata</span>
+                          </button>
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 font-medium text-slate-500">
-                          <Calendar className="w-3.5 h-3.5 text-[#0055FF]" />
-                          <span>Criada em:</span>
-                        </span>
-                        <span className="font-mono text-slate-800">{formatDate(selectedIntent.created_at)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 font-medium text-slate-500">
-                          <Shield className="w-3.5 h-3.5 text-[#0055FF]" />
-                          <span>Controle de Acesso:</span>
-                        </span>
-                        <span className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          Autorizado (Proprietário)
-                        </span>
-                      </div>
+                      {evalResult.isConditionSatisfied ? (
+                        <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl space-y-2 animate-in zoom-in-95 duration-200">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>Condições Satisfeitas! Mensagem Liberada:</span>
+                          </div>
+                          <div className="p-3 bg-white rounded-xl border border-emerald-100 text-sm font-mono text-emerald-950 whitespace-pre-wrap">
+                            {selectedIntent.reveal_content || 'Nenhum texto protegido configurado.'}
+                          </div>
+                          <p className="text-[10px] text-emerald-600">
+                            Acesso autorizado para os destinatários vinculados a esta intenção.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl text-center space-y-2">
+                          <Lock className="w-6 h-6 text-slate-400 mx-auto" />
+                          <p className="text-xs font-bold text-slate-700">
+                            Conteúdo Protegido por Trava
+                          </p>
+                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                            {evalResult.statusSummary}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Modal Actions */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 {isEditing ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setIsEditing(false)}
-                      className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                      className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold"
                     >
                       Cancelar
                     </button>
                     <button
                       type="button"
-                      onClick={handleSaveEdit}
                       disabled={isSubmitting}
-                      className="px-5 py-2 rounded-xl bg-[#0055FF] text-white text-xs font-bold hover:bg-[#0047E0] transition-colors cursor-pointer"
+                      onClick={handleSaveEdit}
+                      className="px-5 py-2 rounded-xl bg-[#0055FF] text-white text-xs font-bold hover:bg-[#0047E0] transition-colors"
                     >
                       {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
                     </button>
@@ -1345,7 +1416,7 @@ export function IntentManager({ user }: IntentManagerProps) {
                     <button
                       type="button"
                       onClick={() => setDeleteConfirmId(selectedIntent.id)}
-                      className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Excluir</span>
@@ -1355,11 +1426,12 @@ export function IntentManager({ user }: IntentManagerProps) {
                       <button
                         type="button"
                         onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                         <span>Editar</span>
                       </button>
+
                       <button
                         type="button"
                         onClick={() => setSelectedIntent(null)}
@@ -1376,31 +1448,32 @@ export function IntentManager({ user }: IntentManagerProps) {
         );
       })()}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Dialog */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
-            <div>
-              <h4 className="text-base font-bold text-slate-900">Excluir esta Intent?</h4>
+            <div className="text-center">
+              <h4 className="text-base font-bold text-slate-900">Excluir esta Intenção?</h4>
               <p className="text-xs text-slate-500 mt-1">
-                Esta ação removerá permanentemente a intenção e suas condições temporais.
+                Esta ação removerá a intent e desvinculará todos os guardiões e destinatários
+                associados. Esta operação não pode ser desfeita.
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition-all cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => handleDeleteIntent(deleteConfirmId)}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md"
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer"
               >
                 Sim, Excluir
               </button>
