@@ -3,7 +3,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInAnonymously,
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser,
@@ -16,7 +15,7 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-export { signInWithPopup, signInAnonymously, signOut, onAuthStateChanged };
+export { signInWithPopup, signOut, onAuthStateChanged };
 export type { FirebaseUser };
 
 export enum OperationType {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, ArrowRight, ShieldCheck, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { UserAccount } from '../types';
-import { auth, googleProvider, signInWithPopup, signInAnonymously } from '../utils/firebase';
+import { auth, googleProvider, signInWithPopup } from '../utils/firebase';
 import { setCurrentSessionUser, registerNewUser, loginUser, getStoredUsers } from '../utils/storage';
 
 interface AuthGateProps {
@@ -16,15 +16,6 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Helper to ensure Firebase Auth session is active
-  const ensureFirebaseAuth = async (displayName?: string, userEmail?: string): Promise<string> => {
-    if (auth.currentUser) {
-      return auth.currentUser.uid;
-    }
-    const cred = await signInAnonymously(auth);
-    return cred.user.uid;
-  };
 
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
@@ -48,36 +39,19 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
       }, 400);
     } catch (err: unknown) {
       console.error('Google Sign In Error:', err);
-      // If popup is blocked or closed, fall back to guest session
-      try {
-        const uid = await ensureFirebaseAuth();
-        const userAccount: UserAccount = {
-          id: uid,
-          name: 'Usuário Convidado',
-          email: 'convidado@intent.app',
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-        setCurrentSessionUser(userAccount);
-        onAuthenticated(userAccount);
-      } catch {
-        setErrorMsg('Não foi possível conectar com o Google. Tente pelo formulário abaixo.');
-      }
+      setErrorMsg('Não foi possível conectar com o Google. Verifique a janela de login.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsLoading(true);
 
     try {
-      // Authenticate with Firebase first to obtain a valid Firebase Auth UID
-      const fbUid = await ensureFirebaseAuth(name, email);
-
       if (isRegisterMode) {
         if (!name.trim()) {
           setErrorMsg('Por favor, informe seu nome.');
@@ -89,22 +63,22 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
           setIsLoading(false);
           return;
         }
-        const user = registerNewUser(name, email, password, fbUid);
+        const user = registerNewUser(name, email, password);
         setSuccessMsg('Cadastro realizado com sucesso! Redirecionando...');
         setTimeout(() => {
           onAuthenticated(user);
-        }, 400);
+        }, 300);
       } else {
         if (!email.trim()) {
           setErrorMsg('Por favor, informe seu e-mail cadastrado.');
           setIsLoading(false);
           return;
         }
-        const user = loginUser(email, password, fbUid);
+        const user = loginUser(email, password);
         setSuccessMsg('Login realizado com sucesso! Acessando...');
         setTimeout(() => {
           onAuthenticated(user);
-        }, 400);
+        }, 300);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -117,14 +91,12 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
     }
   };
 
-  const handleQuickDemoLogin = async () => {
+  const handleQuickDemoLogin = () => {
     setErrorMsg(null);
     setIsLoading(true);
     try {
-      const fbUid = await ensureFirebaseAuth('Rafael', 'rafael@exemplo.com');
       const users = getStoredUsers();
-      const demo = users[0] || registerNewUser('Rafael', 'rafael@exemplo.com', '123', fbUid);
-      demo.id = fbUid;
+      const demo = users[0] || registerNewUser('Rafael', 'rafael@exemplo.com', '123');
       setCurrentSessionUser(demo);
       onAuthenticated(demo);
     } catch (err) {
@@ -193,7 +165,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
-            className="w-full py-3 px-4 mb-6 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer hover:border-slate-300 disabled:opacity-50"
+            className="w-full py-3.5 px-4 mb-6 rounded-xl border-2 border-[#BFD7FE] bg-[#F4F8FF] hover:bg-[#EAF2FF] text-[#0047E0] font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-3 cursor-pointer hover:border-[#0055FF] active:scale-[0.99] disabled:opacity-50"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -213,7 +185,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>Continuar com Google</span>
+            <span>Continuar com Google (Recomendado)</span>
           </button>
 
           <div className="relative flex py-2 items-center mb-6">

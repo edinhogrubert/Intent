@@ -9,7 +9,7 @@ import { DynamicGreetingCard } from './components/DynamicGreetingCard';
 import { AccountStatusCard } from './components/AccountStatusCard';
 import { BottomCardsRow } from './components/BottomCardsRow';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
-import { auth, signOut, onAuthStateChanged, signInAnonymously } from './utils/firebase';
+import { auth, signOut, onAuthStateChanged } from './utils/firebase';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
