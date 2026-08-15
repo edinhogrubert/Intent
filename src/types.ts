@@ -8,6 +8,16 @@ export interface UserAccount {
   avatarUrl?: string;
 }
 
+export interface Intent {
+  id: string;
+  creator_id: string;
+  title: string;
+  description: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  created_at: string;
+  visibility: 'private' | 'public';
+}
+
 export type TimeOfDay = 'morning' | 'afternoon' | 'night';
 
 export interface GreetingConfig {
