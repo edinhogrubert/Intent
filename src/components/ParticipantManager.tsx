@@ -6,23 +6,21 @@ import {
   Eye,
   CheckCircle2,
   Clock,
-  XCircle,
   Plus,
   Trash2,
   Sparkles,
-  UserCheck,
-  UserX,
-  AlertCircle,
   Key,
 } from 'lucide-react';
-import { Participant, ParticipantRole, ParticipantStatus } from '../types';
-import { SAMPLE_PEOPLE_PRESETS } from '../utils/conditionEvaluator';
+import { Participant, ParticipantRole, ParticipantStatus, QuorumMode } from '../types';
+import { calculateEffectiveRequiredApprovals } from '../utils/conditionEvaluator';
 
 interface ParticipantManagerProps {
   participants: Participant[];
   onChange: (updated: Participant[]) => void;
   requiredApprovals?: number;
   onRequiredApprovalsChange?: (num: number) => void;
+  quorumMode?: QuorumMode;
+  onQuorumModeChange?: (mode: QuorumMode) => void;
   isReadOnly?: boolean;
   canSimulateSignatures?: boolean;
 }
@@ -32,6 +30,8 @@ export function ParticipantManager({
   onChange,
   requiredApprovals,
   onRequiredApprovalsChange,
+  quorumMode = 'EXACT_N',
+  onQuorumModeChange,
   isReadOnly = false,
   canSimulateSignatures = true,
 }: ParticipantManagerProps) {
@@ -41,13 +41,15 @@ export function ParticipantManager({
   const [notes, setNotes] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
-  const guardians = participants.filter((p) => p.role === 'guardian');
+  const guardians = participants.filter((p) => p.role === 'guardian' || p.role === 'approver');
   const approvedGuardians = guardians.filter((g) => g.status === 'approved');
-  const recipients = participants.filter((p) => p.role === 'recipient');
-  const viewers = participants.filter((p) => p.role === 'viewer');
+  const declinedGuardians = guardians.filter((g) => g.status === 'declined');
 
-  const quorumNeeded = requiredApprovals !== undefined ? requiredApprovals : Math.max(1, guardians.length);
-  const isQuorumReached = guardians.length === 0 || approvedGuardians.length >= quorumNeeded;
+  // Generic calculation of required quorum
+  const { required: effectiveQuorum, description: quorumFormulaDesc } =
+    calculateEffectiveRequiredApprovals(guardians.length, quorumMode, requiredApprovals);
+
+  const isQuorumReached = guardians.length === 0 || approvedGuardians.length >= effectiveQuorum;
 
   const handleAddParticipant = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -69,12 +71,88 @@ export function ParticipantManager({
     setIsAdding(false);
   };
 
-  const handleAddPreset = (preset: typeof SAMPLE_PEOPLE_PRESETS[0]) => {
-    const newParticipant: Participant = {
-      ...preset,
-      id: 'p-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
-    };
-    onChange([...participants, newParticipant]);
+  const handleLoadPresetCase = (type: '2_OF_2' | '2_OF_3' | '3_OF_5' | '4_OF_5') => {
+    if (type === '2_OF_2') {
+      const p1: Participant = {
+        id: 'app-flavio',
+        name: 'Flávio',
+        email: 'flavio@conselho.org',
+        role: 'approver',
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+        notes: 'Aprovador #1 (✓)',
+      };
+      const p2: Participant = {
+        id: 'app-fernando',
+        name: 'Fernando',
+        email: 'fernando@conselho.org',
+        role: 'approver',
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+        notes: 'Aprovador #2 (✓)',
+      };
+      onChange([p1, p2]);
+      if (onQuorumModeChange) onQuorumModeChange('UNANIMOUS');
+      if (onRequiredApprovalsChange) onRequiredApprovalsChange(2);
+    } else if (type === '2_OF_3') {
+      const p1: Participant = {
+        id: 'app-flavio',
+        name: 'Flávio',
+        email: 'flavio@conselho.org',
+        role: 'approver',
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+        notes: 'Aprovador #1 (✓ Aprovado)',
+      };
+      const p2: Participant = {
+        id: 'app-fernando',
+        name: 'Fernando',
+        email: 'fernando@conselho.org',
+        role: 'approver',
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+        notes: 'Aprovador #2 (✓ Aprovado)',
+      };
+      const p3: Participant = {
+        id: 'app-maria',
+        name: 'Maria',
+        email: 'maria@conselho.org',
+        role: 'approver',
+        status: 'pending',
+        notes: 'Aprovadora #3 (— Pendente)',
+      };
+      onChange([p1, p2, p3]);
+      if (onQuorumModeChange) onQuorumModeChange('MAJORITY');
+      if (onRequiredApprovalsChange) onRequiredApprovalsChange(2);
+    } else if (type === '3_OF_5') {
+      const names = ['Flávio', 'Fernando', 'Maria', 'Roberto', 'Helena'];
+      const pList: Participant[] = names.map((n, idx) => ({
+        id: `app-5-${idx + 1}`,
+        name: n,
+        email: `${n.toLowerCase()}@conselho.org`,
+        role: 'approver',
+        status: idx < 2 ? 'approved' : 'pending',
+        approved_at: idx < 2 ? new Date().toISOString() : undefined,
+        notes: `Conselheiro #${idx + 1}`,
+      }));
+      onChange(pList);
+      if (onQuorumModeChange) onQuorumModeChange('EXACT_N');
+      if (onRequiredApprovalsChange) onRequiredApprovalsChange(3);
+    } else if (type === '4_OF_5') {
+      const names = ['Flávio', 'Fernando', 'Maria', 'Roberto', 'Helena'];
+      const pList: Participant[] = names.map((n, idx) => ({
+        id: `app-5-${idx + 1}`,
+        name: n,
+        email: `${n.toLowerCase()}@conselho.org`,
+        role: 'approver',
+        status: idx < 3 ? 'approved' : 'pending',
+        approved_at: idx < 3 ? new Date().toISOString() : undefined,
+        notes: `Conselheiro #${idx + 1}`,
+      }));
+      onChange(pList);
+      if (onQuorumModeChange) onQuorumModeChange('SUPERMAJORITY');
+      if (onRequiredApprovalsChange) onRequiredApprovalsChange(4);
+    }
   };
 
   const handleRemove = (id: string) => {
@@ -100,10 +178,11 @@ export function ParticipantManager({
   const getRoleBadge = (r: ParticipantRole) => {
     switch (r) {
       case 'guardian':
+      case 'approver':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
             <Shield className="w-3 h-3 text-amber-600" />
-            <span>Guardião (Aprovador)</span>
+            <span>Aprovador / Guardião</span>
           </span>
         );
       case 'recipient':
@@ -114,6 +193,7 @@ export function ParticipantManager({
           </span>
         );
       case 'viewer':
+      case 'participant':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
             <Eye className="w-3 h-3 text-slate-500" />
@@ -128,21 +208,26 @@ export function ParticipantManager({
       {/* Guardian Quorum Status Bar */}
       {guardians.length > 0 && (
         <div className="p-3.5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Key className="w-4 h-4 text-[#0055FF]" />
-              <span className="text-xs font-bold text-slate-800">
-                Quórum de Guardiões (Assinaturas)
-              </span>
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">
+                  Motor de Aprovação & Quórum (Etapa 5)
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  {quorumFormulaDesc}
+                </span>
+              </div>
             </div>
             <span
-              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
+              className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${
                 isQuorumReached
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : 'bg-amber-100 text-amber-800 border border-amber-300'
               }`}
             >
-              {approvedGuardians.length} de {quorumNeeded} aprovado(s)
+              {approvedGuardians.length} de {effectiveQuorum} aprovado(s)
             </span>
           </div>
 
@@ -155,91 +240,109 @@ export function ParticipantManager({
               style={{
                 width: `${Math.min(
                   100,
-                  quorumNeeded > 0 ? (approvedGuardians.length / quorumNeeded) * 100 : 100
+                  effectiveQuorum > 0 ? (approvedGuardians.length / effectiveQuorum) * 100 : 100
                 )}%`,
               }}
             />
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
             <span className="flex items-center gap-1">
               {isQuorumReached ? (
                 <span className="text-emerald-700 font-bold">
-                  ✓ Quórum atingido ({approvedGuardians.length}/{quorumNeeded})! Condição pronta para revelar.
+                  ✓ Quórum atingido ({approvedGuardians.length}/{effectiveQuorum})! Condição pronta para revelar.
                 </span>
               ) : (
                 <span className="text-amber-700 font-bold">
-                  — Aguardando {Math.max(0, quorumNeeded - approvedGuardians.length)} assinatura(s) para atingir {quorumNeeded}/{guardians.length || 3}.
+                  — Aguardando {Math.max(0, effectiveQuorum - approvedGuardians.length)} assinatura(s) para atingir {effectiveQuorum}/{guardians.length}.
                 </span>
               )}
             </span>
-            {onRequiredApprovalsChange && !isReadOnly && (
-              <div className="flex items-center gap-1.5">
-                <span>Quórum exigido:</span>
+
+            {/* Quorum Mode & Rule Selector */}
+            {!isReadOnly && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="font-semibold text-slate-600">Regra:</span>
                 <select
-                  value={quorumNeeded}
-                  onChange={(e) => onRequiredApprovalsChange(Number(e.target.value))}
-                  className="bg-[#F8FAFC] border border-slate-200 rounded-md text-[11px] px-1.5 py-0.5 font-bold text-[#0055FF]"
+                  value={quorumMode}
+                  onChange={(e) => {
+                    const newM = e.target.value as QuorumMode;
+                    if (onQuorumModeChange) onQuorumModeChange(newM);
+                  }}
+                  className="bg-[#F8FAFC] border border-slate-200 rounded-md text-[11px] px-2 py-0.5 font-bold text-[#0055FF]"
                 >
-                  {Array.from({ length: guardians.length || 3 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n}/{guardians.length || 3} ({n === (guardians.length || 3) ? 'Unânime' : `${n} aprovações`})
-                    </option>
-                  ))}
+                  <option value="UNANIMOUS">UNANIMIDADE (Todos)</option>
+                  <option value="MAJORITY">MAIORIA SIMPLES (&gt;50%)</option>
+                  <option value="SUPERMAJORITY">MAIORIA QUALIFICADA (2/3)</option>
+                  <option value="EXACT_N">QUÓRUM M de N</option>
                 </select>
+
+                {quorumMode === 'EXACT_N' && onRequiredApprovalsChange && (
+                  <select
+                    value={requiredApprovals || effectiveQuorum}
+                    onChange={(e) => onRequiredApprovalsChange(Number(e.target.value))}
+                    className="bg-[#F8FAFC] border border-slate-200 rounded-md text-[11px] px-1.5 py-0.5 font-bold text-slate-700"
+                  >
+                    {Array.from({ length: guardians.length || 3 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {n} de {guardians.length || 3}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Preset Etapa 5 Setup Button */}
+      {/* Preset Etapa 5 Rules Grid */}
       {!isReadOnly && (
-        <div className="flex items-center justify-between p-2.5 bg-[#F0F5FD] rounded-xl border border-[#DCE7F6]">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#0055FF]" />
-            <span className="text-xs font-bold text-slate-800">
-              Preset Etapa 5: 3 Pessoas (2/3 Quórum)
+        <div className="p-3 bg-[#F0F5FD] rounded-xl border border-[#DCE7F6] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#0055FF]" />
+              <span>Presets da Etapa 5 (Carregamento Rápido):</span>
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const p1: Participant = {
-                id: 'p-stage5-1',
-                name: 'Dra. Helena Voss',
-                email: 'helena.voss@curadoria.org',
-                role: 'guardian',
-                status: 'approved',
-                approved_at: new Date().toISOString(),
-                notes: 'Guardiã Institucional (✓ Aprovado)',
-              };
-              const p2: Participant = {
-                id: 'p-stage5-2',
-                name: 'Carlos Mendez',
-                email: 'carlos.m@fintech.io',
-                role: 'guardian',
-                status: 'approved',
-                approved_at: new Date().toISOString(),
-                notes: 'Co-fundador & Testemunha (✓ Aprovado)',
-              };
-              const p3: Participant = {
-                id: 'p-stage5-3',
-                name: 'Dra. Amanda Ribeiro',
-                email: 'amanda.ribeiro@conselho.gov',
-                role: 'guardian',
-                status: 'pending',
-                notes: 'Compliance (— Pendente)',
-              };
-              onChange([p1, p2, p3]);
-              if (onRequiredApprovalsChange) {
-                onRequiredApprovalsChange(2);
-              }
-            }}
-            className="px-2.5 py-1 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
-          >
-            Carregar 3 Pessoas (✓ ✓ —)
-          </button>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => handleLoadPresetCase('2_OF_2')}
+              className="px-2 py-1.5 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg font-bold text-[11px] transition-all cursor-pointer text-left shadow-2xs"
+            >
+              <span className="block font-bold">2 de 2 (Unanimidade)</span>
+              <span className="text-[10px] text-slate-500 font-normal">Flávio &amp; Fernando ✓✓</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleLoadPresetCase('2_OF_3')}
+              className="px-2 py-1.5 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg font-bold text-[11px] transition-all cursor-pointer text-left shadow-2xs"
+            >
+              <span className="block font-bold">2 de 3 (Maioria)</span>
+              <span className="text-[10px] text-slate-500 font-normal">Flávio, Fernando, Maria</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleLoadPresetCase('3_OF_5')}
+              className="px-2 py-1.5 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg font-bold text-[11px] transition-all cursor-pointer text-left shadow-2xs"
+            >
+              <span className="block font-bold">3 de 5 (M de N)</span>
+              <span className="text-[10px] text-slate-500 font-normal">5 Guardiões (Meta: 3)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleLoadPresetCase('4_OF_5')}
+              className="px-2 py-1.5 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded-lg font-bold text-[11px] transition-all cursor-pointer text-left shadow-2xs"
+            >
+              <span className="block font-bold">4 de 5 (Qualificada)</span>
+              <span className="text-[10px] text-slate-500 font-normal">Super-maioria</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -262,109 +365,119 @@ export function ParticipantManager({
           )}
         </div>
 
-        {participants.length === 0 ? (
-          <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
-            <p className="text-xs text-slate-500">
-              Nenhuma pessoa ou guardião vinculado a esta intenção.
-            </p>
-            {!isReadOnly && (
-              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-400">Sugestões rápidas:</span>
-                {SAMPLE_PEOPLE_PRESETS.map((p, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleAddPreset(p)}
-                    className="px-2 py-0.5 bg-white hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE] rounded text-[10px] font-semibold transition-all cursor-pointer"
-                  >
-                    + {p.name} ({p.role === 'guardian' ? 'Guardião' : 'Destinatário'})
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-            {participants.map((p) => {
-              const isApproved = p.status === 'approved';
+        {isAdding && !isReadOnly && (
+          <form onSubmit={handleAddParticipant} className="p-3 bg-white rounded-xl border border-[#BFD7FE] space-y-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="text"
+                required
+                placeholder="Nome da pessoa *"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
+              />
+              <input
+                type="email"
+                required
+                placeholder="E-mail *"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as ParticipantRole)}
+                className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
+              >
+                <option value="guardian">Guardião / Aprovador (Voto no Quórum)</option>
+                <option value="recipient">Destinatário Final (Recebe Revelação)</option>
+                <option value="viewer">Observador (Sem poder de voto)</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Notas de contexto (opcional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsAdding(false)}
+                className="px-3 py-1 border border-slate-200 rounded-lg text-xs"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-1 bg-[#0055FF] text-white rounded-lg text-xs font-bold"
+              >
+                Adicionar
+              </button>
+            </div>
+          </form>
+        )}
 
+        <div className="space-y-1.5 max-h-56 overflow-y-auto">
+          {participants.length === 0 ? (
+            <p className="text-xs text-slate-400 italic p-3 text-center bg-white rounded-xl border border-slate-100">
+              Nenhuma pessoa vinculada. Adicione guardiões ou carregue um preset da Etapa 5 acima.
+            </p>
+          ) : (
+            participants.map((p) => {
+              const isGuardian = p.role === 'guardian' || p.role === 'approver';
               return (
                 <div
                   key={p.id}
-                  className="p-3 rounded-xl bg-white border border-slate-200 hover:border-[#BFD7FE] transition-all flex items-center justify-between gap-3 shadow-2xs"
+                  className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-2 text-xs hover:border-[#BFD7FE] transition-colors"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                        p.role === 'guardian'
-                          ? 'bg-amber-100 text-amber-800'
-                          : p.role === 'recipient'
-                          ? 'bg-indigo-100 text-indigo-800'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
+                    <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
                       {p.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-slate-900 truncate">
-                          {p.name}
-                        </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-800 truncate">{p.name}</span>
                         {getRoleBadge(p.role)}
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate font-mono">
-                        {p.email}
-                      </div>
-                      {p.notes && (
-                        <p className="text-[10px] text-slate-500 italic mt-0.5 truncate">
-                          {p.notes}
-                        </p>
-                      )}
+                      <div className="text-[10px] text-slate-400 font-mono truncate">{p.email}</div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Status / Sign toggle */}
-                    {p.role === 'guardian' && canSimulateSignatures && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isGuardian && canSimulateSignatures && (
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(p.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                          isApproved
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                          p.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
+                            : 'bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-800 border border-slate-200'
                         }`}
-                        title={
-                          isApproved
-                            ? 'Clique para revogar assinatura (Simulação)'
-                            : 'Clique para assinar como este Guardião (Simulação)'
-                        }
+                        title="Simular assinatura/voto deste guardião"
                       >
-                        {isApproved ? (
+                        {p.status === 'approved' ? (
                           <>
-                            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Assinado</span>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Aprovado</span>
                           </>
                         ) : (
                           <>
-                            <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                            <span>Assinar</span>
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span>Pendente</span>
                           </>
                         )}
                       </button>
-                    )}
-
-                    {p.role === 'recipient' && (
-                      <span className="text-[11px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-medium border border-indigo-100">
-                        Destinatário
-                      </span>
                     )}
 
                     {!isReadOnly && (
                       <button
                         type="button"
                         onClick={() => handleRemove(p.id)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        className="p-1 text-slate-300 hover:text-rose-500 transition-colors cursor-pointer"
                         title="Remover pessoa"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -373,116 +486,10 @@ export function ParticipantManager({
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Add New Participant Form */}
-      {isAdding && !isReadOnly && (
-        <div className="p-3.5 bg-[#F0F5FD] rounded-2xl border border-[#BFD7FE] space-y-3 animate-in fade-in duration-150">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-[#0055FF]" />
-              <span>Vincular Nova Pessoa</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsAdding(false)}
-              className="text-slate-400 hover:text-slate-600 text-xs font-bold"
-            >
-              Cancelar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Nome Completo *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Gabriel Santos"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                E-mail ou Identificador *
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="gabriel@exemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Papel na Intenção
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as ParticipantRole)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
-              >
-                <option value="guardian">🛡️ Guardião (Aprovação obrigatória)</option>
-                <option value="recipient">🎯 Destinatário (Recebe o conteúdo)</option>
-                <option value="viewer">👁️ Observador (Acompanha status)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Anotação / Responsabilidade
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Confirmação jurídica ou entrega"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-[#0055FF]"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex flex-wrap gap-1">
-              {SAMPLE_PEOPLE_PRESETS.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setName(p.name);
-                    setEmail(p.email);
-                    setRole(p.role);
-                    setNotes(p.notes || '');
-                  }}
-                  className="px-2 py-0.5 bg-white text-[#0055FF] border border-[#BFD7FE] rounded text-[10px] font-semibold hover:bg-[#E2EDFF]"
-                >
-                  Usar {p.name.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleAddParticipant()}
-              disabled={!name.trim() || !email.trim()}
-              className="px-4 py-1.5 bg-[#0055FF] hover:bg-[#0047E0] disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-            >
-              Adicionar Pessoa
-            </button>
-          </div>
+            })
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

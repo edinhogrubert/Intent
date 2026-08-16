@@ -43,7 +43,7 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
   intent,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'questions' | 'lifecycle' | 'people' | 'api' | 'tree' | 'json'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'lifecycle' | 'crypto' | 'people' | 'api' | 'tree' | 'json'>('questions');
 
   if (!isOpen || !intent) return null;
 
@@ -109,7 +109,19 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>Motor de Tempo & Eventos (Etapa 3)</span>
+            <span>Tempo & Quórum (Etapas 3/5)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('crypto')}
+            className={`px-4 py-2.5 rounded-t-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'crypto'
+                ? 'bg-white text-cyan-600 border-t-2 border-t-cyan-600 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Lock className="w-4 h-4 text-cyan-600" />
+            <span>Conteúdo Protegido (Etapa 6)</span>
           </button>
 
           <button
@@ -273,6 +285,82 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
 
           {activeTab === 'lifecycle' && (
             <div className="space-y-6">
+              {/* Painel do Motor Genérico de Aprovação & Quórum (Etapa 5) */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-950 text-slate-100 border border-slate-800 space-y-4 shadow-md">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <span className="text-sm font-bold text-white block">Motor Genérico de Aprovação & Quórum (Etapa 5)</span>
+                      <span className="text-[11px] text-slate-400 font-mono">Regra de Liberação: condition.type = APPROVAL / PEOPLE</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold uppercase">
+                      Modo: {evaluation.quorumMode || 'EXACT_N'}
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase border ${
+                      evaluation.isPeopleConditionSatisfied
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    }`}>
+                      {evaluation.isPeopleConditionSatisfied ? 'Quórum Atingido' : 'Em Coleta'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Aprovadores Elegíveis (N):</span>
+                    <span className="font-mono text-white text-base font-bold">
+                      {evaluation.eligibleApproversCount} <span className="text-xs text-slate-400 font-normal">pessoa(s)</span>
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Necessários para Revelar (M):</span>
+                    <span className="font-mono text-amber-300 text-base font-bold">
+                      {evaluation.effectiveRequiredApprovals} <span className="text-xs text-slate-400 font-normal">voto(s)</span>
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Aprovações Coletadas:</span>
+                    <span className="font-mono text-emerald-400 text-base font-bold">
+                      {evaluation.approvedGuardiansCount} <span className="text-xs text-slate-400 font-normal">({evaluation.quorumRatioText})</span>
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-800/70 rounded-xl border border-slate-700/60">
+                    <span className="text-slate-400 text-[11px] block">Fórmula Ativa:</span>
+                    <span className="font-mono text-indigo-300 text-xs font-bold block truncate" title={evaluation.quorumFormulaDescription}>
+                      {evaluation.quorumFormulaDescription}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/40 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 text-[11px]">Progresso do Quórum:</span>
+                    <div className="w-32 bg-slate-700 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-2 rounded-full transition-all"
+                        style={{ width: `${evaluation.quorumPercentage}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-emerald-400 font-bold text-[11px]">{evaluation.quorumPercentage}%</span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-300">
+                    {evaluation.canStillReachQuorum ? (
+                      <span className="text-emerald-400">✓ Quórum matematicamente alcançável</span>
+                    ) : (
+                      <span className="text-rose-400 font-bold">✕ Quórum inviabilizado por recusa de guardiões</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Painel do Motor Declarativo de Tempo */}
               <div className="p-5 rounded-2xl bg-slate-900 text-slate-100 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
@@ -353,6 +441,124 @@ export const IntentStructureModal: React.FC<IntentStructureModalProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'crypto' && (
+            <div className="space-y-6">
+              {/* Header Etapa 6 — Conteúdo Protegido */}
+              <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-cyan-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-700 leading-relaxed space-y-1">
+                  <strong className="text-cyan-950 block font-bold">Arquitetura de Conteúdo Protegido (Etapa 6):</strong>
+                  <p className="text-[11px] text-slate-600">
+                    O sistema rejeita o modelo ingênuo de <em>&quot;marcar checkbox de criptografado&quot;</em>. 
+                    O segredo original nunca é exposto sem envelope criptográfico, compromisso matemático e autorização por regras.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4 Pilares da Segurança */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Confidencialidade</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Conteúdo protegido por AES-GCM 256-bit.</p>
+                </div>
+
+                <div className="p-3 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Integridade</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Content Hash SHA-256 & Commitment scheme.</p>
+                </div>
+
+                <div className="p-3 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-blue-400 font-bold">
+                    <User className="w-3.5 h-3.5" />
+                    <span>Autenticidade</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Assinatura digital do criador vinculada.</p>
+                </div>
+
+                <div className="p-3 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Auditoria</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Logs imutáveis de cada transição de chave.</p>
+                </div>
+              </div>
+
+              {/* Envelope de Conteúdo Inspecionado */}
+              <div className="p-4 bg-slate-950 text-slate-200 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-slate-800">
+                  <span className="text-cyan-400 font-bold">CONTENT ENVELOPE (ESTRUTURA SEPARADA)</span>
+                  <span className="text-slate-500">AES-256-GCM / SHA-256</span>
+                </div>
+
+                <div className="font-mono text-[11px] space-y-2">
+                  <div>
+                    <span className="text-cyan-400">├── metadata:</span>
+                    <span className="text-slate-300 ml-2">
+                      mime: {normalized.protected_payload?.fileType || 'text/plain'} | size: {normalized.protected_payload?.fileSize || 'N/A'} bytes | name: {normalized.protected_payload?.fileName || 'reveal_secret.dat'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-emerald-400">├── encrypted_blob:</span>
+                    <span className="text-slate-400 ml-2 break-all text-[10px]">
+                      {normalized.protected_payload?.cipherText
+                        ? normalized.protected_payload.cipherText.slice(0, 50) + '... [AES-256 CIPHERTEXT]'
+                        : '[Envelope não instanciado ou segredo em texto puro no rascunho]'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-amber-400">├── content_hash (SHA-256):</span>
+                    <span className="text-amber-200 ml-2 font-mono text-[10px]">
+                      {normalized.protected_payload?.content_hash || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-purple-400">├── commitment (Proof of Possession):</span>
+                    <span className="text-purple-200 ml-2 font-mono text-[10px]">
+                      {normalized.protected_payload?.commitment || 'com-sha256-salt-secret-binding-v1'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-rose-400">└── encryption_key_reference:</span>
+                    <span className="text-rose-200 ml-2 font-mono text-[10px]">
+                      {normalized.protected_payload?.encryption_key_reference || 'kms://vault-key-ref-etapa-6'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fluxo de Ciclo de Vida do Conteúdo */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
+                <span className="font-bold text-slate-800 block">Fluxo Criptográfico Autônomo:</span>
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-600">
+                  <span className="px-2 py-0.5 bg-white border border-slate-300 rounded font-semibold text-slate-800">Criador</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-white border border-slate-300 rounded font-semibold text-slate-800">Criptografar</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-cyan-100 border border-cyan-300 rounded font-semibold text-cyan-800">Fingerprint/Commitment</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-white border border-slate-300 rounded font-semibold text-slate-800">Armazenar</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 rounded font-semibold text-amber-800">Aguardar Condição</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-emerald-100 border border-emerald-300 rounded font-semibold text-emerald-800">Autorizar Acesso</span>
+                  <ArrowRight className="w-3 h-3 text-slate-400" />
+                  <span className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold">Revelar</span>
                 </div>
               </div>
             </div>

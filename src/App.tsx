@@ -11,13 +11,16 @@ import { BottomCardsRow } from './components/BottomCardsRow';
 import { DeleteAccountModal } from './components/DeleteAccountModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TesterProfileSwitcherBar } from './components/TesterProfileSwitcherBar';
+import { StagesChecklistModal } from './components/StagesChecklistModal';
 import { auth, signOut, onAuthStateChanged } from './utils/firebase';
+import { ListChecks } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
   // Load session & sync with Firebase Auth
@@ -106,6 +109,7 @@ export default function App() {
         onLogout={handleLogout}
         onRequestDelete={() => setShowDeleteModal(true)}
         onOpenProfile={() => setShowProfileModal(true)}
+        onOpenChecklist={() => setShowChecklistModal(true)}
       />
 
       {/* Main Content View (Index) */}
@@ -118,7 +122,7 @@ export default function App() {
 
         {/* Top Greeting Header matching the screenshot ("Bom dia, Rafael.") */}
         <header>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1
                 id="page-title"
@@ -134,14 +138,25 @@ export default function App() {
                 <span>Sua sessão está ativa.</span>
               </p>
             </div>
-            <button
-              id="header-profile-btn"
-              onClick={() => setShowProfileModal(true)}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-[#DCE7F6] text-xs font-bold text-[#0055FF] shadow-xs transition-all cursor-pointer"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Gerenciar Perfil (Etapa 1)</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="header-checklist-btn"
+                onClick={() => setShowChecklistModal(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#EAF2FF] hover:bg-[#DCE7F6] border border-[#BFD7FE] text-xs font-bold text-[#0055FF] shadow-2xs transition-all cursor-pointer"
+              >
+                <ListChecks className="w-4 h-4 text-[#0055FF]" />
+                <span>Checklist Etapas 1 a 8</span>
+                <span className="text-[10px] bg-[#0055FF] text-white px-1.5 py-0.5 rounded-md font-mono font-bold">8/8 ✓</span>
+              </button>
+              <button
+                id="header-profile-btn"
+                onClick={() => setShowProfileModal(true)}
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-[#DCE7F6] text-xs font-bold text-[#0055FF] shadow-xs transition-all cursor-pointer"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Gerenciar Perfil (Etapa 1)</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -183,6 +198,12 @@ export default function App() {
         user={currentUser}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDeleteAccount}
+      />
+
+      {/* Architectural Checklist & Concrete Tests Modal (Etapas 1 a 8) */}
+      <StagesChecklistModal
+        isOpen={showChecklistModal}
+        onClose={() => setShowChecklistModal(false)}
       />
     </div>
   );

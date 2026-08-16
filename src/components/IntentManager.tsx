@@ -41,7 +41,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType, signInWithPopup, googleProvider } from '../utils/firebase';
-import { Intent, UserAccount, ConditionType, Participant } from '../types';
+import { Intent, UserAccount, ConditionType, Participant, QuorumMode } from '../types';
 import {
   calculateTimeRemaining,
   formatTargetDateTime,
@@ -119,9 +119,13 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
   ]);
   const [newRequiredApprovals, setNewRequiredApprovals] = useState<number>(2);
+  const [newQuorumMode, setNewQuorumMode] = useState<QuorumMode>('EXACT_N');
+  const [newProtectedPayload, setNewProtectedPayload] = useState<ProtectedPayload | null>(null);
+  const [showCreateEncryptionPipeline, setShowCreateEncryptionPipeline] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter & Search State
+  const [activeViewTab, setActiveViewTab] = useState<'overview' | 'social' | 'approvals' | 'public_support' | 'vault'>('overview');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -137,10 +141,199 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [editRevealContent, setEditRevealContent] = useState<string>('');
   const [editParticipants, setEditParticipants] = useState<Participant[]>([]);
   const [editRequiredApprovals, setEditRequiredApprovals] = useState<number>(1);
+  const [editQuorumMode, setEditQuorumMode] = useState<QuorumMode>('EXACT_N');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Helper: Default 3-people preset intents for Etapa 4 & 5
+  // Helper: Default preset intents for Etapa 4 & 5
   const getInitialDefaultIntents = (): Intent[] => [
+    {
+      id: 'intent-stage5-flavio-fernando-2of2',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 5 — Aprovação Simples (2/2 Unanimidade: Flávio & Fernando)',
+      description: 'Flávio → Aprovar (✓) | Fernando → Aprovar (✓). Quando todos aprovarem (2 / 2) ➔ REVELAR.',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'PEOPLE',
+      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      reveal_content: '🔓 CONTRATO BILATERAL REVELADO COM SUCESSO:\n• Condição: Unanimidade (2 de 2)\n• Aprovado por: Flávio (✓) e Fernando (✓)\n• Protocolo: 0x2OF2_UNANIMOUS_APPROVED',
+      is_locked: true,
+      quorum_mode: 'UNANIMOUS',
+      required_approvals: 2,
+      people: {
+        approvers: [
+          {
+            id: 'app-flavio',
+            name: 'Flávio',
+            email: 'flavio@conselho.org',
+            role: 'approver',
+            status: 'approved',
+            approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+            notes: 'Aprovador #1 (✓ Aprovado)',
+          },
+          {
+            id: 'app-fernando',
+            name: 'Fernando',
+            email: 'fernando@conselho.org',
+            role: 'approver',
+            status: 'approved',
+            approved_at: new Date(Date.now() - 3600000).toISOString(),
+            notes: 'Aprovador #2 (✓ Aprovado)',
+          },
+        ],
+        recipients: [],
+        participants: [],
+      },
+      participants: [
+        {
+          id: 'app-flavio',
+          name: 'Flávio',
+          email: 'flavio@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          notes: 'Aprovador #1 (✓ Aprovado)',
+        },
+        {
+          id: 'app-fernando',
+          name: 'Fernando',
+          email: 'fernando@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000).toISOString(),
+          notes: 'Aprovador #2 (✓ Aprovado)',
+        },
+      ],
+    },
+    {
+      id: 'intent-stage5-majority-2of3',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 5 — Quórum por Maioria (2 de 3: Flávio, Fernando, Maria)',
+      description: 'Motor genérico de regras: condition = { type: "APPROVAL", required: 2, eligible: 3 }. Flávio já aprovou (1/2), aguardando Fernando ou Maria para REVELAR.',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'PEOPLE',
+      created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+      reveal_content: '🔒 COFRE DO PROJETO BETA LIBERADO:\n• Chave de Acesso: 0x99BETA_QUORUM_REACHED\n• Quórum de Maioria Atingido (2 de 3)',
+      is_locked: true,
+      quorum_mode: 'MAJORITY',
+      required_approvals: 2,
+      people: {
+        approvers: [
+          {
+            id: 'app-flavio',
+            name: 'Flávio',
+            email: 'flavio@conselho.org',
+            role: 'approver',
+            status: 'approved',
+            approved_at: new Date(Date.now() - 3600000).toISOString(),
+            notes: 'Aprovador #1 (✓ Aprovado)',
+          },
+          {
+            id: 'app-fernando',
+            name: 'Fernando',
+            email: 'fernando@conselho.org',
+            role: 'approver',
+            status: 'pending',
+            notes: 'Aprovador #2 (— Aguardando)',
+          },
+          {
+            id: 'app-maria',
+            name: 'Maria',
+            email: 'maria@conselho.org',
+            role: 'approver',
+            status: 'pending',
+            notes: 'Aprovadora #3 (— Aguardando)',
+          },
+        ],
+        recipients: [],
+        participants: [],
+      },
+      participants: [
+        {
+          id: 'app-flavio',
+          name: 'Flávio',
+          email: 'flavio@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date(Date.now() - 3600000).toISOString(),
+          notes: 'Aprovador #1 (✓ Aprovado)',
+        },
+        {
+          id: 'app-fernando',
+          name: 'Fernando',
+          email: 'fernando@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovador #2 (— Aguardando)',
+        },
+        {
+          id: 'app-maria',
+          name: 'Maria',
+          email: 'maria@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovadora #3 (— Aguardando)',
+        },
+      ],
+    },
+    {
+      id: 'intent-stage5-exact-3of5',
+      creator_id: user.id || user.email || 'usr-1',
+      title: 'Etapa 5 — Quórum Numérico M de N (3 de 5 Guardiões)',
+      description: 'Regra de liberação: 3 aprovações necessárias de 5 elegíveis (Flávio, Fernando, Maria, Roberto, Helena).',
+      status: 'active',
+      visibility: 'private',
+      condition_type: 'PEOPLE',
+      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+      reveal_content: '🔒 COFRE DO CONSELHO LIBERADO:\n• 3 de 5 assinaturas validadas pelo motor genérico.',
+      is_locked: true,
+      quorum_mode: 'EXACT_N',
+      required_approvals: 3,
+      participants: [
+        {
+          id: 'app-5-1',
+          name: 'Flávio',
+          email: 'flavio@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          notes: 'Aprovador #1 (✓)',
+        },
+        {
+          id: 'app-5-2',
+          name: 'Fernando',
+          email: 'fernando@conselho.org',
+          role: 'guardian',
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          notes: 'Aprovador #2 (✓)',
+        },
+        {
+          id: 'app-5-3',
+          name: 'Maria',
+          email: 'maria@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovadora #3 (—)',
+        },
+        {
+          id: 'app-5-4',
+          name: 'Roberto',
+          email: 'roberto@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovador #4 (—)',
+        },
+        {
+          id: 'app-5-5',
+          name: 'Helena',
+          email: 'helena@conselho.org',
+          role: 'guardian',
+          status: 'pending',
+          notes: 'Aprovadora #5 (—)',
+        },
+      ],
+    },
     {
       id: 'intent-stage4-joao-conselho-demo',
       creator_id: user.id || user.email || 'usr-1',
@@ -149,9 +342,10 @@ export function IntentManager({ user }: IntentManagerProps) {
       status: 'active',
       visibility: 'private',
       condition_type: 'PEOPLE',
-      created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+      created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
       reveal_content: '🔒 REVELAÇÃO EXCLUSIVA DE JOÃO:\n• Documento de Concessão & Cláusulas Restritas\n• Aprovado por: Flávio (✓) e Fernando (✓)\n• Destinatário Autorizado a Leitura: João (joao@silva.com)',
       is_locked: true,
+      quorum_mode: 'MAJORITY',
       required_approvals: 2,
       people: {
         approvers: [
@@ -232,58 +426,27 @@ export function IntentManager({ user }: IntentManagerProps) {
       ],
     },
     {
-      id: 'intent-stage5-approval-demo',
-      creator_id: user.id || user.email || 'usr-1',
-      title: 'Etapa 5 — Acordo de Liberação do Cofre Alfa',
-      description: 'Acordo com 3 pessoas exigindo quórum de 2/3 de aprovações de guardiões para autorizar o botão REVELAR.',
-      status: 'active',
-      visibility: 'private',
-      condition_type: 'PEOPLE',
-      created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
-      reveal_content: '🔒 COFRE SECRETO DESBLOQUEADO:\n• Chave Privada: pk_live_9823091823091823\n• Assinaturas Coletadas: 2/3 Guardiões (Dra. Helena Voss & Carlos Mendez)\n• Hash de Verificação: 0x9f8e7d6c5b4a3f2e1d0c',
-      is_locked: true,
-      required_approvals: 2,
-      participants: [
-        {
-          id: 'p-1',
-          name: 'Dra. Helena Voss',
-          email: 'helena.voss@curadoria.org',
-          role: 'guardian',
-          status: 'approved',
-          approved_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-          notes: 'Guardiã Institucional & Validação (✓)',
-        },
-        {
-          id: 'p-2',
-          name: 'Carlos Mendez',
-          email: 'carlos.m@fintech.io',
-          role: 'guardian',
-          status: 'approved',
-          approved_at: new Date(Date.now() - 3600000).toISOString(),
-          notes: 'Co-fundador e Testemunha (✓)',
-        },
-        {
-          id: 'p-3',
-          name: 'Dra. Amanda Ribeiro',
-          email: 'amanda.ribeiro@conselho.gov',
-          role: 'guardian',
-          status: 'pending',
-          notes: 'Representante de Compliance (—)',
-        },
-      ],
-    },
-    {
       id: 'intent-stage7-public-support-demo',
       creator_id: user.id || user.email || 'usr-1',
-      title: 'Etapa 7 — Mobilização e Petição de Transparência',
-      description: 'Intenção com trava de participação pública coletiva (Meta de 100 Apoios): Intent ➔ Apoios ➔ 10 / 100 ➔ 100 / 100 ➔ REVELAR.',
+      title: 'Etapa 7 — Participação Pública & Janela Efêmera (100 Apoios ➔ 24h Revelado)',
+      description: 'Intenção com ciclo de mobilização pública e janela de revelação: 100 apoios ➔ Revela ➔ 24 horas disponível ➔ Expira.',
       status: 'active',
       visibility: 'public',
       condition_type: 'PUBLIC_SUPPORT',
       created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
       target_supports: 100,
       current_supports: 10,
-      reveal_content: '🔓 RELATÓRIO PÚBLICO REVELADO:\n• Meta Coletiva de 100/100 Apoios Atingida!\n• Chave de Acesso Comunitária: 0xCOMMUNITY_MANIFESTO_2026\n• Dados e auditorias liberados para a comunidade.',
+      reveal_window_hours: 24,
+      reveal_window: {
+        duration_hours: 24,
+        has_expiration: true,
+      },
+      public_participation: {
+        target_supports: 100,
+        current_supports: 10,
+        supporters: [],
+      },
+      reveal_content: '🔓 RELATÓRIO PÚBLICO REVELADO (JANELA DE 24 HORAS):\n• Meta Coletiva de 100/100 Apoios Atingida!\n• Chave de Acesso Comunitária: 0xCOMMUNITY_MANIFESTO_2026\n• Este conteúdo ficará disponível durante 24 horas antes de expirar.',
       is_locked: true,
       supporters: [
         {
@@ -498,6 +661,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       reveal_content:
         newConditionType !== 'NONE' ? newRevealContent.trim() : undefined,
       is_locked: newConditionType !== 'NONE',
+      quorum_mode: newQuorumMode,
       participants:
         newConditionType === 'PEOPLE' || newConditionType === 'HYBRID'
           ? newParticipants
@@ -506,6 +670,7 @@ export function IntentManager({ user }: IntentManagerProps) {
         newConditionType === 'PEOPLE' || newConditionType === 'HYBRID'
           ? newRequiredApprovals
           : undefined,
+      protected_payload: newProtectedPayload || undefined,
     };
 
     if (isFirebase) {
@@ -521,8 +686,10 @@ export function IntentManager({ user }: IntentManagerProps) {
           target_date: newIntent.target_date || null,
           reveal_content: newIntent.reveal_content || null,
           is_locked: newIntent.is_locked || false,
+          quorum_mode: newIntent.quorum_mode || 'EXACT_N',
           participants: newIntent.participants || [],
           required_approvals: newIntent.required_approvals || null,
+          protected_payload: newIntent.protected_payload || null,
         });
       } catch (err) {
         console.error('Error creating intent in Firestore:', err);
@@ -550,6 +717,8 @@ export function IntentManager({ user }: IntentManagerProps) {
     setNewConditionType('PEOPLE');
     setNewTargetDate('');
     setNewRevealContent('');
+    setNewProtectedPayload(null);
+    setShowCreateEncryptionPipeline(false);
     setIsCreating(false);
     setIsSubmitting(false);
   };
@@ -839,14 +1008,26 @@ export function IntentManager({ user }: IntentManagerProps) {
     }
   };
 
-  // Etapa 5: Reveal Ceremony Trigger
+  // Etapa 5 & Etapa 7: Reveal Ceremony Trigger (Sets reveal timestamp and calculates reveal window expiration)
   const handleRevealIntent = async (targetIntent: Intent) => {
     const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const nowIso = new Date().toISOString();
+    const windowHours = targetIntent.reveal_window?.duration_hours || targetIntent.reveal_window_hours || 24;
+    const expiresAtIso = new Date(Date.now() + windowHours * 3600 * 1000).toISOString();
+
     const updatedFields: Partial<Intent> = {
       is_locked: false,
-      revealed_at: new Date().toISOString(),
+      revealed_at: nowIso,
       revealed_by: user.name || user.email || 'Usuário Autorizado',
       status: 'completed',
+      reveal_window_hours: windowHours,
+      expires_at: expiresAtIso,
+      reveal_window: {
+        duration_hours: windowHours,
+        reveal_started_at: nowIso,
+        expires_at: expiresAtIso,
+        has_expiration: true,
+      },
     };
 
     if (isFirebase) {
@@ -1039,11 +1220,11 @@ export function IntentManager({ user }: IntentManagerProps) {
           <div className="flex flex-wrap items-center gap-2 mb-2.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E2EDFF] text-[#0055FF] text-xs font-black">
               <Shield className="w-3.5 h-3.5" />
-              <span>Etapa 6 — Conteúdo Protegido</span>
+              <span>Etapas 1 a 8 — Sistema Operacional</span>
             </div>
 
             {totalAwaitingSignatures > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                 <Shield className="w-3.5 h-3.5 text-amber-600" />
                 <span>{totalAwaitingSignatures} quórum pendente</span>
               </span>
@@ -1067,10 +1248,10 @@ export function IntentManager({ user }: IntentManagerProps) {
           </div>
 
           <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Etapa 7: Participação Pública & Meta de Apoios
+            Gerenciador de Intenções & Protocolos
           </h2>
           <p className="text-xs md:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-            Fluxo de mobilização coletiva: Intent ➔ Apoios ➔ 10 / 100 ➔ 100 / 100 ➔ REVELAR. Liberando a revelação e criptografia com engajamento público.
+            Painel simplificado para criação, verificação e revelação descentralizada com regras de tempo, guardiões, apoio coletivo e cofre seguro.
           </p>
         </div>
 
@@ -1080,78 +1261,119 @@ export function IntentManager({ user }: IntentManagerProps) {
           onClick={() => {
             setIsCreating(!isCreating);
             setErrorMsg(null);
+            if (!isCreating) setActiveViewTab('overview');
           }}
           className="px-6 py-3.5 rounded-2xl bg-[#0055FF] hover:bg-[#0047E0] active:scale-98 text-white text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>{isCreating ? 'Fechar Formulário' : 'Nova Intent com Pessoas'}</span>
+          <span>{isCreating ? 'Fechar Formulário' : 'Nova Intent'}</span>
         </button>
       </div>
 
-      {/* Etapa 5, 6 & 7 Live Interactive Showcase Cards */}
-      {intents.length > 0 && (() => {
-        const publicIntent = intents.find((i) => i.condition_type === 'PUBLIC_SUPPORT') || intents[0];
+      {/* Segmented Workspace Navigation Tab Bar */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#DCE7F6] overflow-x-auto shadow-2xs">
+        {[
+          { key: 'overview', label: 'Minhas Intenções', count: intents.length, icon: Layers },
+          { key: 'social', label: 'Histórico & Feed Social', count: 'Etapa 8', icon: Users },
+          { key: 'approvals', label: 'Quórum & Guardiões', count: 'Etapa 5', icon: Shield },
+          { key: 'public_support', label: 'Participação Coletiva', count: 'Etapa 7', icon: Sparkles },
+          { key: 'vault', label: 'Cofre AES-256', count: 'Etapa 6', icon: Lock },
+        ].map((tab) => {
+          const TabIcon = tab.icon;
+          const isActive = activeViewTab === tab.key;
 
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveViewTab(tab.key as any)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+                isActive
+                  ? 'bg-[#0055FF] text-white shadow-xs'
+                  : 'bg-transparent text-slate-600 hover:bg-[#F0F5FD] hover:text-[#0055FF]'
+              }`}
+            >
+              <TabIcon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+              <span>{tab.label}</span>
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/20 text-white font-bold' : 'bg-slate-100 text-slate-500 font-semibold'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Dedicated Workspace Views */}
+      {activeViewTab === 'social' && intents.length > 0 && (
+        <SocialHistoryWorkflow
+          intent={intents[0]}
+          onAddInteraction={(intentId, interaction) =>
+            handleAddSocialInteractionOnIntent(intentId, interaction)
+          }
+          variant="interactive_hero"
+        />
+      )}
+
+      {activeViewTab === 'approvals' && intents.length > 0 && (() => {
+        const peopleIntent = intents.find((i) => (i.participants && i.participants.length > 0) || i.condition_type === 'PEOPLE') || intents[0];
         return (
-          <div className="space-y-6">
-            {/* Etapa 7 Showcase Component */}
-            <PublicSupportWorkflow
-              intent={publicIntent}
-              currentSupports={publicIntent.current_supports ?? 10}
-              targetSupports={publicIntent.target_supports ?? 100}
-              supporters={publicIntent.supporters}
-              onAddSupport={(amount, name, comment) =>
-                handleUpdateSupportsOnIntent(
-                  publicIntent.id,
-                  (publicIntent.current_supports ?? 10) + amount,
-                  name,
-                  comment
-                )
-              }
-              onSetSupports={(val) => handleUpdateSupportsOnIntent(publicIntent.id, val)}
-              onReveal={() => handleRevealIntent(publicIntent)}
-              isRevealed={!!publicIntent.revealed_at}
-              revealContent={publicIntent.reveal_content}
-              variant="interactive_hero"
-            />
-
-            <ApprovalWorkflow
-              intent={intents[0]}
-              participants={intents[0].participants || []}
-              requiredApprovals={intents[0].required_approvals || 2}
-              onToggleParticipantStatus={(participantId) =>
-                handleToggleParticipantStatusOnIntent(intents[0].id, participantId)
-              }
-              onReveal={() => handleRevealIntent(intents[0])}
-              isRevealed={!!intents[0].revealed_at}
-              revealContent={intents[0].reveal_content}
-              variant="interactive_hero"
-            />
-
-            {/* Etapa 6 Pipeline Showcase */}
-            <ProtectedVaultPipeline
-              intent={intents[0]}
-              isConditionSatisfied={evaluateIntentConditions(intents[0]).isConditionSatisfied}
-              onPayloadEncrypted={(payload) => {
-                const updatedIntents = intents.map((i) =>
-                  i.id === intents[0].id ? { ...i, protected_payload: payload } : i
-                );
-                setIntents(updatedIntents);
-                saveLocalIntents(updatedIntents);
-              }}
-            />
-
-            {/* Etapa 8 — Histórico & Camada Social Showcase */}
-            <SocialHistoryWorkflow
-              intent={intents[0]}
-              onAddInteraction={(intentId, interaction) =>
-                handleAddSocialInteractionOnIntent(intentId, interaction)
-              }
-              variant="interactive_hero"
-            />
-          </div>
+          <ApprovalWorkflow
+            intent={peopleIntent}
+            participants={peopleIntent.participants || []}
+            requiredApprovals={peopleIntent.required_approvals || 2}
+            onToggleParticipantStatus={(participantId) =>
+              handleToggleParticipantStatusOnIntent(peopleIntent.id, participantId)
+            }
+            onReveal={() => handleRevealIntent(peopleIntent)}
+            isRevealed={!!peopleIntent.revealed_at}
+            revealContent={peopleIntent.reveal_content}
+            variant="interactive_hero"
+          />
         );
       })()}
+
+      {activeViewTab === 'public_support' && intents.length > 0 && (() => {
+        const publicIntent = intents.find((i) => i.condition_type === 'PUBLIC_SUPPORT') || intents[0];
+        return (
+          <PublicSupportWorkflow
+            intent={publicIntent}
+            currentSupports={publicIntent.current_supports ?? 10}
+            targetSupports={publicIntent.target_supports ?? 100}
+            supporters={publicIntent.supporters}
+            onAddSupport={(amount, name, comment) =>
+              handleUpdateSupportsOnIntent(
+                publicIntent.id,
+                (publicIntent.current_supports ?? 10) + amount,
+                name,
+                comment
+              )
+            }
+            onSetSupports={(val) => handleUpdateSupportsOnIntent(publicIntent.id, val)}
+            onReveal={() => handleRevealIntent(publicIntent)}
+            isRevealed={!!publicIntent.revealed_at}
+            revealContent={publicIntent.reveal_content}
+            variant="interactive_hero"
+          />
+        );
+      })()}
+
+      {activeViewTab === 'vault' && intents.length > 0 && (
+        <ProtectedVaultPipeline
+          intent={intents[0]}
+          isConditionSatisfied={evaluateIntentConditions(intents[0]).isConditionSatisfied}
+          onPayloadEncrypted={(payload) => {
+            const updatedIntents = intents.map((i) =>
+              i.id === intents[0].id ? { ...i, protected_payload: payload } : i
+            );
+            setIntents(updatedIntents);
+            saveLocalIntents(updatedIntents);
+          }}
+        />
+      )}
 
       {/* Error Alert */}
       {errorMsg && (
@@ -1263,19 +1485,58 @@ export function IntentManager({ user }: IntentManagerProps) {
                 </div>
               </div>
 
-              {/* Protected Content Area */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                  <span>Conteúdo Selado (Protegido até cumprimento das condições):</span>
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Mensagem, credenciais, contrato ou instrução confidencial que só será liberada aos destinatários..."
-                  value={newRevealContent}
-                  onChange={(e) => setNewRevealContent(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-[#0055FF] placeholder:text-slate-400"
-                />
+              {/* Protected Content Area (Etapa 6: Envelope Criptográfico & Prova) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Conteúdo Selado / Segredo:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateEncryptionPipeline(!showCreateEncryptionPipeline)}
+                    className="text-[11px] font-bold text-[#0055FF] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <Shield className="w-3 h-3 text-[#0055FF]" />
+                    <span>{showCreateEncryptionPipeline ? 'Ocultar Pipeline Cripto' : 'Criptografar Arquivo / Payload'}</span>
+                  </button>
+                </div>
+
+                {!showCreateEncryptionPipeline ? (
+                  <textarea
+                    rows={2}
+                    placeholder="Mensagem, credenciais, contrato ou instrução confidencial que só será liberada aos destinatários..."
+                    value={newRevealContent}
+                    onChange={(e) => setNewRevealContent(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-[#0055FF] placeholder:text-slate-400"
+                  />
+                ) : (
+                  <div className="p-3 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                    <ProtectedVaultPipeline
+                      intent={null}
+                      isConditionSatisfied={false}
+                      onPayloadEncrypted={(payload) => {
+                        setNewProtectedPayload(payload);
+                        setNewRevealContent(payload.fileName || 'Arquivo Criptografado');
+                      }}
+                      variant="full_pipeline"
+                    />
+                  </div>
+                )}
+
+                {newProtectedPayload && (
+                  <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-[#0055FF]" />
+                      <span className="font-mono text-slate-700">
+                        Payload AES-256 Selado: <strong>{newProtectedPayload.fileName}</strong> ({newProtectedPayload.fingerprint})
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-[#0055FF] text-white text-[10px] font-bold">
+                      Pronto
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1399,8 +1660,11 @@ export function IntentManager({ user }: IntentManagerProps) {
         </form>
       )}
 
-      {/* Filter and Search Controls */}
-      <div className="bg-white rounded-2xl p-4 border border-[#DCE7F6] flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
+      {/* Overview Tab Content: Search, Filters & Intent Cards Grid */}
+      {activeViewTab === 'overview' && (
+        <>
+          {/* Filter and Search Controls */}
+          <div className="bg-white rounded-2xl p-4 border border-[#DCE7F6] flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
         {/* Search */}
         <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1654,6 +1918,8 @@ export function IntentManager({ user }: IntentManagerProps) {
           })}
         </div>
       )}
+        </>
+      )}
 
       {/* Modal: View & Edit Intent Details (with full Etapa 5 Approval & Reveal support) */}
       {selectedIntent && (() => {
@@ -1858,8 +2124,8 @@ export function IntentManager({ user }: IntentManagerProps) {
                     <ProtectedVaultPipeline
                       intent={selectedIntent}
                       isConditionSatisfied={evalResult.isConditionSatisfied}
-                      onPayloadEncrypted={(payload) => {
-                        const updatedIntent = {
+                      onPayloadEncrypted={async (payload) => {
+                        const updatedIntent: Intent = {
                           ...selectedIntent,
                           protected_payload: payload,
                         };
@@ -1869,6 +2135,18 @@ export function IntentManager({ user }: IntentManagerProps) {
                         );
                         setIntents(updatedIntents);
                         saveLocalIntents(updatedIntents);
+
+                        // Persist to Firestore if synced
+                        const isFirebase = !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
+                        if (isFirebase) {
+                          try {
+                            await updateDoc(doc(db, 'intents', selectedIntent.id), {
+                              protected_payload: payload,
+                            });
+                          } catch (e) {
+                            console.error('Failed to sync encrypted payload to Firestore:', e);
+                          }
+                        }
                       }}
                     />
 

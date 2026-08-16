@@ -93,13 +93,20 @@ export function normalizeIntent(raw: Partial<Intent>, currentUser?: UserAccount)
     protected_payload: protectedPayload,
   };
 
+  const quorumMode = raw.conditions?.quorum_mode || raw.quorum_mode || 'EXACT_N';
+  const eligibleApprovers = raw.conditions?.eligible_approvers || approvers.length;
+  const quorumPercentage = raw.conditions?.quorum_percentage;
+
   const conditionsObj = {
     condition_type: conditionType,
     operator,
     value: targetDate ? new Date(targetDate).toISOString() : undefined,
     target_date: targetDate,
     expiration_date: expirationDate,
+    quorum_mode: quorumMode,
     required_approvals: requiredApprovals,
+    eligible_approvers: eligibleApprovers,
+    quorum_percentage: quorumPercentage,
     target_supports: targetSupports,
     current_supports: currentSupports,
     is_locked: isLocked,

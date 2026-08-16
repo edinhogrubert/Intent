@@ -1,4 +1,4 @@
-import { Home, Compass, PlusCircle, Inbox, Bell, LogOut, Trash2, User } from 'lucide-react';
+import { Home, Compass, PlusCircle, Inbox, Bell, LogOut, Trash2, User, ListChecks } from 'lucide-react';
 import { UserAccount } from '../types';
 
 interface SidebarProps {
@@ -6,9 +6,10 @@ interface SidebarProps {
   onLogout: () => void;
   onRequestDelete: () => void;
   onOpenProfile?: () => void;
+  onOpenChecklist?: () => void;
 }
 
-export function Sidebar({ user, onLogout, onRequestDelete, onOpenProfile }: SidebarProps) {
+export function Sidebar({ user, onLogout, onRequestDelete, onOpenProfile, onOpenChecklist }: SidebarProps) {
   return (
     <aside
       id="app-sidebar"
@@ -31,15 +32,16 @@ export function Sidebar({ user, onLogout, onRequestDelete, onOpenProfile }: Side
           <span className="text-[10px] font-semibold tracking-tight">Início</span>
         </button>
 
-        {/* Nav item: Explorar */}
-        <div
-          id="nav-explorar"
-          title="Explorar"
-          className="w-14 h-14 rounded-2xl border border-dashed border-[#94BFFF] text-[#4A6D9C] flex flex-col items-center justify-center gap-1 opacity-70 hover:opacity-100 hover:bg-[#E2EDFC] transition-all cursor-pointer"
+        {/* Nav item: Checklist das 8 Etapas */}
+        <button
+          id="nav-checklist"
+          title="Checklist das 8 Etapas & Testes Concretos"
+          onClick={onOpenChecklist}
+          className="w-14 h-14 rounded-2xl bg-cyan-950/80 border border-cyan-800 text-cyan-300 flex flex-col items-center justify-center gap-1 hover:bg-cyan-900 transition-all cursor-pointer shadow-xs"
         >
-          <Compass className="w-4 h-4 stroke-[2]" />
-          <span className="text-[9px] font-medium">Explorar</span>
-        </div>
+          <ListChecks className="w-4 h-4 stroke-[2.5] text-cyan-400" />
+          <span className="text-[9px] font-black tracking-tight">Etapas 1-8</span>
+        </button>
 
         {/* Nav item: Perfil & Identidade */}
         <div

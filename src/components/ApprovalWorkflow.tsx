@@ -17,7 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Participant, Intent } from '../types';
-import { evaluateIntentConditions } from '../utils/conditionEvaluator';
+import { evaluateIntentConditions, calculateEffectiveRequiredApprovals } from '../utils/conditionEvaluator';
 
 interface ApprovalWorkflowProps {
   intent?: Intent;
@@ -49,11 +49,15 @@ export function ApprovalWorkflow({
   const [isRevealingAnim, setIsRevealingAnim] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
 
-  const guardians = participants.filter((p) => p.role === 'guardian');
+  const guardians = participants.filter((p) => p.role === 'guardian' || p.role === 'approver');
   const approvedGuardians = guardians.filter((g) => g.status === 'approved');
   const effectiveGuardians = guardians.length > 0 ? guardians : participants;
   
-  const quorumTarget = requiredApprovals > 0 ? requiredApprovals : Math.max(1, effectiveGuardians.length);
+  const { required: quorumTarget, description: quorumFormulaDesc } = calculateEffectiveRequiredApprovals(
+    effectiveGuardians.length,
+    intent?.quorum_mode || 'EXACT_N',
+    requiredApprovals
+  );
   const approvedCount = approvedGuardians.length;
   const isQuorumReached = approvedCount >= quorumTarget;
   const isCurrentlyRevealed = isRevealed || (intent && !!intent.revealed_at);
@@ -176,6 +180,9 @@ export function ApprovalWorkflow({
               </span>
               <span className="text-xs font-bold text-slate-500">
                 {effectiveGuardians.length} {effectiveGuardians.length === 1 ? 'pessoa' : 'pessoas'}
+              </span>
+              <span className="text-[11px] font-mono text-[#0055FF] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 font-semibold">
+                {quorumFormulaDesc}
               </span>
             </div>
             <h4 className="text-base font-extrabold text-slate-900 mt-0.5">

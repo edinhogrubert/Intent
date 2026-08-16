@@ -61,18 +61,90 @@ export interface Participant {
   notes?: string;
 }
 
-export type ConditionType = 'NONE' | 'TIME' | 'PEOPLE' | 'PUBLIC_SUPPORT' | 'HYBRID';
+export type ConditionType = 'NONE' | 'TIME' | 'PEOPLE' | 'APPROVAL' | 'PUBLIC_SUPPORT' | 'HYBRID';
+
+export type QuorumMode = 'UNANIMOUS' | 'MAJORITY' | 'SUPERMAJORITY' | 'EXACT_N' | 'PERCENTAGE';
 
 export type SocialOpinionType = 'AGREE' | 'DISAGREE' | 'COMMENT' | 'PREDICTION';
+
+export type PostVisibility = 'public' | 'private' | 'followers';
+export type PostCategory = 'GENERAL' | 'INTENT_OPINION' | 'PREDICTION' | 'DEBATE';
+
+export interface SocialComment {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  text: string;
+  created_at: string;
+  source_referrer?: string; // Causalidade de quem convidou/trouxe o comentarista
+}
+
+export interface PredictionDetail {
+  intent_id: string;
+  intent_title?: string;
+  target_statement: string; // Ex: "A Intent não será concluída até sexta-feira."
+  predicted_outcome: 'WILL_SUCCEED' | 'WILL_FAIL' | 'CUSTOM_DATE';
+  predicted_date?: string;
+  resolved_status: 'PENDING' | 'CORRECT' | 'INCORRECT';
+  resolved_at?: string;
+  confidence_level?: number; // 1-100%
+  actual_outcome_summary?: string;
+}
+
+export interface CausalityAttribution {
+  source_user_id?: string; // Quem convidou / originou a ação (ex: "Flávio")
+  source_user_name?: string;
+  invitation_code?: string;
+  referral_depth?: number; // 1 = Direto, 2 = Indireto (2º grau)
+  action_recorded: 'INTENT_CREATED' | 'SUPPORTED' | 'APPROVED' | 'PREDICTED' | 'COMMENTED' | 'REFERRED';
+  target_intent_id?: string;
+  recorded_at: string;
+}
+
+export interface SocialPost {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  created_at: string;
+  
+  // POST core
+  text: string;
+  media_url?: string;
+  media_type?: 'image' | 'link' | 'file';
+  visibility: PostVisibility;
+  
+  // Referência opcional à Intent (Desacoplamento: Opinião NÃO altera a Intent)
+  intent_id?: string;
+  intent_title?: string;
+  category: PostCategory;
+  
+  // Debate Social
+  agree_count: number;
+  disagree_count: number;
+  agreed_user_ids?: string[];
+  disagreed_user_ids?: string[];
+  comments_count: number;
+  comments?: SocialComment[];
+  
+  // Previsão Formal (opcional)
+  prediction?: PredictionDetail;
+  
+  // Registro de Causalidade (Rastreamento de origem para futuro cálculo de impacto)
+  causality?: CausalityAttribution;
+}
 
 export interface SocialInteraction {
   id: string;
   user_name: string;
+  user_id?: string;
   user_avatar?: string;
   type: SocialOpinionType;
   text?: string;
   prediction_val?: string;
   created_at: string;
+  source_referrer?: string; // Causalidade: quem indicou
 }
 
 export type TimeOperator = '>=' | '<=' | 'BETWEEN' | 'WINDOW';
@@ -117,11 +189,14 @@ export type IntentEventType =
 export interface HistoryLogEntry {
   id: string;
   timestamp: string;
-  action_type: 'CREATED' | 'UPDATED' | 'ENCRYPTED' | 'GUARDIAN_APPROVED' | 'GUARDIAN_DECLINED' | 'SUPPORTED' | 'REVEALED' | 'SOCIAL_OPINION' | IntentEventType;
+  action_type: 'CREATED' | 'UPDATED' | 'ENCRYPTED' | 'GUARDIAN_APPROVED' | 'GUARDIAN_DECLINED' | 'SUPPORTED' | 'REVEALED' | 'SOCIAL_OPINION' | 'PREDICTION_MADE' | 'PREDICTION_RESOLVED' | IntentEventType;
   actor_name: string;
+  actor_id?: string;
   description: string;
   badge?: string;
   event_type?: IntentEventType;
+  source_referrer_id?: string; // Quem convidou/originou esta ação (Causalidade)
+  source_referrer_name?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -132,6 +207,9 @@ export interface Supporter {
   avatar_url?: string;
   supported_at: string;
   comment?: string;
+  source_user_id?: string; // Causalidade: quem convidou este apoiador (ex: "Flávio")
+  source_user_name?: string;
+  invitation_code?: string;
 }
 
 export type AudienceType = 'PRIVATE' | 'SELECTED' | 'PUBLIC' | 'FOLLOWERS' | 'LINK' | 'GROUP';
@@ -144,6 +222,27 @@ export interface IntentCreator {
   avatar_url?: string;
 }
 
+export interface ProtectedPayload {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  cipherText: string;
+  cipherAlg: 'AES-256-GCM';
+  salt: string;
+  iv: string;
+  fingerprint: string; // SHA-256 checksum (prefix/display)
+  content_hash: string; // SHA-256 integral do payload original (Integridade pós-revelação)
+  commitment: string; // SHA-256 (Payload || Salt || Secret) - Prova pública imutável pré-revelação
+  encryption_key_reference?: string; // Referência da chave de custódia / KMS
+  creator_signature?: string; // Assinatura digital / identificador de autenticidade do criador
+  key_status?: 'SEALED' | 'AUTHORIZED' | 'REVEALED';
+  encryptedAt: string;
+  isEncrypted: boolean;
+  decryptedContent?: string;
+  integrity_verified?: boolean; // Booleano indicando que o hash conferiu no momento da abertura
+}
+
 export interface IntentContent {
   title: string;
   description: string;
@@ -153,20 +252,22 @@ export interface IntentContent {
   current_version?: number; // v1, v2, v3
   versions?: ContentVersion[]; // Histórico imutável de edições/versões de conteúdo
   release_stages?: ReleaseStage[]; // Suporte a revelações em etapas (ex: Edital -> Homologação -> Aprovados)
-  protected_payload?: {
-    id: string;
-    fileName: string;
-    fileSize: number;
-    fileType: string;
-    cipherText: string;
-    cipherAlg: 'AES-256-GCM';
-    salt: string;
-    iv: string;
-    fingerprint: string;
-    encryptedAt: string;
-    isEncrypted: boolean;
-    decryptedContent?: string;
-  };
+  protected_payload?: ProtectedPayload;
+}
+
+export interface PublicParticipationConfig {
+  target_supports: number; // Meta de apoios (ex: 100)
+  current_supports: number; // Apoios atuais (ex: 73)
+  supporters: Supporter[]; // Lista de apoiadores com registro imutável
+  support_threshold_met?: boolean; // Flag se atingiu a meta
+}
+
+export interface RevealWindowConfig {
+  has_expiration: boolean; // Se true, o segredo possui janela finita de acesso (ex: 24h)
+  duration_hours: number; // Duração da janela em horas após a revelação (ex: 24h, 48h, 7d)
+  reveal_started_at?: string; // Timestamp exato em que a revelação foi disparada
+  expires_at?: string; // reveal_started_at + duration_hours
+  is_expired?: boolean; // Se o prazo da janela encerrou
 }
 
 export interface IntentConditions {
@@ -175,9 +276,19 @@ export interface IntentConditions {
   value?: string; // ISO string UTC do alvo (ex: 2030-12-25T00:00:00.000Z)
   target_date?: string; // Data/hora do disparo/revelação (ISO string)
   expiration_date?: string; // Data limite de expiração da janela de revelação
-  required_approvals?: number; // Quórum de aprovações de guardiões (ex: 2)
+  
+  // Etapa 5: Generic Approval & Quorum Engine
+  quorum_mode?: QuorumMode; // 'UNANIMOUS' | 'MAJORITY' | 'SUPERMAJORITY' | 'EXACT_N' | 'PERCENTAGE'
+  required_approvals?: number; // M de N (ex: 2)
+  eligible_approvers?: number; // N (total de aprovadores elegíveis, ex: 3)
+  quorum_percentage?: number; // Se percentual (ex: 66 para 66%)
+
+  // Etapa 7: Public Support & Ephemeral Reveal Window
   target_supports?: number; // Meta de apoios (ex: 100)
-  current_supports?: number; // Apoios acumulados
+  current_supports?: number; // Apoios acumulados (ex: 73)
+  public_participation?: PublicParticipationConfig;
+  reveal_window?: RevealWindowConfig;
+
   is_locked?: boolean; // Bloqueio atual do conteúdo
 }
 
@@ -228,30 +339,23 @@ export interface Intent {
   participants?: Participant[];
   approvers?: Participant[]; // Aprovadores específicos
   recipients?: Participant[]; // Destinatários específicos
+  quorum_mode?: QuorumMode; // 'UNANIMOUS' | 'MAJORITY' | 'SUPERMAJORITY' | 'EXACT_N' | 'PERCENTAGE'
   required_approvals?: number; // Quórum de aprovações de guardiões necessário para liberação (ex: 2/3)
   revealed_by?: string; // Usuário ou processo que acionou a revelação
   approval_status?: 'pending_quorum' | 'ready_to_reveal' | 'revealed';
 
-  // Etapa 6: Conteúdo Protegido (Arquivo -> Criptografia -> Armazenamento -> Condição -> Descriptografia)
-  protected_payload?: {
-    id: string;
-    fileName: string;
-    fileSize: number;
-    fileType: string;
-    cipherText: string;
-    cipherAlg: 'AES-256-GCM';
-    salt: string;
-    iv: string;
-    fingerprint: string;
-    encryptedAt: string;
-    isEncrypted: boolean;
-    decryptedContent?: string;
-  };
+  // Etapa 6: Conteúdo Protegido (Confidencialidade, Integridade, Autenticidade, Auditoria)
+  protected_payload?: ProtectedPayload;
 
-  // Etapa 7: Participação Pública & Meta de Apoios (Intent -> Apoios -> 10 / 100 -> 100 / 100 -> REVELAR)
+  // Etapa 7: Participação Pública, Meta de Apoios & Janela de Revelação Efêmera (CONDITION -> REVEAL_WINDOW -> EXPIRATION)
   target_supports?: number; // Meta de apoios (ex: 100)
-  current_supports?: number; // Apoios atuais acumulados (ex: 10)
-  supporters?: Supporter[]; // Lista de apoiadores públicos
+  current_supports?: number; // Apoios atuais acumulados (ex: 73)
+  supporters?: Supporter[]; // Lista de apoiadores públicos (anti-duplicação)
+  public_participation?: PublicParticipationConfig;
+  reveal_window?: RevealWindowConfig;
+  reveal_window_hours?: number; // Ex: 24 (horas disponíveis pós-revelação)
+  expires_at?: string; // Timestamp em que o conteúdo revelado expira e é bloqueado/destruído
+  is_expired?: boolean; // Se a janela expirou
 
   // Etapa 8: Camada Social & Histórico (Intent, Histórico, Opinião, Concordo, Discordo, Comentário, Previsão)
   history_logs?: HistoryLogEntry[];
