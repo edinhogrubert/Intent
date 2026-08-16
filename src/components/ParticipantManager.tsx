@@ -14,6 +14,8 @@ import {
 import { Participant, ParticipantRole, ParticipantStatus, QuorumMode } from '../types';
 import { calculateEffectiveRequiredApprovals } from '../utils/conditionEvaluator';
 
+import { DevInspectorBadge } from './DevInspectorBadge';
+
 interface ParticipantManagerProps {
   participants: Participant[];
   onChange: (updated: Participant[]) => void;
@@ -204,7 +206,12 @@ export function ParticipantManager({
   };
 
   return (
-    <div className="space-y-4" id="participant-manager-section">
+    <div className="space-y-4 relative" id="participant-manager-section">
+      <DevInspectorBadge
+        file="src/components/ParticipantManager.tsx"
+        functionName="ParticipantManager"
+        className="mb-1"
+      />
       {/* Guardian Quorum Status Bar */}
       {guardians.length > 0 && (
         <div className="p-3.5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-2.5">
@@ -366,7 +373,7 @@ export function ParticipantManager({
         </div>
 
         {isAdding && !isReadOnly && (
-          <form onSubmit={handleAddParticipant} className="p-3 bg-white rounded-xl border border-[#BFD7FE] space-y-2.5">
+          <div className="p-3 bg-white rounded-xl border border-[#BFD7FE] space-y-2.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
                 type="text"
@@ -374,6 +381,12 @@ export function ParticipantManager({
                 placeholder="Nome da pessoa *"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddParticipant();
+                  }
+                }}
                 className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
               />
               <input
@@ -382,6 +395,12 @@ export function ParticipantManager({
                 placeholder="E-mail *"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddParticipant();
+                  }
+                }}
                 className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
               />
             </div>
@@ -400,6 +419,12 @@ export function ParticipantManager({
                 placeholder="Notas de contexto (opcional)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddParticipant();
+                  }
+                }}
                 className="px-3 py-1.5 bg-[#F8FAFC] border border-slate-200 rounded-lg text-xs"
               />
             </div>
@@ -407,18 +432,19 @@ export function ParticipantManager({
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="px-3 py-1 border border-slate-200 rounded-lg text-xs"
+                className="px-3 py-1 border border-slate-200 rounded-lg text-xs cursor-pointer"
               >
                 Cancelar
               </button>
               <button
-                type="submit"
-                className="px-3 py-1 bg-[#0055FF] text-white rounded-lg text-xs font-bold"
+                type="button"
+                onClick={() => handleAddParticipant()}
+                className="px-3 py-1 bg-[#0055FF] text-white rounded-lg text-xs font-bold cursor-pointer"
               >
                 Adicionar
               </button>
             </div>
-          </form>
+          </div>
         )}
 
         <div className="space-y-1.5 max-h-56 overflow-y-auto">

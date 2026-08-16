@@ -27,17 +27,23 @@ export function getUserActivityFromStorage(user: UserAccount): UserActivitySumma
 
     // Intents criadas pelo usuário
     const createdIntentsList = allIntents.filter((intent) => {
+      if (!intent.creator_id) return false;
       return (
         intent.creator_id === userId ||
-        intent.creator_id === 'usr-1' ||
-        intent.creator_id === userEmailLower
+        (userEmailLower && intent.creator_id.toLowerCase() === userEmailLower)
       );
     });
 
     // Intents onde o usuário participa (como Guardião, destinatário ou participante)
     const participatedIntentsList = allIntents.filter((intent) => {
-      if (!intent.participants || intent.participants.length === 0) return false;
-      return intent.participants.some((p) => {
+      const allParticipants = [
+        ...(intent.participants || []),
+        ...(intent.people?.approvers || []),
+        ...(intent.people?.recipients || []),
+        ...(intent.people?.participants || []),
+      ];
+      if (allParticipants.length === 0) return false;
+      return allParticipants.some((p) => {
         const nameMatch = p.name && p.name.toLowerCase() === userNameLower;
         const emailMatch = p.email && p.email.toLowerCase() === userEmailLower;
         const idMatch = p.id === userId;
@@ -47,12 +53,16 @@ export function getUserActivityFromStorage(user: UserAccount): UserActivitySumma
 
     // Intents recebidas (papel de recipient)
     const receivedIntentsList = allIntents.filter((intent) => {
-      if (!intent.participants) return false;
-      return intent.participants.some((p) => {
+      const allParticipants = [
+        ...(intent.participants || []),
+        ...(intent.people?.recipients || []),
+      ];
+      return allParticipants.some((p) => {
         const isRecipient = p.role === 'recipient';
         const nameMatch = p.name && p.name.toLowerCase() === userNameLower;
         const emailMatch = p.email && p.email.toLowerCase() === userEmailLower;
-        return isRecipient && (nameMatch || emailMatch);
+        const idMatch = p.id === userId;
+        return isRecipient && (nameMatch || emailMatch || idMatch);
       });
     });
 

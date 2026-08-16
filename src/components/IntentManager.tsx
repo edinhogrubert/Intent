@@ -53,6 +53,7 @@ import { ApprovalWorkflow } from './ApprovalWorkflow';
 import { ProtectedVaultPipeline } from './ProtectedVaultPipeline';
 import { PublicSupportWorkflow } from './PublicSupportWorkflow';
 import { SocialHistoryWorkflow } from './SocialHistoryWorkflow';
+import { DevInspectorBadge } from './DevInspectorBadge';
 import { IntentStructureModal } from './IntentStructureModal';
 import { normalizeIntent } from '../utils/intentSchema';
 import { ProtectedPayload, SAMPLE_PROTECTED_FILES } from '../utils/cryptoVault';
@@ -148,7 +149,7 @@ export function IntentManager({ user }: IntentManagerProps) {
   const getInitialDefaultIntents = (): Intent[] => [
     {
       id: 'intent-stage5-flavio-fernando-2of2',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'app-1', // Flávio
       title: 'Etapa 5 — Aprovação Simples (2/2 Unanimidade: Flávio & Fernando)',
       description: 'Flávio → Aprovar (✓) | Fernando → Aprovar (✓). Quando todos aprovarem (2 / 2) ➔ REVELAR.',
       status: 'active',
@@ -162,7 +163,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       people: {
         approvers: [
           {
-            id: 'app-flavio',
+            id: 'app-1',
             name: 'Flávio',
             email: 'flavio@conselho.org',
             role: 'approver',
@@ -171,7 +172,7 @@ export function IntentManager({ user }: IntentManagerProps) {
             notes: 'Aprovador #1 (✓ Aprovado)',
           },
           {
-            id: 'app-fernando',
+            id: 'app-2',
             name: 'Fernando',
             email: 'fernando@conselho.org',
             role: 'approver',
@@ -185,7 +186,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       },
       participants: [
         {
-          id: 'app-flavio',
+          id: 'app-1',
           name: 'Flávio',
           email: 'flavio@conselho.org',
           role: 'guardian',
@@ -194,7 +195,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           notes: 'Aprovador #1 (✓ Aprovado)',
         },
         {
-          id: 'app-fernando',
+          id: 'app-2',
           name: 'Fernando',
           email: 'fernando@conselho.org',
           role: 'guardian',
@@ -206,7 +207,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
     {
       id: 'intent-stage5-majority-2of3',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'app-2', // Fernando
       title: 'Etapa 5 — Quórum por Maioria (2 de 3: Flávio, Fernando, Maria)',
       description: 'Motor genérico de regras: condition = { type: "APPROVAL", required: 2, eligible: 3 }. Flávio já aprovou (1/2), aguardando Fernando ou Maria para REVELAR.',
       status: 'active',
@@ -220,7 +221,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       people: {
         approvers: [
           {
-            id: 'app-flavio',
+            id: 'app-1',
             name: 'Flávio',
             email: 'flavio@conselho.org',
             role: 'approver',
@@ -229,7 +230,7 @@ export function IntentManager({ user }: IntentManagerProps) {
             notes: 'Aprovador #1 (✓ Aprovado)',
           },
           {
-            id: 'app-fernando',
+            id: 'app-2',
             name: 'Fernando',
             email: 'fernando@conselho.org',
             role: 'approver',
@@ -237,7 +238,7 @@ export function IntentManager({ user }: IntentManagerProps) {
             notes: 'Aprovador #2 (— Aguardando)',
           },
           {
-            id: 'app-maria',
+            id: 'app-3',
             name: 'Maria',
             email: 'maria@conselho.org',
             role: 'approver',
@@ -250,7 +251,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       },
       participants: [
         {
-          id: 'app-flavio',
+          id: 'app-1',
           name: 'Flávio',
           email: 'flavio@conselho.org',
           role: 'guardian',
@@ -259,7 +260,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           notes: 'Aprovador #1 (✓ Aprovado)',
         },
         {
-          id: 'app-fernando',
+          id: 'app-2',
           name: 'Fernando',
           email: 'fernando@conselho.org',
           role: 'guardian',
@@ -267,7 +268,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           notes: 'Aprovador #2 (— Aguardando)',
         },
         {
-          id: 'app-maria',
+          id: 'app-3',
           name: 'Maria',
           email: 'maria@conselho.org',
           role: 'guardian',
@@ -278,7 +279,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
     {
       id: 'intent-stage5-exact-3of5',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'app-1', // Flávio
       title: 'Etapa 5 — Quórum Numérico M de N (3 de 5 Guardiões)',
       description: 'Regra de liberação: 3 aprovações necessárias de 5 elegíveis (Flávio, Fernando, Maria, Roberto, Helena).',
       status: 'active',
@@ -291,7 +292,7 @@ export function IntentManager({ user }: IntentManagerProps) {
       required_approvals: 3,
       participants: [
         {
-          id: 'app-5-1',
+          id: 'app-1',
           name: 'Flávio',
           email: 'flavio@conselho.org',
           role: 'guardian',
@@ -300,7 +301,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           notes: 'Aprovador #1 (✓)',
         },
         {
-          id: 'app-5-2',
+          id: 'app-2',
           name: 'Fernando',
           email: 'fernando@conselho.org',
           role: 'guardian',
@@ -309,7 +310,7 @@ export function IntentManager({ user }: IntentManagerProps) {
           notes: 'Aprovador #2 (✓)',
         },
         {
-          id: 'app-5-3',
+          id: 'app-3',
           name: 'Maria',
           email: 'maria@conselho.org',
           role: 'guardian',
@@ -336,7 +337,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
     {
       id: 'intent-stage4-joao-conselho-demo',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'app-1', // Flávio
       title: 'Etapa 4 — Documento Privado com Quórum de Aprovadores (Caso João & Conselho)',
       description: '2 de 3 Aprovadores (Flávio, Fernando, Maria) autorizam a liberação, mas a revelação é direcionada estritamente ao Destinatário (João).',
       status: 'active',
@@ -427,7 +428,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
     {
       id: 'intent-stage7-public-support-demo',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'usr-1', // Rafael
       title: 'Etapa 7 — Participação Pública & Janela Efêmera (100 Apoios ➔ 24h Revelado)',
       description: 'Intenção com ciclo de mobilização pública e janela de revelação: 100 apoios ➔ Revela ➔ 24 horas disponível ➔ Expira.',
       status: 'active',
@@ -471,7 +472,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
     {
       id: 'intent-time-demo',
-      creator_id: user.id || user.email || 'usr-1',
+      creator_id: 'usr-1', // Rafael
       title: 'Distribuição de Dividendos e Relatório Trimestral',
       description: 'Trava temporal agendada para distribuição de demonstrativos contábeis aos acionistas.',
       status: 'active',
@@ -494,40 +495,94 @@ export function IntentManager({ user }: IntentManagerProps) {
     },
   ];
 
-  // Helper: Local fallback
-  const getLocalIntents = (): Intent[] => {
+  // Helper: Retrieve full master list from localStorage or seed with defaults
+  const getAllStoredIntents = (): Intent[] => {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_INTENTS_KEY);
-      let listToReturn: Intent[] = [];
       if (!raw) {
         const defaults = getInitialDefaultIntents();
-        saveLocalIntents(defaults);
-        listToReturn = defaults;
-      } else {
-        const parsed: Intent[] = JSON.parse(raw);
-        if (parsed.length === 0) {
-          const defaults = getInitialDefaultIntents();
-          saveLocalIntents(defaults);
-          listToReturn = defaults;
-        } else {
-          listToReturn = parsed.filter(
-            (i) =>
-              !i.creator_id ||
-              i.creator_id === user.id ||
-              i.creator_id === 'usr-1' ||
-              i.creator_id === user.email
-          );
-        }
+        localStorage.setItem(LOCAL_STORAGE_INTENTS_KEY, JSON.stringify(defaults));
+        return defaults;
       }
-      return listToReturn.map((item) => normalizeIntent(item, user));
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        const defaults = getInitialDefaultIntents();
+        localStorage.setItem(LOCAL_STORAGE_INTENTS_KEY, JSON.stringify(defaults));
+        return defaults;
+      }
+      return parsed;
     } catch {
-      return getInitialDefaultIntents().map((item) => normalizeIntent(item, user));
+      const defaults = getInitialDefaultIntents();
+      localStorage.setItem(LOCAL_STORAGE_INTENTS_KEY, JSON.stringify(defaults));
+      return defaults;
     }
   };
 
-  const saveLocalIntents = (updated: Intent[]) => {
+  // Check if a specific intent is authorized to be viewed by currentUser
+  const isUserAuthorizedForIntent = (intent: Intent, currentUser: UserAccount): boolean => {
+    if (!currentUser) return false;
+
+    // 1. Public intents are visible to all users
+    if (intent.visibility === 'public' || intent.condition_type === 'PUBLIC_SUPPORT') {
+      return true;
+    }
+
+    const userId = currentUser.id;
+    const userEmail = (currentUser.email || '').toLowerCase();
+    const userName = (currentUser.name || '').toLowerCase();
+
+    // 2. Creator owns the intent
+    if (
+      intent.creator_id === userId ||
+      (intent.creator_id && intent.creator_id.toLowerCase() === userEmail)
+    ) {
+      return true;
+    }
+
+    // Special fallback for initial default creator 'usr-1' if user is Rafael
+    if (intent.creator_id === 'usr-1' && (userId === 'usr-1' || userEmail.includes('rafael'))) {
+      return true;
+    }
+
+    // 3. User is a participant (guardian, approver, recipient, etc.)
+    const allParticipants = [
+      ...(intent.participants || []),
+      ...(intent.people?.approvers || []),
+      ...(intent.people?.recipients || []),
+      ...(intent.people?.participants || []),
+    ];
+
+    const isParticipant = allParticipants.some((p) => {
+      if (!p) return false;
+      const pIdMatch = p.id === userId;
+      const pEmailMatch = p.email && p.email.toLowerCase() === userEmail;
+      const pNameMatch = p.name && p.name.toLowerCase() === userName;
+      return pIdMatch || pEmailMatch || pNameMatch;
+    });
+
+    return isParticipant;
+  };
+
+  // Helper: Get intents filtered strictly for active user persona
+  const getLocalIntents = (): Intent[] => {
+    const allStored = getAllStoredIntents();
+    const authorized = allStored.filter((item) => isUserAuthorizedForIntent(item, user));
+    return authorized.map((item) => normalizeIntent(item, user));
+  };
+
+  // Save updated user intents without removing other users' intents from master storage
+  const saveLocalIntents = (updatedUserIntents: Intent[]) => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_INTENTS_KEY, JSON.stringify(updated));
+      const allStored = getAllStoredIntents();
+      const updatedUserIds = new Set(updatedUserIntents.map((i) => i.id));
+
+      const otherUsersIntents = allStored.filter(
+        (storedIntent) =>
+          !updatedUserIds.has(storedIntent.id) && !isUserAuthorizedForIntent(storedIntent, user)
+      );
+
+      const merged = [...updatedUserIntents, ...otherUsersIntents];
+      localStorage.setItem(LOCAL_STORAGE_INTENTS_KEY, JSON.stringify(merged));
     } catch (e) {
       console.error('Failed to save to localStorage:', e);
     }
@@ -606,7 +661,7 @@ export function IntentManager({ user }: IntentManagerProps) {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user.id]);
+  }, [user.id, user.email]);
 
   // Connect with Google to enable Firestore sync
   const handleConnectGoogle = async () => {
@@ -1213,7 +1268,13 @@ export function IntentManager({ user }: IntentManagerProps) {
   }).length;
 
   return (
-    <div id="intent-manager-container" className="space-y-6">
+    <div id="intent-manager-container" className="space-y-6 relative">
+      <DevInspectorBadge
+        file="src/components/IntentManager.tsx"
+        functionName="IntentManager"
+        className="mb-1"
+      />
+
       {/* Header Bar */}
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
@@ -1396,8 +1457,13 @@ export function IntentManager({ user }: IntentManagerProps) {
         <form
           id="form-create-intent"
           onSubmit={handleCreateIntent}
-          className="bg-white rounded-3xl p-6 md:p-8 border-2 border-[#BFD7FE] shadow-lg space-y-6 animate-in fade-in slide-in-from-top-4 duration-200"
+          className="relative bg-white rounded-3xl p-6 md:p-8 border-2 border-[#BFD7FE] shadow-lg space-y-6 animate-in fade-in slide-in-from-top-4 duration-200"
         >
+          <DevInspectorBadge
+            file="src/components/IntentManager.tsx"
+            functionName="FormCreateIntent"
+            className="mb-1 block w-max"
+          />
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-[#EAF2FF] text-[#0055FF] flex items-center justify-center font-bold">
@@ -1755,9 +1821,15 @@ export function IntentManager({ user }: IntentManagerProps) {
               <div
                 key={intent.id}
                 id={`intent-card-${intent.id}`}
-                className="bg-white rounded-2xl p-5 border border-[#DCE7F6] hover:border-[#94BFFF] hover:shadow-md transition-all flex flex-col justify-between group"
+                className="bg-white rounded-2xl p-5 border border-[#DCE7F6] hover:border-[#94BFFF] hover:shadow-md transition-all flex flex-col justify-between group relative"
               >
                 <div>
+                  <DevInspectorBadge
+                    file="src/components/IntentManager.tsx"
+                    functionName="IntentCard"
+                    className="mb-2"
+                  />
+
                   {/* Top Badges */}
                   <div className="flex items-center justify-between gap-2 mb-2.5">
                     <div className="flex items-center gap-1.5 flex-wrap">

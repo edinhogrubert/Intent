@@ -12,6 +12,7 @@ import { DeleteAccountModal } from './components/DeleteAccountModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { TesterProfileSwitcherBar } from './components/TesterProfileSwitcherBar';
 import { StagesChecklistModal } from './components/StagesChecklistModal';
+import { DevInspectorBadge } from './components/DevInspectorBadge';
 import { auth, signOut, onAuthStateChanged } from './utils/firebase';
 import { ListChecks } from 'lucide-react';
 
@@ -121,7 +122,12 @@ export default function App() {
         />
 
         {/* Top Greeting Header matching the screenshot ("Bom dia, Rafael.") */}
-        <header>
+        <header className="relative">
+          <DevInspectorBadge
+            file="src/App.tsx"
+            functionName="App <header>"
+            className="mb-1"
+          />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1

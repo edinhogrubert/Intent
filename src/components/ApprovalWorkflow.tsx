@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Participant, Intent } from '../types';
 import { evaluateIntentConditions, calculateEffectiveRequiredApprovals } from '../utils/conditionEvaluator';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface ApprovalWorkflowProps {
   intent?: Intent;
@@ -78,7 +79,12 @@ export function ApprovalWorkflow({
   // Compact card view (for Intent List cards)
   if (variant === 'compact') {
     return (
-      <div className="p-3.5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-2.5">
+      <div className="p-3.5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-2.5 relative">
+        <DevInspectorBadge
+          file="src/components/ApprovalWorkflow.tsx"
+          functionName="ApprovalWorkflow (compact)"
+          className="mb-1"
+        />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-[#0055FF]" />
@@ -165,8 +171,13 @@ export function ApprovalWorkflow({
   return (
     <div
       id="approval-workflow-container"
-      className="p-5 md:p-6 rounded-3xl bg-gradient-to-b from-white to-[#F9FBFF] border-2 border-[#BFD7FE] shadow-sm space-y-6"
+      className="p-5 md:p-6 rounded-3xl bg-gradient-to-b from-white to-[#F9FBFF] border-2 border-[#BFD7FE] shadow-sm space-y-6 relative"
     >
+      <DevInspectorBadge
+        file="src/components/ApprovalWorkflow.tsx"
+        functionName="ApprovalWorkflow"
+        className="mb-1"
+      />
       {/* Stage 5 Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">

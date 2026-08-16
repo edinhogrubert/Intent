@@ -1,5 +1,6 @@
 import { Flame, Clock, Sparkles, CheckCircle2, ChevronRight } from 'lucide-react';
 import { UserAccount } from '../types';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface BottomCardsRowProps {
   user: UserAccount;
@@ -7,7 +8,12 @@ interface BottomCardsRowProps {
 
 export function BottomCardsRow({ user }: BottomCardsRowProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6 relative">
+      <DevInspectorBadge
+        file="src/components/BottomCardsRow.tsx"
+        functionName="BottomCardsRow"
+        className="absolute -top-3 left-0"
+      />
       {/* Left Item: Matches "Próximos - Contrato Empresa XP" */}
       <div className="lg:col-span-5">
         <div className="flex items-center gap-2 text-sm font-bold text-slate-800 mb-3">

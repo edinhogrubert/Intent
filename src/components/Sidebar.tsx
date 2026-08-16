@@ -1,5 +1,6 @@
 import { Home, Compass, PlusCircle, Inbox, Bell, LogOut, Trash2, User, ListChecks } from 'lucide-react';
 import { UserAccount } from '../types';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface SidebarProps {
   user: UserAccount;
@@ -13,8 +14,13 @@ export function Sidebar({ user, onLogout, onRequestDelete, onOpenProfile, onOpen
   return (
     <aside
       id="app-sidebar"
-      className="w-20 md:w-24 bg-[#EBF2FC] border-r border-[#D9E5F5] flex flex-col items-center py-6 justify-between select-none shrink-0 min-h-screen"
+      className="w-20 md:w-24 bg-[#EBF2FC] border-r border-[#D9E5F5] flex flex-col items-center py-6 justify-between select-none shrink-0 min-h-screen relative"
     >
+      <DevInspectorBadge
+        file="src/components/Sidebar.tsx"
+        functionName="Sidebar"
+        className="absolute top-1 left-1 max-w-[70px] text-[8px]"
+      />
       {/* Top section: Logo + Navigation items */}
       <div className="flex flex-col items-center w-full gap-5">
         {/* Brand Logo */}

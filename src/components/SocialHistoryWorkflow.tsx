@@ -26,6 +26,8 @@ import {
   PostVisibility,
 } from '../types';
 
+import { DevInspectorBadge } from './DevInspectorBadge';
+
 interface SocialHistoryWorkflowProps {
   intent: Intent;
   onAddInteraction?: (
@@ -278,8 +280,13 @@ export const SocialHistoryWorkflow: React.FC<SocialHistoryWorkflowProps> = ({
   return (
     <div
       id="etapa-8-social-history-container"
-      className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] text-slate-800 shadow-xs space-y-6"
+      className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] text-slate-800 shadow-xs space-y-6 relative"
     >
+      <DevInspectorBadge
+        file="src/components/SocialHistoryWorkflow.tsx"
+        functionName="SocialHistoryWorkflow"
+        className="mb-1"
+      />
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
         <div>

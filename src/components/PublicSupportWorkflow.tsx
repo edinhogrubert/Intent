@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { Intent, Supporter } from '../types';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface PublicSupportWorkflowProps {
   intent: Intent;
@@ -149,7 +150,12 @@ export function PublicSupportWorkflow({
 
   if (variant === 'compact') {
     return (
-      <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 space-y-2.5">
+      <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 space-y-2.5 relative">
+        <DevInspectorBadge
+          file="src/components/PublicSupportWorkflow.tsx"
+          functionName="PublicSupportWorkflow (compact)"
+          className="mb-1"
+        />
         <div className="flex items-center justify-between text-xs font-bold text-slate-800">
           <div className="flex items-center gap-1.5">
             <Heart className="w-3.5 h-3.5 text-[#0055FF] fill-[#0055FF]/20" />
@@ -210,8 +216,13 @@ export function PublicSupportWorkflow({
   return (
     <div
       id="public-support-workflow-hero"
-      className="p-6 md:p-8 rounded-3xl bg-white text-slate-800 border border-[#DCE7F6] shadow-xs space-y-6"
+      className="p-6 md:p-8 rounded-3xl bg-white text-slate-800 border border-[#DCE7F6] shadow-xs space-y-6 relative"
     >
+      <DevInspectorBadge
+        file="src/components/PublicSupportWorkflow.tsx"
+        functionName="PublicSupportWorkflow"
+        className="mb-1"
+      />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-3.5">

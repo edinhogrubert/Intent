@@ -1,6 +1,8 @@
+import React, { useState } from 'react';
 import { UserAccount } from '../types';
 import { PRESET_TEST_PERSONAS, createGuestUser, switchPersona, TestPersona } from '../utils/testPersonas';
-import { Zap, Users, UserCheck } from 'lucide-react';
+import { Zap, Users, UserCheck, Code2 } from 'lucide-react';
+import { DevInspectorBadge, getGlobalDevBadgesState, toggleGlobalDevBadges } from './DevInspectorBadge';
 
 interface TesterProfileSwitcherBarProps {
   currentUser: UserAccount;
@@ -8,6 +10,13 @@ interface TesterProfileSwitcherBarProps {
 }
 
 export function TesterProfileSwitcherBar({ currentUser, onUserChanged }: TesterProfileSwitcherBarProps) {
+  const [devBadgesActive, setDevBadgesActive] = useState<boolean>(getGlobalDevBadgesState());
+
+  const handleToggleBadges = () => {
+    const newState = toggleGlobalDevBadges();
+    setDevBadgesActive(newState);
+  };
+
   const handleSwitchPersona = (persona: TestPersona) => {
     const updated = switchPersona(persona);
     onUserChanged(updated);
@@ -19,8 +28,14 @@ export function TesterProfileSwitcherBar({ currentUser, onUserChanged }: TesterP
   };
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-[#BFD7FE] p-3 shadow-xs space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+    <div className="relative w-full bg-white rounded-2xl border border-[#BFD7FE] p-3 shadow-xs space-y-2">
+      <DevInspectorBadge
+        file="src/components/TesterProfileSwitcherBar.tsx"
+        functionName="TesterProfileSwitcherBar"
+        className="absolute top-2 left-2"
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 pt-5 sm:pt-0">
         <div className="flex items-center gap-2 text-xs">
           <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-2xs">
             <Users className="w-3 h-3" />
@@ -32,7 +47,21 @@ export function TesterProfileSwitcherBar({ currentUser, onUserChanged }: TesterP
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 text-[11px]">Logado como:</span>
+          {/* Dev Badges Toggle */}
+          <button
+            onClick={handleToggleBadges}
+            className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+              devBadgesActive
+                ? 'bg-amber-100 text-amber-900 border-amber-300'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
+            }`}
+            title="Ativar/Desativar rótulos identificadores de arquivo .tsx e funções nas telas"
+          >
+            <Code2 className="w-3 h-3 text-amber-600" />
+            <span>Dev Tags: {devBadgesActive ? 'ON ✓' : 'OFF'}</span>
+          </button>
+
+          <span className="text-slate-500 text-[11px] hidden sm:inline">Logado como:</span>
           <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-xs flex items-center gap-1.5">
             <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>{currentUser.name}</span>
@@ -74,3 +103,4 @@ export function TesterProfileSwitcherBar({ currentUser, onUserChanged }: TesterP
     </div>
   );
 }
+

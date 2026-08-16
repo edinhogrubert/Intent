@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, Intent } from '../types';
 import { updateUserProfile, getUserActivityFromStorage } from '../utils/storage';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -116,7 +117,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden relative my-8">
         {/* Header Bar */}
         <div className="bg-gradient-to-r from-[#152744] to-[#0D1B2E] p-6 text-white flex items-center justify-between relative">
-          <div className="flex items-center gap-3">
+          <DevInspectorBadge
+            file="src/components/UserProfileModal.tsx"
+            functionName="UserProfileModal"
+            className="absolute top-2 left-2"
+          />
+          <div className="flex items-center gap-3 pt-4 sm:pt-0">
             <div className="w-10 h-10 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center font-black text-lg shadow-md">
               IT
             </div>

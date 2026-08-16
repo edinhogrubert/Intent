@@ -1,5 +1,6 @@
 import { TrendingUp, UserCheck, Shield, LogOut, Trash2, User, Sparkles, CheckCircle2 } from 'lucide-react';
 import { UserAccount } from '../types';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface AccountStatusCardProps {
   user: UserAccount;
@@ -23,8 +24,13 @@ export function AccountStatusCard({
   return (
     <div
       id="account-status-card"
-      className="bg-white border border-[#DCE7F6] rounded-3xl p-6 md:p-7 shadow-xs flex flex-col justify-between"
+      className="bg-white border border-[#DCE7F6] rounded-3xl p-6 md:p-7 shadow-xs flex flex-col justify-between relative"
     >
+      <DevInspectorBadge
+        file="src/components/AccountStatusCard.tsx"
+        functionName="AccountStatusCard"
+        className="mb-1"
+      />
       {/* Card Header */}
       <div>
         <div className="flex items-center justify-between mb-5">

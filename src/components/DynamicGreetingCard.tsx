@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Sun, SunMedium, Moon, Clock, Check, RefreshCw } from 'lucide-react';
 import { UserAccount, TimeOfDay } from '../types';
 import { getGreetingConfig, getTimeOfDay, formatTime } from '../utils/time';
+import { DevInspectorBadge } from './DevInspectorBadge';
 
 interface DynamicGreetingCardProps {
   user: UserAccount;
@@ -62,6 +63,11 @@ export function DynamicGreetingCard({ user }: DynamicGreetingCardProps) {
       id="main-greeting-card"
       className="bg-white rounded-3xl border border-dashed border-[#94BFFF] p-6 md:p-8 shadow-xs relative flex flex-col justify-between"
     >
+      <DevInspectorBadge
+        file="src/components/DynamicGreetingCard.tsx"
+        functionName="DynamicGreetingCard"
+        className="mb-1"
+      />
       {/* Top Header Row in Card */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
