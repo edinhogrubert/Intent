@@ -232,7 +232,7 @@ Sem suíte automatizada hoje. A primeira suíte não deve testar componentes —
 3. Quórum de 2 de 3 não libera com 1 aprovação; libera com 2; a 3ª não gera segunda liberação.
 4. O mesmo usuário apoiando duas vezes incrementa o contador uma vez.
 5. Janela expirada não entrega chave a quem ainda não acessou.
-6. `SHA-256(plaintext revelado)` bate com o `commitment` publicado na criação.
+6. `SHA-256(plaintext revelado)` bate com `content_hash`, e `SHA-256(content_hash || salt)` bate com o `commitment` publicado na criação.
 7. 500 debates na camada social não alteram um único campo de `conditions`.
 8. Evento duplicado não produz segunda revelação.
 9. Vínculo A→B→A entre Intents é recusado na criação.
