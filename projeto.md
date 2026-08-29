@@ -1,6 +1,8 @@
 # INTENT OS — Documento de Produto e Engenharia
 
 > Escrito na posição de Product Owner **e** engenheiro responsável pelo sistema. Não é um resumo do que existe (isso está em `projatual.md`) nem uma auditoria (`revisar.md`, `revisao-docs-relatorio.md`): é **como eu construiria o INTENT OS para valer**, com as decisões que sustentam a promessa do produto e as que hoje não se sustentam.
+>
+> **Revisão sênior incorporada.** As opiniões registradas em `visaodedoisenior.md` (Chety e Gemerson) foram lidas e integradas neste documento: a formalização do ADR-001, a correção da promessa do produto, eventos como fonte da verdade *com read model*, a fase F-1 (threat model), os invariantes numerados `INV-001..010`, a stop list e o Definition of Done do núcleo. O §19 lista o que foi aceito e o que foi ajustado.
 
 ---
 
@@ -17,6 +19,12 @@ INTENÇÃO → CONDIÇÃO → PARTICIPAÇÃO → ACONTECIMENTO → REVELAÇÃO �
 Isso cria uma primitiva que a internet atual não tem de forma genérica: **compromisso público com conteúdo oculto e liberação automática governada por regra, não por vontade**.
 
 O criador não pode antecipar a revelação. O sistema não pode revelar antes da hora. Terceiros podem provar, depois, que o conteúdo revelado é exatamente o que foi lacrado. Essa combinação — *commitment* + *tempo/quórum/meta* + *destinatário restrito* — é o produto.
+
+**A promessa, enunciada com precisão.** É tentador dizer *"nem o criador consegue abrir antes da hora"*, mas isso é falso por construção: quem escreveu o conteúdo já o conhece. Nenhuma criptografia apaga a memória do autor. A promessa tecnicamente correta — e a que o sistema tem obrigação de cumprir — é:
+
+> **Depois de selada a Intent, nenhuma entidade — criador, guardião, operador da plataforma — consegue, através do sistema, alterar o conteúdo, alterar a condição ou provocar a revelação antes que a condição seja satisfeita; e qualquer pessoa pode verificar depois que o revelado é exatamente o que foi selado.**
+
+O valor não está em esconder do autor, está em **retirar do autor o controle do instante e do conteúdo da revelação**, e em tornar isso verificável. Toda vez que este documento usar a forma curta, é esta a leitura válida.
 
 ### 2. Por que isso importa (o problema real)
 
@@ -73,7 +81,17 @@ Nada disso invalida o trabalho: era um protótipo de produto e cumpriu o papel. 
 
 ### 6. Decisão fundadora: a confiança tem que sair do cliente
 
-Um sistema cuja proposta é *"nem o criador consegue abrir antes da hora"* não pode avaliar a condição nem guardar a chave onde o criador tem controle. Essa é a única decisão realmente irreversível do projeto; tudo o mais decorre dela.
+Um sistema com a promessa do §1 não pode avaliar a condição nem guardar a chave onde o criador tem controle. Essa é a única decisão realmente irreversível do projeto; tudo o mais decorre dela. Registro como decisão de arquitetura, porque toda discussão futura deve ser resolvida por referência a ela:
+
+> ### ADR-001 — The Client Is Untrusted
+>
+> **Contexto:** o protótipo decide no navegador a satisfação da condição, a liberação do conteúdo, a contagem de apoios e a escrita do histórico.
+>
+> **Decisão:** nenhuma decisão sobre satisfação de condição, liberação de conteúdo, contagem de participação, aprovação, custódia de chave ou autorização de leitura pode depender do cliente. O cliente propõe; o servidor decide e registra.
+>
+> **Status:** aceita, vinculante. Precede qualquer outra decisão técnica do projeto.
+>
+> **Consequências:** o cliente perde direito de escrita na Intent; o avaliador migra para o backend; a chave sai do navegador; as rules deixam de ser a única defesa e passam a ser a *última*.
 
 **Divisão de responsabilidades:**
 
@@ -116,6 +134,13 @@ Propriedades obtidas:
 - **Prova pública pré-revelação:** o `commitment` é publicado na criação; qualquer um verifica depois que o conteúdo é o mesmo.
 - **Janela efêmera com dente:** expirada a janela, o servidor deixa de entregar a DEK. (Honestidade necessária: quem já baixou, já tem — a janela restringe *novos* acessos, não apaga cópias. Isso precisa estar escrito na UI, não escondido.)
 - **Auditoria de acesso:** cada entrega de chave é um evento com ator e timestamp.
+
+O `commitment` deixa de ser "um detalhe da arquitetura" e sobe a requisito funcional de segurança — é ele que separa o INTENT de um post agendado:
+
+| ID | Requisito |
+| :--- | :--- |
+| **RF-SEC-001** | Toda Intent com conteúdo condicionado possui um `commitment` imutável, registrado **antes** da revelação e legível por qualquer um desde a criação. |
+| **RF-SEC-002** | Após a revelação, qualquer pessoa — inclusive quem não participa da Intent — consegue verificar o conteúdo contra o `commitment` publicado originalmente, com ferramenta fornecida pela própria plataforma. |
 
 Correções imediatas em relação ao código atual: eliminar `DEFAULT_VAULT_KEY`; nunca exibir chave na UI (hoje o `JIRA.md` até pedia isso como critério de aceite); tornar `content_hash` e `commitment` obrigatórios e imutáveis após a criação.
 
@@ -181,6 +206,17 @@ state = fold(events, initialState)
 
 `IntentEventType` já existe e é bom. O que falta é fazê-lo autoritativo: eventos gravados só pelo servidor, em subcoleção append-only, com `seq` monotônico e chave de idempotência (`intentId + type + seq`) — isso resolve a US-07.2 de verdade, não por checagem de estado no cliente. Ganho colateral: auditoria, replay e a Etapa 9 saem de graça, porque reputação vira uma projeção diferente do mesmo log.
 
+Uma ressalva de engenharia que considero importante: **isso não é "transformar o banco inteiro em Event Sourcing"**. Nenhuma tela vai reconstruir a Intent por replay a cada leitura.
+
+```
+EVENTS (append-only)  →  fonte da verdade das transições de domínio
+        │ projeção (na mesma transação)
+        ▼
+INTENT DOC            →  read model; é o que a UI lê
+```
+
+O documento da Intent continua sendo o estado corrente materializado e barato de ler; o log é quem tem autoridade quando os dois divergem, e é a partir dele que se reconstrói, audita e faz replay. Divergência entre projeção e log é bug de gravidade máxima e deve ter uma verificação de consistência rodando periodicamente.
+
 ### 10. Como uma condição dispara sem ninguém olhando
 
 Três caminhos, todos convergindo no mesmo avaliador:
@@ -197,7 +233,22 @@ Idempotência e transação são obrigatórias: dois apoios simultâneos no 99º
 
 Previsões (`PredictionDetail`) são o inverso: não afetam a Intent, mas são **resolvidas por ela**. Quando a Intent resolve, todas as previsões pendentes viram `PREDICTION_RESOLVED` com `CORRECT`/`INCORRECT`. É esse registro — e só ele — que alimenta a reputação.
 
-### 12. Etapa 9 — impacto e reputação sem gamificação
+### 12. Etapa 9 — impacto e reputação sem gamificação (fora do núcleo)
+
+Antes do conteúdo desta seção, o recorte de escopo: **reputação não prova a tese e por isso não entra no núcleo.**
+
+```
+INTENT CORE                      FUTURE
+├─ Intent                        └─ Impacto / Reputação
+├─ Condition
+├─ Participation
+├─ Event
+├─ Release
+├─ Access
+└─ Audit
+```
+
+O que prova a tese é `Intent → Condition → Event → Release automático → Access autorizado`. Enquanto essa cadeia não for à prova de ataque, reputação é distração — daí ela aparecer só em F6. O desenho abaixo fica registrado agora para que, quando chegar a hora, não se invente XP.
 
 A orientação registrada em `revisar.md` (não implementar pontos e rankings antes de ter proveniência) está correta e mantenho. A reputação deve ser **derivada, explicável e sem números inventados**:
 
@@ -213,6 +264,7 @@ Ordenado por risco, não por facilidade. Estimativas em sessões de trabalho min
 
 | Fase | Entrega | Por que agora | Esforço |
 | :--- | :--- | :--- | :---: |
+| **F-1 — Threat model** | documentar contra quem defendemos, antes de escrever cripto | cripto sem modelo de ameaça é ritual | 0,5 sessão |
 | **F0 — Verdade** | Rules por papel; escrita da Intent só pelo servidor; eventos append-only | sem isso, nada acima é confiável | 1–2 sessões |
 | **F1 — Cofre real** | KMS + envelope encryption; `releaseKey` no servidor; fim da chave padrão | é a promessa central do produto | 2–3 sessões |
 | **F2 — Motor** | avaliador recursivo compartilhado; scheduler temporal; idempotência transacional | tira a decisão de revelar do navegador | 2 sessões |
@@ -221,24 +273,42 @@ Ordenado por risco, não por facilidade. Estimativas em sessões de trabalho min
 | **F5 — Composição** | Intent como guardiã de Intent (DAG + detecção de ciclo) | destrava o uso institucional | 2 sessões |
 | **F6 — Etapa 9** | projeções de impacto e acurácia | só faz sentido com F0–F3 sólidos | 2 sessões |
 
-O caminho crítico é F0 → F1 → F2. Antes de F1 concluído, eu **não** colocaria conteúdo sensível real na plataforma, e diria isso na própria UI.
+O caminho crítico é F-1 → F0 → F1 → F2. Antes de F1 concluído, eu **não** colocaria conteúdo sensível real na plataforma, e diria isso na própria UI.
 
-### 14. Testes: os invariantes que definem o produto
+**Por que F-1 existe.** Implementar KMS sem responder "protegendo contra quem?" produz criptografia decorativa — exatamente o erro que o `DEFAULT_VAULT_KEY` é hoje. F-1 é um documento curto que responde, para cada ator, o que ele consegue tentar e o que o sistema faz a respeito:
 
-Sem suíte automatizada hoje. A primeira suíte não deve testar componentes — deve testar as afirmações que o produto faz:
+| Ator | O que ele tenta | O que precisa ser verdade |
+| :--- | :--- | :--- |
+| Criador | antecipar revelação, trocar o conteúdo selado, baixar a meta | `releaseKey` nega por papel/condição; `commitment` imútavel; condição congelada na ativação |
+| Participante/apoiador | inflar contador, apoiar várias vezes, forjar referência | 1 apoio por identidade; contagem só no servidor; rate limit |
+| Guardião/aprovador | aprovar por outro, aprovar depois de revogado | aprovação vinculada ao `uid`, checada contra `eligible_approvers` no instante |
+| Destinatário | reusar a chave depois da janela, repassar conteúdo | entrega de DEK expira; marca d'água; cópia repassada é risco aceito e declarado |
+| Conta comprometida | agir como o dono | reautenticação em operações críticas; todo acesso à chave vira evento |
+| Operador da infra | ler o cofre | KMS com IAM separado e log de acesso; caminho para *split-key* entre guardiões |
+| Vazamento de ciphertext | decifrar offline | AES-256-GCM com DEK aleatória; ciphertext sozinho não serve de nada |
 
-1. Criador **não** obtém a DEK antes da condição (chamada a `releaseKey` retorna 403).
-2. Alterar `target_supports` depois de ativa é rejeitado.
-3. Quórum de 2 de 3 não libera com 1 aprovação; libera com 2; a 3ª não gera segunda liberação.
-4. O mesmo usuário apoiando duas vezes incrementa o contador uma vez.
-5. Janela expirada não entrega chave a quem ainda não acessou.
-6. `SHA-256(plaintext revelado)` bate com `content_hash`, e `SHA-256(content_hash || salt)` bate com o `commitment` publicado na criação.
-7. 500 debates na camada social não alteram um único campo de `conditions`.
-8. Evento duplicado não produz segunda revelação.
-9. Vínculo A→B→A entre Intents é recusado na criação.
-10. Não-participante recebe negação de leitura (teste contra o emulador das rules).
+A saída de F-1 é a lista do que **aceitamos** não defender (cópia pós-revelação, memória do autor) escrita de forma explícita — no documento e na UI.
 
-Cada um mapeia direto para uma das etapas. Se os dez passam, o produto faz o que promete; se algum falha, a promessa é marketing.
+### 14. Os invariantes: a especificação executável do produto
+
+Esta é a seção mais importante do documento. Não é uma lista de testes desejados: é **a definição formal do que o INTENT é**. Cada item é uma afirmação que o produto faz ao usuário; se não houver um teste automatizado que a prove, a afirmação é marketing.
+
+Por isso ganham identificador próprio e viram a espinha da rastreabilidade (§18):
+
+| ID | Invariante | Etapa | Teste |
+| :--- | :--- | :---: | :--- |
+| **INV-001** | O criador não obtém a DEK antes da condição satisfeita | 6 | `releaseKey` chamado pelo criador com Intent selada retorna 403 |
+| **INV-002** | Condição de Intent ativa não pode ser reescrita | 2 | alterar `target_supports`/prazo após ativação é rejeitado no servidor |
+| **INV-003** | Quórum não libera antes do limiar | 5 | 2 de 3: não libera com 1; libera com 2; a 3ª não gera segunda liberação |
+| **INV-004** | Uma identidade apoia uma única vez | 7 | duplo apoio do mesmo `uid` incrementa o contador em 1 |
+| **INV-005** | Janela expirada impede nova entrega de chave | 3 | destinatário que não acessou dentro da janela recebe negação |
+| **INV-006** | Conteúdo revelado corresponde ao commitment original | 6 | `SHA-256(plaintext)` == `content_hash` e `SHA-256(content_hash \|\| salt)` == `commitment` |
+| **INV-007** | Atividade social não altera condição | 8 | 500 debates/votações não mudam um campo de `conditions`; teste de arquitetura barra o import |
+| **INV-008** | Evento duplicado não causa segunda revelação | 7 | reentrega do mesmo evento é idempotente |
+| **INV-009** | O grafo de Intents não contém ciclos | — | vínculo A→B→A recusado na criação |
+| **INV-010** | Não-participante não lê dado protegido | 4 | negação de leitura verificada contra o emulador das rules |
+
+Se os dez passam, o produto faz o que promete. Nenhuma fase de F0 a F3 é dada como concluída sem os invariantes correspondentes verdes.
 
 ### 15. Riscos que assumo explicitamente
 
@@ -251,7 +321,24 @@ Cada um mapeia direto para uma das etapas. Se os dez passam, o produto faz o que
 | Complexidade do avaliador | bugs que revelam cedo ou nunca | avaliador puro, 100% coberto por testes, compartilhado cliente/servidor |
 | Custo de scheduler por minuto | conta do Firebase | só varre `nextEvaluationAt` indexado |
 
-### 16. Como eu sei que deu certo
+### 16. O que eu deliberadamente não farei agora
+
+Uma stop list vale tanto quanto um roadmap, porque o risco real deste projeto não é falta de ideia — é diluir esforço antes de a tese ser verdadeira. Até F3 concluir, estão **congelados**:
+
+ranking e pontuação · gamificação · algoritmo sofisticado de feed · marketplace · novos tipos de condição além dos cinco do §9b · novos tipos de conteúdo · blockchain (o `commitment` não pede uma) · microserviços · IA · automações genéricas.
+
+O critério para descongelar é uma sequência de seis perguntas respondidas com sim e com teste:
+
+```
+Can we seal?      → conteúdo selado sem chave no cliente          (INV-001)
+Can we wait?      → ninguém antecipa a revelação                  (INV-002, INV-005)
+Can we verify?    → commitment conferível por terceiros           (INV-006)
+Can we release?   → liberação automática, uma única vez           (INV-003, INV-008)
+Can we authorize? → só quem tem papel lê                          (INV-010)
+Can we prove?     → histórico autoritativo e reconstruível         (INV-004, INV-007)
+```
+
+### 17. Como eu sei que deu certo
 
 Métricas que interessam (nenhuma delas é vaidade):
 - **Taxa de revelação automática** — % de Intents reveladas por regra, sem intervenção manual. Se for baixa, o produto está sendo usado como agenda, não como cofre.
@@ -261,8 +348,59 @@ Métricas que interessam (nenhuma delas é vaidade):
 
 ---
 
-## 17. Fechamento
+### 18. Como esse trabalho vira execução
+
+O `JIRA.md` hoje usa `Epic → Story`. Para este próximo ciclo isso é insuficiente, porque boa parte de F-1 a F2 não é implementação — é **descoberta**. Adotaria `EPIC · FEATURE · STORY · SPIKE · BUG · TASK`, com destaque para o SPIKE (caixa de tempo, entrega um documento de decisão, não código):
+
+| SPIKE | Pergunta a responder | Fase |
+| :--- | :--- | :---: |
+| SPIKE-001 | Threat model do release engine | F-1 |
+| SPIKE-002 | Modelo de envelope encryption e custódia (KMS, rotação, split-key) | F1 |
+| SPIKE-003 | Modelo de condições compostas e migração do `HYBRID` | F2 |
+| SPIKE-004 | Estratégia de scheduler temporal (precisão × custo) | F2 |
+| SPIKE-005 | Verificador público de commitment | F3 |
+
+E a rastreabilidade passa a fechar o ciclo inteiro, de forma que nenhum item exista sem prova:
+
+```
+Invariante (INV-00x)  →  Epic  →  Story  →  Critério de aceite  →  Teste automatizado
+```
+
+Na prática: **critério de aceite que não vira teste não é critério de aceite**, e story que não rastreia até um invariante ou até um problema de usuário real é candidata a não ser feita.
+
+### 19. Registro da revisão sênior (`visaodedoisenior.md`)
+
+O que veio da revisão e onde foi parar:
+
+| Ponto | Origem | Decisão |
+| :--- | :--- | :--- |
+| "O cliente não pode ser a autoridade" vira ADR | Chety | **Aceito** — ADR-001 no §6 |
+| Corrigir a promessa: o autor conhece o próprio conteúdo | Chety | **Aceito** — promessa reescrita no §1 |
+| Commitment como requisito, não como detalhe | Chety | **Aceito** — RF-SEC-001/002 no §7 |
+| Eventos autoritativos, mas com read model | Chety | **Aceito com ajuste** — §9c: log é autoridade, doc da Intent é projeção; sem replay por leitura |
+| Isolamento social como invariante de arquitetura | Chety / Gemerson | **Já previsto**, reforçado como INV-007 com teste de arquitetura |
+| Etapa 9 fora do núcleo | Chety | **Aceito** — §12 abre com o recorte CORE/FUTURE |
+| Fase F-1 de threat model antes da F0 | Chety | **Aceito** — §13, com a matriz de atores |
+| Os 10 testes são invariantes de produto | Chety | **Aceito** — §14 renumerado como INV-001..010 e ligado a etapas |
+| Tipos de item no Jira, com SPIKE | Chety | **Aceito** — §18 |
+| Stop list | Chety | **Aceito** — §16 |
+| DoD do núcleo: usuário malicioso não viola invariante | Chety | **Aceito** — §20 |
+| Tese causal, independência de domínio, condição recursiva, envelope encryption, reputação rastreável | Gemerson | **Confirmados** — mantidos sem alteração |
+| Janela efêmera restringe entrega, não apaga cópias | Gemerson | **Confirmado** — já declarado no §7 e no §15; deve estar também na UI |
+| Ordem F0→F1→F2→F3 antes de social/reputação | ambos | **Confirmada** — §13 |
+
+Divergência registrada: nenhuma de fundo. As duas revisões empurram na mesma direção — **não redesenhar o INTENT, e sim torná-lo verdadeiro**. É também a minha leitura, e por isso este documento não propõe nenhuma funcionalidade nova antes de F3.
+
+### 20. Definition of Done do núcleo
+
+> **O INTENT não está pronto quando a interface aparentar bloquear o conteúdo. Ele estará pronto quando um usuário malicioso — usando o cliente, as APIs e as permissões que ele legitimamente possui — não conseguir violar nenhum dos dez invariantes.**
+
+Esse é o critério de aceite do núcleo inteiro, acima de qualquer story. Enquanto ele não for atingido, o produto se descreve na UI como demonstração, não como cofre.
+
+---
+
+## 21. Fechamento
 
 O que o INTENT tem de mais valioso não é a interface, nem o esquema de dados: é a **clareza da tese** — a revelação governada por regra em vez de por vontade — sustentada por um modelo de dados que já é genérico o bastante para não trair essa tese.
 
-O que falta é fazer o sistema *merecer* a confiança que a interface já aparenta ter. Isso é um trabalho concentrado, não infinito: tirar a decisão e a chave do navegador, tornar o log autoritativo e provar tudo com dez testes. Feito isso, o INTENT deixa de ser uma boa demonstração de uma ideia forte e passa a ser infraestrutura em que faz sentido depositar um segredo — que é, no fim, a única métrica que importa.
+O que falta é fazer o sistema *merecer* a confiança que a interface já aparenta ter. Isso é um trabalho concentrado, não infinito: tirar a decisão e a chave do navegador, tornar o log autoritativo e provar tudo com os dez invariantes. **Não é um redesenho do INTENT — é torná-lo verdadeiro.** Feito isso, o INTENT deixa de ser uma boa demonstração de uma ideia forte e passa a ser infraestrutura em que faz sentido depositar um segredo — que é, no fim, a única métrica que importa.
