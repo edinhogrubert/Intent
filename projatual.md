@@ -21,14 +21,14 @@ $$\text{INTENÇÃO} \longrightarrow \text{CONDIÇÃO} \longrightarrow \text{PART
 
 ## 🛠️ 2. Arquitetura Técnica & Stack Tecnológico
 
-* **Frontend**: React 18 + Vite + TypeScript (Modo SPA responsivo e desktop-first).
-* **Estilização**: Tailwind CSS com esquema neutro de alto contraste e legibilidade.
+* **Frontend**: React 19 + Vite 6 + TypeScript (Modo SPA responsivo e desktop-first).
+* **Estilização**: Tailwind CSS v4 (plugin `@tailwindcss/vite`) com esquema neutro de alto contraste e legibilidade.
 * **Animações & UI**: `motion` (Framer Motion) e `lucide-react` para ícones.
 * **Persistência de Dados**:
   * **Firebase Firestore & Auth Sync**: Sincronização remota e autenticação de usuários.
-  * **Local Storage Layer (`src/utils/storage.ts`)**: Fallback e persistência imediata no navegador com log de auditoria local imutável.
-* **Segurança & Criptografia Client-side**:
-  * Criptografia AES-256-GCM para carga selada (`ProtectedPayload`).
+  * **Local Storage Layer (`src/utils/storage.ts`)**: Fallback e persistência imediata no navegador (contas de usuário, sessão ativa e Intents locais).
+* **Segurança & Criptografia Client-side** (`src/utils/cryptoVault.ts`, Web Crypto API):
+  * Criptografia AES-256-GCM para carga selada (`ProtectedPayload`), com chave derivada via PBKDF2 (SHA-256, 100.000 iterações).
   * Checksum SHA-256 e Commitment imutável pré-revelação: `SHA-256(Payload || Salt || Secret)`.
 
 ---
@@ -41,9 +41,9 @@ Abaixo está o detalhamento de todos os módulos que compõem o sistema hoje em 
 | :--- | :--- |
 | **`AuthGate.tsx`** | Portal de Autenticação com suporte a login/cadastro real no Firebase Auth e simulação rápida para ambiente de teste. |
 | **`TesterProfileSwitcherBar.tsx`** | Barra de navegação rápida de personas em modo de teste (`Creator`, `Participant`, `Guardian`, `Recipient`). Permite alternar de perfil em tempo real para validar regras de acesso. |
-| **`UserProfileModal.tsx`** | Modal de gestão da conta do usuário com exibição de nível de reputação, histórico de pontuação, estatísticas de participação e configurações de privacidade. |
-| **`DeleteAccountModal.tsx`** | Fluxo de cancelamento, confirmação de segurança e anonimização de dados do usuário (LGPD/GDPR compliance). |
-| **`IntentManager.tsx`** | Painel principal de controle do ciclo de vida das Intents. Permite criar, editar e monitorar os estados: `DRAFT`, `ACTIVE`, `WAITING`, `TRIGGERED`, `RELEASED`. |
+| **`UserProfileModal.tsx`** | Modal de gestão da conta do usuário com estatísticas de participação, configurações de privacidade e os campos de reputação previstos em `UserAccount.relacionamentos.reputacao` (pontuação ainda não calculada — ver Etapa 9). |
+| **`DeleteAccountModal.tsx`** | Modal de confirmação para cancelamento da inscrição. A exclusão executa `deleteUserAccount()`, removendo o usuário do Local Storage; **anonimização formal e expurgo remoto ainda não implementados**. |
+| **`IntentManager.tsx`** | Painel principal do ciclo de vida das Intents (criação, edição e listener em tempo real no Firestore com fallback local). Estados persistidos em `Intent.status`: `draft`, `active`, `completed`, `cancelled`; o progresso da revelação é derivado das condições (`is_locked`, `reveal_window`, `revealed_at`). |
 | **`ParticipantManager.tsx`** | Gestor de participantes e papéis múltiplos (`Approver/Guardian`, `Recipient`, `Participant`, `Viewer`), incluindo aprovação ou rejeição de solicitações. |
 | **`ApprovalWorkflow.tsx`** | Motor de quórum e multi-assinatura para Guardiões. Calcula o consenso exigido (`UNANIMOUS`, `MAJORITY`, `SUPERMAJORITY`, `EXACT_N`, `PERCENTAGE`). |
 | **`ProtectedVaultPipeline.tsx`** | Pipeline do cofre criptografado. Exibe o estado selado (`LOCKED`), a impressão digital SHA-256, o Commitment de prova e executa a revelação quando as regras são cumpridas. |
@@ -54,6 +54,7 @@ Abaixo está o detalhamento de todos os módulos que compõem o sistema hoje em 
 | **`DevInspectorBadge.tsx`** | Badge de desenvolvimento para inspeção rápida de logs, contadores de estado e integridade de dados. |
 | **`AccountStatusCard.tsx`** & **`BottomCardsRow.tsx`** | Cards informativos com status da conta ativa, métricas resumidas e links para verificação. |
 | **`Sidebar.tsx`** | Menu lateral responsivo com atalhos de navegação para a plataforma. |
+| **`DynamicGreetingCard.tsx`** | Card de saudação contextual por período do dia (`GreetingConfig`: manhã, tarde, noite). |
 
 ---
 
@@ -69,6 +70,8 @@ export interface Intent {
   title: string;
   description: string;
   status: 'draft' | 'active' | 'completed' | 'cancelled';
+  created_at: string;
+  visibility: 'private' | 'public';
   creator?: IntentCreator;
   content?: IntentContent;
   conditions?: IntentConditions;
@@ -86,13 +89,18 @@ export interface Intent {
 export interface ProtectedPayload {
   id: string;
   fileName: string;
+  fileSize: number;
+  fileType: string;
   cipherText: string;
   cipherAlg: 'AES-256-GCM';
   salt: string;
   iv: string;
-  fingerprint: string; // SHA-256 Checksum prefixado
+  fingerprint: string; // SHA-256 Checksum prefixado (exibição)
+  content_hash: string; // SHA-256 integral do payload original
   commitment: string; // SHA-256 (Payload || Salt || Secret) -> Prova imutável pré-revelação
-  key_status: 'SEALED' | 'AUTHORIZED' | 'REVEALED';
+  key_status?: 'SEALED' | 'AUTHORIZED' | 'REVEALED';
+  encryptedAt: string;
+  isEncrypted: boolean;
   integrity_verified?: boolean; // Verificação pós-abertura
 }
 ```
@@ -110,8 +118,8 @@ Suporta múltiplos tipos de condição:
 
 1. **Criptografia e Prova Pré-Revelação**:
    Antes de o segredo ser revelado, o sistema gera e publica o **Commitment SHA-256**. Qualquer pessoa pode verificar que o conteúdo revelado no futuro é idêntico ao que foi registrado no momento da criação, sem que o conteúdo pudesse ser lido antecipadamente.
-2. **Log Imutável de Auditoria (`HistoryLogEntry`)**:
-   Todas as ações críticas (`INTENT_CREATED`, `ENCRYPTED`, `GUARDIAN_APPROVED`, `SUPPORTED`, `REVEALED`, `PREDICTION_MADE`) geram uma entrada de histórico com timestamp e nome do ator.
+2. **Log de Auditoria (`HistoryLogEntry`)**:
+   As ações críticas (`CREATED`, `ENCRYPTED`, `GUARDIAN_APPROVED`, `SUPPORTED`, `REVEALED`, `PREDICTION_MADE`, `PREDICTION_RESOLVED`, além dos `IntentEventType` como `CONDITION_SATISFIED`, `REVEAL_STARTED`, `CONTENT_REVEALED` e `REVEAL_EXPIRED`) geram uma entrada com timestamp e nome do ator. O log é append-only por convenção da aplicação — a imutabilidade ainda não é garantida por regras do Firestore.
 3. **Atribuição de Causalidade (`CausalityAttribution`)**:
    O sistema rastreia quem convidou quem (`source_user_id`), permitindo calcular o impacto causal de um usuário no engajamento e nas metas de uma Intent.
 

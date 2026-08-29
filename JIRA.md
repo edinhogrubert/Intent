@@ -5,7 +5,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 ---
 
 ## 📊 Mapeamento de Status no Jira
-- **Concluído (Done):** Funcionalidade validada no MVP e testada no aplicativo.
+- **Concluído (Done):** Funcionalidade validada manualmente no MVP (o repositório ainda não possui testes automatizados).
 - **Code Review:** Código implementado pela IA / Desenvolvedor, aguardando validação visual ou de regra de negócio do Product Owner.
 - **Em Análise:** Item em refinamento funcional / validação com Product Owner.
 - **Em Andamento (In Progress):** Item atualmente sendo trabalhado.
@@ -16,7 +16,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 ## 🟢 EPIC 01 — Identity & Account
 **Resumo:** Gestão de identidade, autenticação, controle de sessão e seleção de personas ativas.  
 **Status do Epic:** `Concluído`  
-**Componente Técnico:** `src/components/TesterProfileSwitcherBar.tsx`, `src/components/UserProfileModal.tsx`
+**Componente Técnico:** `src/components/AuthGate.tsx`, `src/components/TesterProfileSwitcherBar.tsx`, `src/components/UserProfileModal.tsx`, `src/utils/storage.ts`
 
 ---
 
@@ -43,7 +43,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 ---
 
 ### ➔ US-01.3: Cancelamento e Limpeza de Conta
-- **Status:** `A Fazer` (Futuro)
+- **Status:** `Em Andamento` — modal de confirmação (`DeleteAccountModal.tsx`) e remoção local (`deleteUserAccount()`) prontos; anonimização e expurgo remoto pendentes.
 - **Tipo:** User Story
 - **Descrição:** Como usuário, quero solicitar o cancelamento e anonimização da minha conta, garantindo conformidade com políticas de privacidade e LGPD.
 - **Critérios de Aceitação:**
@@ -57,7 +57,8 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 **Resumo:** Criação, edição, ativação e controle de ciclo de vida das Intents.  
 **Status do Epic:** `Concluído`  
 **Componente Técnico:** `src/components/IntentManager.tsx`  
-**Estados Suportados:** `DRAFT` | `ACTIVE` | `WAITING` | `TRIGGERED` | `RELEASED`
+**Estados Suportados (`Intent.status`):** `draft` | `active` | `completed` | `cancelled`  
+**Sub-estados de revelação (derivados das condições, não persistidos como status):** `is_locked` ➔ `CONDITION_SATISFIED` ➔ `REVEAL_STARTED` ➔ `REVEAL_EXPIRED`
 
 ---
 
@@ -68,14 +69,14 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Critérios de Aceitação:**
   - **Given** que clico em "Nova Intenção",
   - **When** preencho o título, descrição e meta,
-  - **Then** uma nova Intent é registrada com ID único no estado `DRAFT` ou `ACTIVE` e exibida no painel.
+  - **Then** uma nova Intent é registrada com ID único no estado `draft` ou `active` e exibida no painel.
 
 ---
 
 ### ➔ US-02.2: Transição de Estados da Intent
 - **Status:** `Code Review`
 - **Tipo:** User Story
-- **Descrição:** Como Creator ou Sistema, quero que a Intent transite de forma transparente entre os estados `ACTIVE` -> `WAITING` -> `TRIGGERED` -> `RELEASED`.
+- **Descrição:** Como Creator ou Sistema, quero que a Intent transite de forma transparente de `active` para `completed`, com a revelação derivada das condições (`is_locked` ➔ condição satisfeita ➔ janela de revelação ➔ expiração).
 - **Critérios de Aceitação:**
   - **Given** uma Intent ativa,
   - **When** participantes se engajam e condições são cumpridas,
@@ -97,7 +98,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Critérios de Aceitação:**
   - **Given** uma solicitação de entrada em uma Intent que requer aprovação,
   - **When** o Creator clica em "Aprovar Participante",
-  - **Then** o usuário muda de `REQUESTED` para `APPROVED` e o evento `USER_APPROVED` é registrado.
+  - **Then** o `Participant.status` muda de `pending` para `approved` (com `approved_at`) e o log `GUARDIAN_APPROVED` é registrado.
 
 ---
 
@@ -126,14 +127,14 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Critérios de Aceitação:**
   - **Given** um conteúdo sensível adicionado a uma Intent,
   - **When** a condição ainda não foi cumprida,
-  - **Then** a interface exibe a chave de criptografia AES-256 e o selo "Conteúdo Bloqueado", impedindo visualização precoce.
+  - **Then** a interface exibe a impressão digital SHA-256, o `commitment` e o selo "Conteúdo Bloqueado" (`key_status: 'SEALED'`), impedindo visualização precoce — a chave AES nunca é exibida.
 
 ---
 
 ### ➔ US-04.2: Liberação do Cofre (`CONTENT_RELEASED`)
 - **Status:** `Concluído`
 - **Tipo:** User Story
-- **Descrição:** Como Recipient, quero acessar o conteúdo descriptografado assim que a Intent atingir o estado `RELEASED`.
+- **Descrição:** Como Recipient, quero acessar o conteúdo descriptografado assim que o cofre atingir `key_status: 'REVEALED'`.
 - **Critérios de Aceitação:**
   - **Given** que o Release Engine confirma a satisfação das regras,
   - **When** o destinatário acessa a aba do Cofre,
@@ -144,7 +145,8 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 ## 🟢 EPIC 05 — Rules & Conditions (Motor de Regras)
 **Resumo:** Definição de regras baseadas em datas, metas numéricas e acontecimentos.  
 **Status do Epic:** `Concluído`  
-**Componente Técnico:** `src/utils/conditionEvaluator.ts`
+**Componente Técnico:** `src/utils/conditionEvaluator.ts`, `src/utils/timeCondition.ts`  
+**Tipos de Condição (`ConditionType`):** `NONE` | `TIME` | `PEOPLE` | `APPROVAL` | `PUBLIC_SUPPORT` | `HYBRID`
 
 ---
 
@@ -155,7 +157,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Critérios de Aceitação:**
   - **Given** uma regra configurada para a data X,
   - **When** o relógio do sistema atinge ou ultrapassa a data X,
-  - **Then** a avaliação da regra retorna `TRUE` e dispara o evento `DEADLINE_REACHED`.
+  - **Then** `evaluateIntentConditions()` retorna condição satisfeita e registra `CONDITION_SATISFIED`.
 
 ---
 
@@ -166,7 +168,7 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Critérios de Aceitação:**
   - **Given** a meta `Target = N`,
   - **When** o valor atual atinge `Current >= Target`,
-  - **Then** a regra retorna `TRUE` e gera o evento `GOAL_REACHED`.
+  - **Then** a regra retorna condição satisfeita e gera os eventos `SUPPORT_RECEIVED` / `CONDITION_SATISFIED`.
 
 ---
 
@@ -191,8 +193,8 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 ## 🟢 EPIC 07 — Event Engine (Motor de Eventos)
 **Resumo:** Registro de fatos imutáveis no sistema e processamento reativo.  
 **Status do Epic:** `Concluído`  
-**Componente Técnico:** `src/utils/storage.ts`  
-**Eventos Registrados:** `USER_REGISTERED`, `USER_JOINED`, `USER_APPROVED`, `GOAL_REACHED`, `DEADLINE_REACHED`, `CONTENT_RELEASED`, `CONTENT_ACCESSED`
+**Componente Técnico:** `src/types.ts` (`IntentEventType`, `HistoryLogEntry`), `src/components/SocialHistoryWorkflow.tsx`; persistência via Firestore e `src/utils/storage.ts`  
+**Eventos Registrados (`IntentEventType`):** `INTENT_CREATED`, `CONTENT_ATTACHED`, `CONTENT_UPDATED`, `CONDITION_CREATED`, `CONDITION_SATISFIED`, `REVEAL_STARTED`, `CONTENT_REVEALED`, `REVEAL_EXPIRED`, `SUPPORT_RECEIVED`, `GUARDIAN_APPROVED`, `GUARDIAN_DECLINED`, `API_CONTENT_RECEIVED`, `STAGE_ADVANCED`, `WEBHOOK_RECEIVED`
 
 ---
 
@@ -212,9 +214,9 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Tipo:** User Story
 - **Descrição:** Como sistema, quero garantir que eventos repetidos não provoquem múltiplas liberações indevidas de conteúdo.
 - **Critérios de Aceitação:**
-  - **Given** que o evento `GOAL_REACHED` já foi processado e o conteúdo foi liberado,
+  - **Given** que `CONDITION_SATISFIED` já foi processado e o conteúdo foi revelado,
   - **When** um novo evento idêntico ocorre,
-  - **Then** o sistema detecta que o estado atual já é `RELEASED` e ignora a re-execução.
+  - **Then** o sistema detecta que `key_status` já é `REVEALED` e ignora a re-execução.
 
 ---
 
@@ -230,19 +232,19 @@ Este documento foi gerado para auxiliar na criação e atualização das demanda
 - **Tipo:** User Story
 - **Descrição:** Como Release Engine, quero checar continuamente se a avaliação das regras retornou `TRUE` para executar a transição de liberação.
 - **Critérios de Aceitação:**
-  - **Given** uma Intent em estado de espera com regra avaliada como `TRUE`,
+  - **Given** uma Intent bloqueada (`is_locked`) com regra avaliada como satisfeita,
   - **When** o motor de liberação roda a validação,
-  - **Then** o status muda para `RELEASED`, a chave do cofre é liberada e a notificação é gerada.
+  - **Then** o cofre passa para `key_status: 'REVEALED'`, `revealed_at` é gravado e a janela de revelação (`RevealWindowConfig`) é iniciada quando configurada.
 
 ---
 
 ## 📋 Resumo para Copiar e Colar no Jira
 
-| Código | Título da Histórico / Tarefa | Status Sugerido | Epic Correspondente |
+| Código | Título da História / Tarefa | Status Sugerido | Epic Correspondente |
 | :--- | :--- | :--- | :--- |
 | **INTENT-101** | Autenticação e Seleção de Perfil (Login/Session) | `Concluído` | Epic 01 — Identity & Account |
 | **INTENT-102** | Visualização e Edição de Perfil de Usuário | `Concluído` | Epic 01 — Identity & Account |
-| **INTENT-103** | Cancelamento e Limpeza de Conta | `A Fazer` | Epic 01 — Identity & Account |
+| **INTENT-103** | Cancelamento e Limpeza de Conta | `Em Andamento` | Epic 01 — Identity & Account |
 | **INTENT-201** | Criar Nova Intent | `Concluído` | Epic 02 — Intent |
 | **INTENT-202** | Transição de Estados da Intent | `Code Review` | Epic 02 — Intent |
 | **INTENT-301** | Solicitar e Aprovar Participação | `Concluído` | Epic 03 — Participation |

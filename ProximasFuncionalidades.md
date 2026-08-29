@@ -29,7 +29,7 @@ Embora a funcionalidade seja altamente coerente e expanda o sistema para um mode
    * Apresentar visualmente uma cadeia de dependências aninhadas (árvore de dependências) exige componentes visuais dedicados para que os usuários acompanhem claramente o status do fluxo.
 
 4. **Preservação da Estabilidade e Clareza do MVP (Etapas 1 a 8):**
-   * O MVP atual consolida com precisão e elegância as 8 Etapas fundamentais (Identidade, Intenção, Tempo, Pessoas, Quórum, Cofre AES-256, Participação Coletiva e Histórico Social).
+   * O MVP atual consolida as 8 Etapas fundamentais (Identidade, Intenção, Tempo, Pessoas, Quórum, Cofre AES-256-GCM, Participação Coletiva e Histórico Social).
    * Manter essas etapas isoladas e testadas garante um núcleo estável e sem riscos de regressão.
 
 ---
@@ -39,15 +39,18 @@ Embora a funcionalidade seja altamente coerente e expanda o sistema para um mode
 Quando a funcionalidade for integrada na Fase 2, a arquitetura deverá seguir este roteiro:
 
 #### A. Extensão do Modelo de Dados (`src/types.ts`)
-O tipo `Participant` ou `Guardia` será estendido com um discriminador de entidade:
+O tipo `Participant` (que hoje concentra também os guardiões via `role: 'guardian' | 'approver'`) será estendido com um discriminador de entidade, preservando os valores atuais de `status`:
 
 ```typescript
 export interface Participant {
   id: string;
-  entity_type: 'USER' | 'INTENT'; // Identifica se é um usuário humano ou outra Intent
-  target_intent_id?: string;       // ID da Intent guardiã (caso entity_type === 'INTENT')
-  required_status?: 'SATISFIED' | 'REVEALED';
-  status: 'PENDING' | 'APPROVED';
+  name: string;
+  email: string;
+  role: ParticipantRole;           // 'recipient' | 'guardian' | 'approver' | 'participant' | 'viewer'
+  status: ParticipantStatus;       // 'pending' | 'approved' | 'declined'
+  entity_type?: 'USER' | 'INTENT'; // NOVO: usuário humano ou outra Intent
+  target_intent_id?: string;       // NOVO: ID da Intent guardiã (caso entity_type === 'INTENT')
+  required_status?: 'SATISFIED' | 'REVEALED'; // NOVO: estado exigido da Intent guardiã
 }
 ```
 
