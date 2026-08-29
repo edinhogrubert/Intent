@@ -117,8 +117,9 @@ O que muda em relação ao atual: a chave que abre o conteúdo **nunca é deriv�
   commitment    = SHA-256(content_hash || salt)         // publicado imediatamente
   wrappedDEK    = KMS.encrypt(DEK)                      // no servidor; o cliente descarta a DEK
 
-  → Firestore: { cipherText, iv, salt, commitment, key_status: 'SEALED' }
-  → Cofre servidor (coleção sem leitura pública): { wrappedDEK }
+  → Firestore /intents/{id}:                  { commitment, key_status: 'SEALED' }   // metadado
+  → Firestore /intents/{id}/protected/payload: { cipherText, iv, salt }              // só papel ativo lê
+  → Cofre servidor (sem leitura por cliente):  { wrappedDEK }
 
 [revelação]
   serviço avalia condição (relógio do servidor / quórum / meta)
@@ -146,36 +147,70 @@ Correções imediatas em relação ao código atual: eliminar `DEFAULT_VAULT_KEY
 
 ### 8. Autorização: negar por padrão, liberar por papel
 
-O gargalo atual (só o criador lê) se resolve materializando os papéis em um índice consultável pelas rules, sem exigir leitura do documento inteiro:
+O gargalo atual (só o criador lê) se resolve com três separações, nenhuma delas opcional: **separar metadado de payload**, **materializar o papel** e **materializar o índice de listagem**.
 
 ```
-/intents/{intentId}                    // metadados + cipherText, sem chave
-/intents/{intentId}/roles/{userId}     // { role, status, added_at }  ← materialização do papel
-/intents/{intentId}/events/{eventId}   // append-only, escrita só pelo servidor
-/vault/{intentId}                      // wrappedDEK, sem leitura por cliente algum
+/intents/{intentId}                        // SÓ metadado: título, status, progresso, commitment
+/intents/{intentId}/protected/payload      // cipherText + iv  ← documento separado, leitura restrita
+/intents/{intentId}/roles/{userId}         // { role, status, granted_at, revoked_at }
+/intents/{intentId}/events/{eventId}       // append-only, escrita só pelo servidor
+/vault/{intentId}                          // wrappedDEK, sem leitura por cliente algum
+/users/{userId}/intent_refs/{intentId}     // índice de listagem: { role, status, updated_at }
 ```
+
+**Por que o payload sai do documento da Intent.** Se `cipherText` mora no mesmo documento que o título, qualquer regra que libere o metadado libera o texto cifrado junto — inclusive para uma Intent pública, onde a leitura é anônima. O ciphertext sem a DEK não abre, mas entregá-lo a quem quer que passe por ali é dar tempo ilimitado de posse a um atacante que só espera um vazamento futuro de chave. Metadado é público quando o criador quer; payload nunca é.
+
+**Por que o papel precisa de estado.** Existir um documento de papel não é o mesmo que ter direito de leitura: convite pendente e papel revogado também existem. A checagem é sobre o *estado* do papel, não sobre a sua existência.
 
 ```javascript
-function hasRole(intentId) {
-  return exists(/databases/$(database)/documents/intents/$(intentId)/roles/$(request.auth.uid));
+function role(intentId) {
+  return get(/databases/$(database)/documents/intents/$(intentId)/roles/$(request.auth.uid)).data;
+}
+function hasActiveRole(intentId) {
+  return exists(/databases/$(database)/documents/intents/$(intentId)/roles/$(request.auth.uid))
+      && role(intentId).status == 'approved'
+      && role(intentId).revoked_at == null;
 }
 
 match /intents/{intentId} {
-  allow get, list: if isSignedIn() && (isCreator() || hasRole(intentId) || isPublic());
+  // metadado apenas; sem cipherText no documento
+  allow get:       if isPublic() || (isSignedIn() && (isCreator() || hasActiveRole(intentId)));
+  allow list:      if isPublic();               // feed público: só Intents com visibility == 'PUBLIC'
   allow create:    if isSignedIn() && request.resource.data.creator_id == request.auth.uid;
   allow update:    if false;   // toda mutação passa pelo backend
   allow delete:    if false;   // Intent ativa não se apaga; cancela-se
 }
 
+match /intents/{intentId}/protected/payload {
+  allow read:   if isSignedIn() && hasActiveRole(intentId);   // nunca por isPublic()
+  allow write:  if false;
+}
+
 match /intents/{intentId}/events/{eventId} {
-  allow read:   if hasRole(intentId) || isCreator();
+  allow read:   if isSignedIn() && (isCreator() || hasActiveRole(intentId));
   allow write:  if false;      // append-only, exclusivo do servidor
 }
 
 match /vault/{intentId} { allow read, write: if false; }
+
+// caixa de entrada do usuário: a única coleção que ele consulta para montar o painel
+match /users/{userId}/intent_refs/{intentId} {
+  allow read:   if request.auth.uid == userId;
+  allow write:  if false;      // escrito pelo servidor junto com o papel
+}
 ```
 
-Duas consequências deliberadas: **o cliente perde o direito de escrever na Intent** (some o risco de contador de apoios forjado e de histórico reescrito) e **a Intent ativa deixa de ser deletável**, o que é coerente com "intenção é compromisso".
+**Por que existe `intent_refs`.** Uma regra em `list` não filtra nada: o Firestore só autoriza a consulta se a *query* já garantir, por si, que todo resultado é permitido — e uma condição que depende de um `get()` por documento não é verificável sobre um conjunto. Ou seja, `hasActiveRole` funciona para "abrir a Intent X" e **não** funciona para "listar minhas Intents". Cada painel tem, portanto, seu caminho próprio:
+
+| Consulta | Caminho | Regra |
+| :--- | :--- | :--- |
+| "minhas Intents" (qualquer papel) | query em `/users/{uid}/intent_refs` | dono do caminho |
+| "abrir a Intent X" | `get` em `/intents/{X}` | papel ativo, criador ou pública |
+| feed público | query em `/intents` com `where('visibility','==','PUBLIC')` | só metadado, nunca payload |
+
+`intent_refs` é projeção, escrita pelo servidor na mesma transação que cria ou revoga o papel — e uma inconsistência entre `roles` e `intent_refs` é bug de correção, tratada pela mesma verificação periódica do §9c.
+
+Três consequências deliberadas: **o cliente perde o direito de escrever na Intent** (some o risco de contador de apoios forjado e de histórico reescrito), **a Intent ativa deixa de ser deletável** — coerente com "intenção é compromisso" — e **revogar um papel corta o acesso imediatamente**, sem depender de apagar documentos.
 
 ### 9. Modelo de dados: o núcleo genérico
 
@@ -204,7 +239,28 @@ Um avaliador recursivo puro — `evaluate(condition, context): { satisfied, prog
 state = fold(events, initialState)
 ```
 
-`IntentEventType` já existe e é bom. O que falta é fazê-lo autoritativo: eventos gravados só pelo servidor, em subcoleção append-only, com `seq` monotônico e chave de idempotência (`intentId + type + seq`) — isso resolve a US-07.2 de verdade, não por checagem de estado no cliente. Ganho colateral: auditoria, replay e a Etapa 9 saem de graça, porque reputação vira uma projeção diferente do mesmo log.
+`IntentEventType` já existe e é bom. O que falta é fazê-lo autoritativo: eventos gravados só pelo servidor, em subcoleção append-only, com `seq` monotônico para **ordenação**. Ganho colateral: auditoria, replay e a Etapa 9 saem de graça, porque reputação vira uma projeção diferente do mesmo log.
+
+**Idempotência é sobre o comando, não sobre o evento.** É tentador usar `intentId + type + seq` como chave de deduplicação, mas isso não dedupica nada: uma reentrega recebe um `seq` novo e passa como se fosse fato inédito. A chave tem que ser **estável na origem** — derivada do fato que causou o evento, não da posição dele no log:
+
+| Origem | `dedupe_key` |
+| :--- | :--- |
+| apoio | `SUPPORT:{intentId}:{uid}` |
+| aprovação de guardião | `APPROVAL:{intentId}:{uid}` |
+| disparo temporal | `TIME:{intentId}:{scheduled_for}` |
+| webhook/oráculo | `EXTERNAL:{source_id}:{delivery_id}` (id da entrega, fornecido pela origem) |
+| revelação | `REVEAL:{intentId}` — por definição acontece uma única vez |
+
+A unicidade é imposta pelo banco, não pelo código: `/intents/{id}/dedupe/{dedupe_key}` é criado com `create` dentro da **mesma transação** que grava o evento, incrementa o contador e atualiza a projeção. Se a chave já existe, a transação falha e a reentrega vira no-op — o retorno para o chamador é sucesso, porque o efeito desejado já está aplicado.
+
+```
+transaction:
+  create /intents/{id}/dedupe/{dedupe_key}   ← falha aqui = reentrega, aborta silenciosamente
+  create /intents/{id}/events/{eventId}      ← seq = último + 1 (só ordem)
+  update projeção (contador, status, key_status)
+```
+
+Isso cobre os dois casos que quebram sistemas de liberação: **reentrega** do mesmo fato pelo broker/cliente (barrada pela chave) e **concorrência real** — dois apoios distintos que cruzam a meta ao mesmo tempo, em que ambos são fatos legítimos, mas só um pode abrir a janela: a transação que perde a corrida relê a projeção e encontra a revelação já registrada sob `REVEAL:{intentId}`.
 
 Uma ressalva de engenharia que considero importante: **isso não é "transformar o banco inteiro em Event Sourcing"**. Nenhuma tela vai reconstruir a Intent por replay a cada leitura.
 

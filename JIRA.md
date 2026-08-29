@@ -328,18 +328,18 @@ Cadeia de rastreabilidade obrigatória: `INV-00x → Epic → Story → Critéri
 ## 🔴 EPIC 10 — Autoridade & Autorização (Fase F0)
 **Resumo:** Tirar do cliente o direito de escrever a verdade e liberar a leitura multiusuário por papel.  
 **Status do Epic:** `A Fazer` · **Caminho crítico** — sem isso, nada acima é confiável.  
-**Componente Técnico:** `firestore.rules`, backend (Cloud Functions/Run), `/intents/{id}/roles/{userId}`, `/intents/{id}/events/{eventId}`
+**Componente Técnico:** `firestore.rules`, backend (Cloud Functions/Run), `/intents/{id}/roles/{userId}`, `/intents/{id}/protected/payload`, `/intents/{id}/events/{eventId}`, `/users/{uid}/intent_refs/{intentId}`
 
 ---
 
-### ➔ INTENT-1001: Rules por papel (materialização de `roles`)
+### ➔ INTENT-1001: Rules por papel ativo (materialização de `roles`)
 - **Status:** `A Fazer` · **Tipo:** User Story · **Invariante:** `INV-010`
 - **Descrição:** Como guardião/destinatário/apoiador, quero enxergar a Intent em que participo, porque hoje as rules liberam `intents/{id}` apenas para `creator_id` e as Etapas 4, 5, 7 e 8 só funcionam no `localStorage`.
 - **Critérios de Aceitação:**
   - **Given** uma Intent com participantes de vários papéis,
-  - **When** um usuário com documento em `/intents/{id}/roles/{uid}` consulta a Intent,
-  - **Then** a leitura é permitida; e para quem não tem papel nem é Intent pública, é negada.
-- **Teste:** suíte contra o emulador das rules cobrindo permitido/negado por papel.
+  - **When** um usuário com papel **ativo** (`status == 'approved'` e `revoked_at == null`) em `/intents/{id}/roles/{uid}` abre a Intent,
+  - **Then** a leitura é permitida; e é negada para quem não tem papel, para convite **pendente** e para papel **revogado** — existir o documento de papel não basta.
+- **Teste:** suíte contra o emulador das rules cobrindo permitido/negado por papel × estado (ativo, pendente, revogado, sem papel).
 
 ---
 
@@ -355,7 +355,7 @@ Cadeia de rastreabilidade obrigatória: `INV-00x → Epic → Story → Critéri
 
 ### ➔ INTENT-1003: Eventos append-only autoritativos com read model
 - **Status:** `A Fazer` · **Tipo:** User Story · **Invariante:** base de `INV-008`
-- **Descrição:** Como sistema, quero que o log de eventos seja gravado somente pelo servidor, com `seq` monotônico e chave de idempotência, e que o documento da Intent seja **projeção** desse log — sem replay a cada leitura de tela.
+- **Descrição:** Como sistema, quero que o log de eventos seja gravado somente pelo servidor, com `seq` monotônico **para ordenação**, e que o documento da Intent seja **projeção** desse log — sem replay a cada leitura de tela. A deduplicação não é responsabilidade do `seq` (ver INTENT-1203).
 - **Critérios de Aceitação:**
   - **Given** qualquer transição de domínio,
   - **When** ela ocorre,
@@ -371,6 +371,28 @@ Cadeia de rastreabilidade obrigatória: `INV-00x → Epic → Story → Critéri
   - **Given** um usuário que já apoiou,
   - **When** ele apoia novamente (inclusive por chamada forjada ou concorrente),
   - **Then** o contador permanece incrementado em 1, com rate limit e registro do apoio por `uid`.
+
+---
+
+### ➔ INTENT-1005: Separar payload protegido do documento da Intent
+- **Status:** `A Fazer` · **Tipo:** Task (segurança) · **Invariante:** apoia `INV-010`
+- **Descrição:** Como sistema, quero que `cipherText`/`iv` vivam em `/intents/{id}/protected/payload`, e não no documento da Intent, para que abrir o metadado de uma Intent pública não entregue o texto cifrado a qualquer visitante anônimo.
+- **Critérios de Aceitação:**
+  - **Given** uma Intent com `visibility: 'PUBLIC'`,
+  - **When** um usuário sem papel lê a Intent,
+  - **Then** recebe apenas metadado (título, status, progresso, `commitment`) e a leitura de `protected/payload` é negada — nem por `isPublic()`.
+- **Observação:** ciphertext sem DEK não abre, mas posse ilimitada por anônimos transforma um futuro vazamento de chave em vazamento retroativo de conteúdo.
+
+---
+
+### ➔ INTENT-1006: Índice de listagem por usuário (`intent_refs`)
+- **Status:** `A Fazer` · **Tipo:** Feature · **Depende de:** INTENT-1001
+- **Descrição:** Como participante, quero abrir o painel e ver todas as Intents em que tenho papel. Regra de rules não filtra `list`: o Firestore só autoriza a query se a própria query garantir que todo resultado é permitido, e `hasActiveRole` depende de um `get` por documento — serve para abrir uma Intent, não para listar.
+- **Critérios de Aceitação:**
+  - **Given** um usuário com papéis em várias Intents,
+  - **When** o painel carrega,
+  - **Then** ele consulta `/users/{uid}/intent_refs` (leitura restrita ao dono) e obtém a lista completa; o feed público usa query separada por `visibility == 'PUBLIC'`, retornando só metadado.
+  - **And** conceder ou revogar papel atualiza `roles` e `intent_refs` **na mesma transação**, com verificação periódica de consistência entre os dois.
 
 ---
 
@@ -451,11 +473,13 @@ Cadeia de rastreabilidade obrigatória: `INV-00x → Epic → Story → Critéri
 
 ### ➔ INTENT-1203: Idempotência transacional da liberação
 - **Status:** `A Fazer` · **Tipo:** User Story · **Invariante:** `INV-008`
-- **Descrição:** Reescreve a US-07.2 em bases confiáveis: a garantia deixa de ser "o cliente confere se `key_status` já é `REVEALED`" e passa a ser chave de idempotência + transação no servidor.
+- **Descrição:** Reescreve a US-07.2 em bases confiáveis: a garantia deixa de ser "o cliente confere se `key_status` já é `REVEALED`" e passa a ser **chave de idempotência estável na origem** + transação. A chave é derivada do fato que causou o evento — `SUPPORT:{intentId}:{uid}`, `APPROVAL:{intentId}:{uid}`, `TIME:{intentId}:{scheduled_for}`, `EXTERNAL:{source_id}:{delivery_id}`, `REVEAL:{intentId}` — e **nunca** de `seq`, que muda a cada reentrega e portanto não dedupica nada.
 - **Critérios de Aceitação:**
-  - **Given** dois apoios simultâneos que cruzam a meta, ou o mesmo evento entregue duas vezes,
+  - **Given** o mesmo fato reentregue (retry de broker, duplo clique, replay de webhook),
   - **When** o motor processa,
-  - **Then** exatamente uma revelação ocorre e exatamente uma janela é aberta.
+  - **Then** o `create` de `/intents/{id}/dedupe/{dedupe_key}` falha dentro da transação, nada é aplicado duas vezes e o chamador recebe sucesso (o efeito já está aplicado).
+  - **And given** dois apoios **distintos** e simultâneos que cruzam a meta (concorrência legítima, não duplicata),
+  - **Then** ambos são contados, mas exatamente uma revelação ocorre e exatamente uma janela é aberta, sob `REVEAL:{intentId}`.
 
 ---
 
@@ -545,10 +569,12 @@ Critério de descongelamento: `Can we seal? · Can we wait? · Can we verify? ·
 | **SPIKE-003** | Condições compostas e migração do `HYBRID` | Spike | `A Fazer` | Epic 09 | F-1 | — |
 | **SPIKE-004** | Estratégia de scheduler temporal | Spike | `A Fazer` | Epic 09 | F-1 | — |
 | **SPIKE-005** | Verificador público de commitment | Spike | `A Fazer` | Epic 09 | F-1 | — |
-| **INTENT-1001** | Rules por papel (materialização de `roles`) | Story | `A Fazer` | Epic 10 | F0 | INV-010 |
+| **INTENT-1001** | Rules por papel ativo (materialização de `roles`) | Story | `A Fazer` | Epic 10 | F0 | INV-010 |
 | **INTENT-1002** | Escrita da Intent exclusiva do backend | Story | `A Fazer` | Epic 10 | F0 | INV-002 |
 | **INTENT-1003** | Eventos append-only autoritativos com read model | Story | `A Fazer` | Epic 10 | F0 | base INV-008 |
 | **INTENT-1004** | Contagem de apoios no servidor | Story | `A Fazer` | Epic 10 | F0 | INV-004 |
+| **INTENT-1005** | Separar payload protegido do documento da Intent | Task | `A Fazer` | Epic 10 | F0 | apoia INV-010 |
+| **INTENT-1006** | Índice de listagem por usuário (`intent_refs`) | Feature | `A Fazer` | Epic 10 | F0 | — |
 | **INTENT-1101** | Remover `DEFAULT_VAULT_KEY` | Bug | `A Fazer` | Epic 11 | F1 | — |
 | **INTENT-1102** | Envelope encryption + KMS + `releaseKey` | Feature | `A Fazer` | Epic 11 | F1 | INV-001 |
 | **INTENT-1103** | Janela de revelação com efeito real | Story | `A Fazer` | Epic 11 | F1 | INV-005 |
