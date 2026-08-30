@@ -33,12 +33,20 @@ import {
   Unlock,
   Hourglass,
   Timer,
+  Compass,
   Zap,
   Users,
   Key,
   UserCheck,
   Send,
   Sliders,
+  Heart,
+  MessageSquare,
+  Share2,
+  ThumbsUp,
+  Bookmark,
+  Bell,
+  Check,
 } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType, signInWithPopup, googleProvider } from '../utils/firebase';
 import { Intent, UserAccount, ConditionType, Participant, QuorumMode } from '../types';
@@ -72,6 +80,42 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(false);
   const [inspectingIntent, setInspectingIntent] = useState<Intent | null>(null);
+
+  // ==========================================
+  // SOCIAL FEED SIMULATION STATES
+  // ==========================================
+  const [marcosAgreed, setMarcosAgreed] = useState(42);
+  const [marcosDisagreed, setMarcosDisagreed] = useState(3);
+  const [marcosVote, setMarcosVote] = useState<'AGREE' | 'DISAGREE' | null>(null);
+  const [marcosComments, setMarcosComments] = useState<string[]>([
+    'Marcos é mestre nos palpites!',
+    'Se você acertar esse vou te chamar de mago.'
+  ]);
+  const [marcosNewComment, setMarcosNewComment] = useState('');
+
+  const [anaSupports, setAnaSupports] = useState(8);
+  const [anaUserSupported, setAnaUserSupported] = useState(false);
+  const [anaComments, setAnaComments] = useState<string[]>([
+    'Iniciativa linda! Sua mãe merece tudo de melhor.',
+    'Amei! Mal posso esperar para ver a reação dela.'
+  ]);
+  const [anaNewComment, setAnaNewComment] = useState('');
+
+  const [ricardoParticipants, setRicardoParticipants] = useState(41);
+  const [ricardoUserParticipated, setRicardoUserParticipated] = useState(false);
+  const [ricardoComments, setRicardoComments] = useState<string[]>([
+    'Esse conteúdo é de altíssimo valor!',
+    'Obrigado por compartilhar, Professor!'
+  ]);
+  const [ricardoNewComment, setRicardoNewComment] = useState('');
+
+  // Suggestions for following users
+  const [followingAmanda, setFollowingAmanda] = useState(false);
+  const [followingEduardo, setFollowingEduardo] = useState(false);
+  const [followingCarol, setFollowingCarol] = useState(false);
+
+  // Quick post text in the central feed card
+  const [feedQuickPostText, setFeedQuickPostText] = useState('');
 
   // Time ticker state to update active countdowns every second
   const [, setTicker] = useState(0);
@@ -1364,202 +1408,803 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
   };
 
   const renderInicioDashboard = () => {
-    // 1. O que está quase acontecendo? (Find active public support intent, or active time intent, or just the first active one)
+    // Real user active intents
     const activeIntents = intents.filter((i) => i.status === 'active');
-    const almostHappening = activeIntents.find((i) => i.condition_type === 'PUBLIC_SUPPORT') || activeIntents[0] || intents[0];
     
-    // 2. O que está esperando por mim? (Filter intents with pending signatures from this user or that require guardians)
-    const waitingForMe = intents.filter((i) => {
-      const isAwaiting = (i.condition_type === 'PEOPLE' || i.condition_type === 'HYBRID') && i.status === 'active';
-      return isAwaiting; // simplify to represent items for active quorums
-    });
+    // Quick post submission handler
+    const handleQuickPostSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!feedQuickPostText.trim()) return;
+      
+      // Create a quick public support intent directly on behalf of the user to insert in their feed
+      const newIntent: Intent = {
+        id: 'intent-feed-' + Date.now(),
+        creator_id: auth.currentUser?.uid || user.id,
+        title: feedQuickPostText.trim().slice(0, 60) + (feedQuickPostText.length > 60 ? '...' : ''),
+        description: feedQuickPostText.trim(),
+        status: 'active',
+        created_at: new Date().toISOString(),
+        visibility: 'public',
+        condition_type: 'PUBLIC_SUPPORT',
+        target_supports: 10,
+        current_supports: 0,
+        reveal_content: '🔓 CONTEÚDO REVELADO COLETIVAMENTE: Obrigado por apoiarem este compromisso público!',
+        is_locked: true,
+        supporters: [],
+      };
 
-    // 3. O que aconteceu hoje? (Recently completed intents)
-    const recentlyCompleted = intents.filter((i) => i.status === 'completed' || i.revealed_at).slice(0, 3);
+      const updated = [newIntent, ...intents];
+      setIntents(updated);
+      saveLocalIntents(updated);
+      setFeedQuickPostText('');
+    };
 
     return (
-      <div className="space-y-8 animate-in fade-in duration-200">
-        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderInicioDashboard" className="mb-1" />
+      <div className="w-full animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderInicioDashboard" className="mb-4" />
 
-        {/* Small Summary Metrics */}
-        <div className="grid grid-cols-3 gap-3 md:gap-6 bg-white rounded-2xl p-4 border border-[#DCE7F6] shadow-2xs">
-          <div className="text-center md:text-left md:px-4">
-            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Em andamento</p>
-            <p className="text-lg md:text-2xl font-black text-[#0055FF] mt-1">{activeIntents.length}</p>
-          </div>
-          <div className="text-center md:text-left md:px-4 border-x border-slate-100">
-            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Realizadas</p>
-            <p className="text-lg md:text-2xl font-black text-emerald-600 mt-1">
-              {intents.filter((i) => i.status === 'completed' || i.revealed_at).length}
-            </p>
-          </div>
-          <div className="text-center md:text-left md:px-4">
-            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Esperando por mim</p>
-            <p className="text-lg md:text-2xl font-black text-amber-500 mt-1">{waitingForMe.length}</p>
-          </div>
-        </div>
-
-        {/* Dashboard Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* 3-Column Social Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* A. Quase Acontecendo - Left Column Spotlight */}
-          <div className="lg:col-span-8 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-              <span>Quase acontecendo</span>
-            </h3>
+          {/* ==========================================
+              LEFT COLUMN: IDENTITY & RELATIONSHIPS
+              ========================================== */}
+          <div className="lg:col-span-3 space-y-6">
+            
+            {/* Minimalist Profile Identity Card */}
+            <div className="bg-white rounded-3xl border border-[#DCE7F6] overflow-hidden shadow-2xs">
+              {/* Banner Cover Accent */}
+              <div className="h-16 bg-gradient-to-r from-blue-400 to-[#0055FF] opacity-80" />
+              
+              {/* User Details */}
+              <div className="px-5 pb-5 pt-0 relative flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-full border-4 border-white bg-gradient-to-tr from-[#0055FF] to-blue-500 text-white font-black text-xl flex items-center justify-center -mt-8 shadow-xs select-none">
+                  {(user.name || user.email || 'U')[0].toUpperCase()}
+                </div>
+                
+                <h3 className="font-extrabold text-slate-900 text-base mt-2.5 leading-tight">
+                  {user.name || 'Rafael Silva'}
+                </h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  @{user.username || 'rafaelsilva'}
+                </p>
+                
+                <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+                  "Preparo o amanhã no presente. O Intent revela quando acontecer."
+                </p>
 
-            {almostHappening ? (
-              <div 
-                onClick={() => setSelectedIntent(almostHappening)}
-                className="group bg-white rounded-3xl p-6 border-2 border-amber-300 hover:border-[#0055FF] transition-all shadow-md cursor-pointer space-y-4 relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 px-3 py-1 bg-amber-500 text-white text-[10px] font-black uppercase rounded-bl-xl">
-                  Destaque
+                {/* Social Stats Metrics row */}
+                <div className="grid grid-cols-3 gap-2 w-full pt-4 mt-4 border-t border-slate-100 text-center">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Fãs</p>
+                    <p className="text-sm font-black text-slate-800">{312}</p>
+                  </div>
+                  <div className="border-x border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Seguindo</p>
+                    <p className="text-sm font-black text-slate-800">{185}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ativas</p>
+                    <p className="text-sm font-black text-[#0055FF]">{activeIntents.length}</p>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <h4 className="text-lg md:text-xl font-black text-slate-900 group-hover:text-[#0055FF] transition-colors">
-                    {almostHappening.title}
+                {/* Direct action to edit profile */}
+                <button
+                  onClick={() => onTabChange && onTabChange('perfil')}
+                  className="w-full mt-4 py-2 bg-slate-50 hover:bg-[#F0F5FD] text-[#0055FF] border border-slate-200 hover:border-[#BFD7FE] rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Gerenciar Meu Perfil</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Friends & Circles Panel */}
+            <div className="bg-white rounded-3xl p-5 border border-[#DCE7F6] space-y-4 shadow-2xs">
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                <span>Amigos Online (6)</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </h4>
+
+              <div className="space-y-3">
+                {[
+                  { name: 'Marcos Silva', bio: '⚽ Palpites & Esportes', avatar: 'M', col: 'bg-emerald-500' },
+                  { name: 'Ana Costa', bio: '🎁 Família & Momentos', avatar: 'A', col: 'bg-amber-500' },
+                  { name: 'Prof. Ricardo', bio: '📚 Educação & IA', avatar: 'R', col: 'bg-[#0055FF]' },
+                  { name: 'Eduardo Lima', bio: '💻 Tech & Criptografia', avatar: 'E', col: 'bg-indigo-500' },
+                  { name: 'Amanda Cruz', bio: '🎨 UI/UX Designer', avatar: 'A', col: 'bg-purple-500' },
+                  { name: 'Carol Reis', bio: '📸 Viagens & Arte', avatar: 'C', col: 'bg-pink-500' },
+                ].map((friend) => (
+                  <div key={friend.name} className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className={`w-8 h-8 rounded-full ${friend.col} text-white font-bold text-xs flex items-center justify-center shadow-2xs`}>
+                        {friend.avatar}
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-800 truncate">{friend.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate leading-none">{friend.bio}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Navigation Shortcuts */}
+            <div className="bg-white rounded-3xl p-4 border border-[#DCE7F6] shadow-2xs">
+              <div className="space-y-1">
+                <button
+                  onClick={() => onTabChange && onTabChange('minhas')}
+                  className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F0F5FD] text-slate-600 hover:text-[#0055FF] text-xs font-bold text-left flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Lock className="w-4 h-4 text-purple-600" />
+                  <span>Minhas Intents Criptografadas</span>
+                </button>
+                <button
+                  onClick={() => onTabChange && onTabChange('explorar')}
+                  className="w-full px-3 py-2.5 rounded-xl hover:bg-[#F0F5FD] text-slate-600 hover:text-[#0055FF] text-xs font-bold text-left flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <Compass className="w-4 h-4 text-blue-500" />
+                  <span>Canais de Exploração</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* ==========================================
+              CENTER COLUMN: THE SOCIAL FEED
+              ========================================== */}
+          <div className="lg:col-span-6 space-y-6">
+            
+            {/* Quick Creation Entry Card */}
+            <div className="bg-white rounded-3xl p-5 border-2 border-[#BFD7FE] shadow-xs space-y-4">
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0055FF] to-blue-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                  {(user.name || 'U')[0].toUpperCase()}
+                </div>
+                <form onSubmit={handleQuickPostSubmit} className="flex-1">
+                  <textarea
+                    rows={2}
+                    value={feedQuickPostText}
+                    onChange={(e) => setFeedQuickPostText(e.target.value)}
+                    placeholder="O que você quer fazer acontecer? Prepare e revele depois..."
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-[#0055FF] focus:bg-white rounded-2xl py-2 px-4 text-xs font-medium placeholder-slate-400 focus:outline-none resize-none transition-all"
+                  />
+                  
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100">
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onTabChange && onTabChange('criar')}
+                        className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        <Sparkles className="w-3 h-3 text-purple-600" />
+                        <span>Criar Intent</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onTabChange && onTabChange('criar');
+                          setActiveTemplate && setActiveTemplate('palpite');
+                        }}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        <Zap className="w-3 h-3 text-amber-500" />
+                        <span>Fazer Palpite</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onTabChange && onTabChange('criar');
+                          setActiveTemplate && setActiveTemplate('data');
+                        }}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0055FF] rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        <Calendar className="w-3 h-3 text-[#0055FF]" />
+                        <span>Trava de Tempo</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={!feedQuickPostText.trim()}
+                      className="px-4 py-2 bg-[#0055FF] hover:bg-[#0047E0] disabled:bg-slate-200 text-white disabled:text-slate-400 font-extrabold text-xs rounded-xl shadow-xs hover:shadow-md transition-all active:scale-98 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Publicar</span>
+                      <Send className="w-3 h-3" />
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* Social Post Feed Items */}
+            <div className="space-y-6">
+
+              {/* POST 1: MARCOS SILVA (⚽ Palpite Criptografado Interativo) */}
+              <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] shadow-2xs space-y-4">
+                {/* Header info */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                      M
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-800">
+                        Marcos Silva <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded-md ml-1.5">✓ Seguindo</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400">Há 12 minutos • Categoria Esportes</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1.5 bg-slate-100 text-slate-600 text-[9px] font-black uppercase rounded-lg tracking-wider">
+                    ⏱️ Auto-Revela
+                  </span>
+                </div>
+
+                {/* Content body */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    ⚽ Registrei meu palpite criptografado para o Grenal de amanhã!
                   </h4>
-                  <p className="text-xs md:text-sm text-slate-500 line-clamp-2">
-                    {almostHappening.description || "Nenhuma descrição detalhada fornecida para este protocolo."}
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    "Previ o placar exato do jogo, quem fará os gols e o minuto do primeiro cartão. O conteúdo está selado no cofre Intent e será revelado automaticamente às 18h de amanhã, 5 minutos após o apito final!"
                   </p>
                 </div>
 
-                {/* Human condition copy */}
-                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs font-semibold text-[#0B1B3D]">
-                  <span className="flex items-center gap-1.5">
-                    <Shield className="w-4 h-4 text-[#0055FF]" />
-                    <span>
-                      {almostHappening.condition_type === 'PUBLIC_SUPPORT' 
-                        ? `Será revelada ao atingir ${almostHappening.target_supports || 10} apoios.`
-                        : almostHappening.condition_type === 'TIME'
-                        ? 'Agendada para revelar em data específica.'
-                        : 'Será revelada sob aprovação de guardiões.'}
-                    </span>
-                  </span>
+                {/* Visual Locked Box Representation */}
+                <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-2.5 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-slate-950/20 backdrop-blur-xs flex flex-col items-center justify-center">
+                    <Lock className="w-8 h-8 text-amber-500 mb-1 animate-pulse" />
+                    <p className="text-[11px] font-extrabold text-white uppercase tracking-wider">Palpite Selado & Protegido</p>
+                    <p className="text-[9px] text-slate-400">Revelação automática: Amanhã às 18:00h</p>
+                  </div>
+                  <div className="opacity-15 select-none font-mono text-[9px] text-green-500 space-y-0.5 text-left blur-2xs">
+                    <p>AES-GCM-256 ENCRYPTED BLOCK MATCHED</p>
+                    <p>ORACLE_TRIGGER_EVENT_DATE: 2026-08-30T18:05:00Z</p>
+                  </div>
+                </div>
+
+                {/* Simulated Opinion Vote (Interactive!) */}
+                <div className="space-y-2 pt-2">
+                  <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">O que você acha do palpite dele?</p>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => {
+                        if (marcosVote === 'AGREE') {
+                          setMarcosVote(null);
+                          setMarcosAgreed(p => p - 1);
+                        } else {
+                          if (marcosVote === 'DISAGREE') setMarcosDisagreed(p => p - 1);
+                          setMarcosVote('AGREE');
+                          setMarcosAgreed(p => p + 1);
+                        }
+                      }}
+                      className={`flex-1 py-2 px-3.5 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
+                        marcosVote === 'AGREE'
+                          ? 'bg-blue-50 border-[#0055FF] text-[#0055FF]'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Concordo ({marcosAgreed})</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (marcosVote === 'DISAGREE') {
+                          setMarcosVote(null);
+                          setMarcosDisagreed(p => p - 1);
+                        } else {
+                          if (marcosVote === 'AGREE') setMarcosAgreed(p => p - 1);
+                          setMarcosVote('DISAGREE');
+                          setMarcosDisagreed(p => p + 1);
+                        }
+                      }}
+                      className={`flex-1 py-2 px-3.5 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
+                        marcosVote === 'DISAGREE'
+                          ? 'bg-red-50 border-red-300 text-red-600'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Discordo ({marcosDisagreed})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Comments block */}
+                <div className="space-y-2 pt-3 border-t border-slate-100">
+                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3 text-slate-400" />
+                    <span>Comentários ({marcosComments.length})</span>
+                  </p>
                   
-                  <span className="text-[#0055FF] font-black font-mono">
-                    {almostHappening.condition_type === 'PUBLIC_SUPPORT' 
-                      ? `${almostHappening.current_supports || 8} de ${almostHappening.target_supports || 10}`
-                      : 'Em contagem'}
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {marcosComments.map((comment, idx) => (
+                      <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <p className="font-extrabold text-slate-800 text-[10px]">
+                          {idx === marcosComments.length - 1 && marcosComments.length > 2 ? 'Você' : 'Parceiro'}
+                        </p>
+                        <p className="text-slate-600 text-xs mt-0.5 font-medium leading-relaxed">{comment}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Comment form */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!marcosNewComment.trim()) return;
+                      setMarcosComments([...marcosComments, marcosNewComment.trim()]);
+                      setMarcosNewComment('');
+                    }}
+                    className="flex gap-2 mt-2"
+                  >
+                    <input
+                      type="text"
+                      value={marcosNewComment}
+                      onChange={(e) => setMarcosNewComment(e.target.value)}
+                      placeholder="Deixe sua opinião..."
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium placeholder-slate-400 focus:outline-none focus:border-[#0055FF] focus:bg-white transition-all"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 bg-[#0055FF] text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all cursor-pointer"
+                    >
+                      Enviar
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* POST 2: ANA COSTA (🎁 Apoio Coletivo Interativo com Revelação Real!) */}
+              <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] shadow-2xs space-y-4">
+                {/* Header info */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                      A
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-800">
+                        Ana Costa <span className="text-[10px] text-amber-600 font-extrabold bg-amber-50 px-1.5 py-0.5 rounded-md ml-1.5">✓ Amiga</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400">Há 2 horas • Categoria Família</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-[#0055FF] text-[9px] font-black uppercase rounded-lg tracking-wider">
+                    👥 Apoio Coletivo
                   </span>
                 </div>
 
-                {/* Progress bar */}
-                {almostHappening.condition_type === 'PUBLIC_SUPPORT' && (
-                  <div className="space-y-1">
-                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-amber-400 to-[#0055FF] rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${Math.min(100, ((almostHappening.current_supports || 8) / (almostHappening.target_supports || 10)) * 100)}%` 
-                        }}
+                {/* Content body */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    🎁 Surpresa de aniversário emocionante para minha mãe!
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    "Preparamos um vídeo lindo de 15 minutos reunindo primos, tios e antigos amigos que ela não vê há anos. O vídeo será liberado automaticamente do cofre Intent quando esta publicação atingir a meta de 10 apoios aqui na rede!"
+                  </p>
+                </div>
+
+                {/* Dynamic Lock/Reveal Container based on interactive support level */}
+                {anaSupports >= 10 ? (
+                  <div className="p-5 bg-emerald-50 rounded-2xl border-2 border-emerald-200 text-slate-800 space-y-2 animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2 text-emerald-800 font-black text-xs">
+                      <Unlock className="w-4 h-4 text-emerald-600" />
+                      <span>🔓 META ALCANÇADA! REVELADO COM SUCESSO</span>
+                    </div>
+                    <p className="font-mono text-xs bg-white p-3 rounded-xl border border-emerald-100 whitespace-pre-wrap leading-relaxed">
+                      📺 <strong>Link do Vídeo Revelado:</strong> https://www.youtube.com/watch?v=aniversario_surpresa_mamae
+                      <br />• <strong>Mensagem secreta da Ana:</strong> "Parabéns, mãe! Obrigado a todos do círculo do Intent que apoiaram para desbloquear este momento especial!"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                      <span>Status: Selado (Faltam {10 - anaSupports} apoios)</span>
+                      <span className="text-[#0055FF]">{anaSupports} de 10</span>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-400 to-[#0055FF] rounded-full transition-all duration-300"
+                        style={{ width: `${(anaSupports / 10) * 100}%` }}
                       />
                     </div>
-                    <div className="flex justify-between text-[10px] font-bold text-slate-400 font-mono">
-                      <span>Progresso: {Math.round(((almostHappening.current_supports || 8) / (almostHappening.target_supports || 10)) * 100)}%</span>
-                      <span>Faltam {Math.max(0, (almostHappening.target_supports || 10) - (almostHappening.current_supports || 8))} apoios</span>
+
+                    <div className="flex justify-between text-[9px] text-slate-400 font-bold font-mono">
+                      <span>Início</span>
+                      <span>Meta: 10 Apoios</span>
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400 font-bold">
-                    <User className="w-3.5 h-3.5 text-[#0055FF]" />
-                    <span>Criado por {almostHappening.creator_id === user.id ? 'Você' : 'Parceiro'}</span>
-                  </div>
+                {/* Support and comment interactions */}
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    onClick={() => {
+                      if (anaUserSupported) {
+                        setAnaUserSupported(false);
+                        setAnaSupports(p => p - 1);
+                      } else {
+                        setAnaUserSupported(true);
+                        setAnaSupports(p => p + 1);
+                      }
+                    }}
+                    className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer shadow-2xs ${
+                      anaUserSupported
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-[#E2EDFF] hover:bg-[#D4E4FD] text-[#0055FF] border border-blue-200'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{anaUserSupported ? '✓ Apoiado' : 'Apoiar esta Intent'}</span>
+                  </button>
+                </div>
+
+                {/* Comments block */}
+                <div className="space-y-2 pt-3 border-t border-slate-100">
+                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3 text-slate-400" />
+                    <span>Comentários ({anaComments.length})</span>
+                  </p>
                   
-                  <span className="text-xs font-bold text-[#0055FF] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    <span>Acompanhar Intent</span>
-                    <span>→</span>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    {anaComments.map((comment, idx) => (
+                      <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <p className="font-extrabold text-slate-800 text-[10px]">
+                          {idx === anaComments.length - 1 && anaUserSupported ? 'Você' : 'Parceira'}
+                        </p>
+                        <p className="text-slate-600 text-xs mt-0.5 font-medium leading-relaxed">{comment}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Comment form */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!anaNewComment.trim()) return;
+                      setAnaComments([...anaComments, anaNewComment.trim()]);
+                      setAnaNewComment('');
+                    }}
+                    className="flex gap-2 mt-2"
+                  >
+                    <input
+                      type="text"
+                      value={anaNewComment}
+                      onChange={(e) => setAnaNewComment(e.target.value)}
+                      placeholder="Adicione um carinho..."
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium placeholder-slate-400 focus:outline-none focus:border-[#0055FF] focus:bg-white transition-all"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 bg-[#0055FF] text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all cursor-pointer"
+                    >
+                      Enviar
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* POST 3: PROFESSOR RICARDO (👥 Campanha Coletiva E-Book) */}
+              <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] shadow-2xs space-y-4">
+                {/* Header info */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                      R
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-800">
+                        Professor Ricardo <span className="text-[10px] text-blue-600 font-extrabold bg-blue-50 px-1.5 py-0.5 rounded-md ml-1.5">✓ Recomendado</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400">Há 5 horas • Categoria Educação</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-[#0055FF] text-[9px] font-black uppercase rounded-lg tracking-wider">
+                    🔥 Campanha
+                  </span>
+                </div>
+
+                {/* Content body */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    📚 E-book Exclusivo: O Guia Definitivo da Engenharia de Prompts de IA
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    "Escrevi um guia passo-a-passo com mais de 100 prompts para aumentar sua produtividade em até 5x. O link de download ficará público para todos os membros que participarem assim que atingirmos o quórum de 50 inscritos!"
+                  </p>
+                </div>
+
+                {/* Progress rendering */}
+                {ricardoParticipants >= 50 ? (
+                  <div className="p-5 bg-emerald-50 rounded-2xl border-2 border-emerald-200 text-slate-800 space-y-2 animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2 text-emerald-800 font-black text-xs">
+                      <Unlock className="w-4 h-4 text-emerald-600" />
+                      <span>🔓 REVELADO! DOWNLOAD LIBERADO</span>
+                    </div>
+                    <p className="font-mono text-xs bg-white p-3 rounded-xl border border-emerald-100 whitespace-pre-wrap leading-relaxed">
+                      🔗 <strong>Link para Download:</strong> https://baixar.portal.app/ia_prompts_guide_ricardo.pdf
+                      <br />• <strong>Nota do Autor:</strong> "Meta de 50 pessoas atingida! Aproveitem os segredos de prompt!"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                      <span>Status: Selado (Faltam {50 - ricardoParticipants} participantes)</span>
+                      <span className="text-[#0055FF]">{ricardoParticipants} de 50</span>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300"
+                        style={{ width: `${(ricardoParticipants / 50) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Join interaction */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (ricardoUserParticipated) {
+                        setRicardoUserParticipated(false);
+                        setRicardoParticipants(p => p - 1);
+                      } else {
+                        setRicardoUserParticipated(true);
+                        setRicardoParticipants(p => p + 1);
+                      }
+                    }}
+                    className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
+                      ricardoUserParticipated
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-[#F0F5FD] hover:bg-[#E2EDFF] text-[#0055FF] border border-[#BFD7FE]'
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    <span>{ricardoUserParticipated ? '✓ Participando da Campanha' : 'Quero Participar Gratuitamente'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* DYNAMIC USER-MADE INTENTS (Merged directly in Feed) */}
+              {intents.filter(i => i.creator_id === (auth.currentUser?.uid || user.id)).map((myIntent) => {
+                const isRevealed = !!myIntent.revealed_at || myIntent.status === 'completed';
+                
+                return (
+                  <div
+                    key={myIntent.id}
+                    onClick={() => setSelectedIntent(myIntent)}
+                    className="group bg-white rounded-3xl p-6 border-2 border-[#E2EDFF] hover:border-[#0055FF] transition-all cursor-pointer space-y-4 shadow-2xs relative"
+                  >
+                    {/* Header info */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#0055FF] to-blue-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                          {(user.name || 'U')[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800">
+                            Você <span className="text-[10px] text-slate-400 font-bold ml-1.5">@{user.username || 'rafaelsilva'}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400">Criado recentemente • Minhas</p>
+                        </div>
+                      </div>
+                      
+                      <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                        isRevealed 
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' 
+                          : 'bg-blue-50 border border-blue-200 text-[#0055FF]'
+                      }`}>
+                        {isRevealed ? '🔓 Revelada' : '🔒 Selada'}
+                      </span>
+                    </div>
+
+                    {/* Content body */}
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-[#0055FF] transition-colors leading-tight">
+                        {myIntent.title}
+                      </h4>
+                      <p className="text-xs text-slate-500 line-clamp-2">
+                        {myIntent.description || "Nenhuma descrição fornecida."}
+                      </p>
+                    </div>
+
+                    {/* Condition details badge */}
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-[11px] font-bold text-[#0B1B3D]">
+                      <span className="flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-[#0055FF]" />
+                        <span>
+                          {myIntent.condition_type === 'PUBLIC_SUPPORT' 
+                            ? 'Apoio Coletivo'
+                            : myIntent.condition_type === 'TIME'
+                            ? 'Trava Temporal'
+                            : myIntent.condition_type === 'PEOPLE'
+                            ? 'Quórum de Guardiões'
+                            : 'Sem Condição'}
+                        </span>
+                      </span>
+
+                      <span className="text-[#0055FF] font-mono">
+                        {myIntent.condition_type === 'PUBLIC_SUPPORT' 
+                          ? `${myIntent.current_supports || 0} de ${myIntent.target_supports || 10}`
+                          : 'Validando'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold pt-1.5 border-t border-slate-50">
+                      <span>Clique para ver os logs e gerenciar</span>
+                      <span className="text-[#0055FF] flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                        Detalhes →
+                      </span>
+                    </div>
+
+                  </div>
+                );
+              })}
+
+            </div>
+
+          </div>
+
+          {/* ==========================================
+              RIGHT COLUMN: DISCOVERY & TRENDS
+              ========================================== */}
+          <div className="lg:col-span-3 space-y-6">
+            
+            {/* Quick Expectation Tracker ("Happening now") */}
+            <div className="bg-white rounded-3xl p-5 border border-[#DCE7F6] space-y-4 shadow-2xs">
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Timer className="w-4 h-4 text-amber-500" />
+                <span>Acontecendo Agora</span>
+              </h4>
+
+              <div className="space-y-3">
+                {/* Simulated events */}
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="font-extrabold text-slate-800 truncate text-xs">Surpresa da Ana</p>
+                    <p className="text-[10px] text-amber-600 font-bold">8 de 10 apoios (80%)</p>
+                  </div>
+                  <span className="px-2 py-1 bg-amber-500 text-white text-[9px] font-black rounded-lg whitespace-nowrap animate-pulse">
+                    Faltam 2!
+                  </span>
+                </div>
+
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="font-extrabold text-slate-800 truncate text-xs">Palpite de Marcos</p>
+                    <p className="text-[10px] text-[#0055FF] font-bold">Revela amanhã às 18:00h</p>
+                  </div>
+                  <span className="px-2 py-1 bg-[#0055FF] text-white text-[9px] font-black rounded-lg whitespace-nowrap">
+                    Selado
+                  </span>
+                </div>
+
+                <div className="p-3 bg-purple-50 border border-purple-100 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="font-extrabold text-slate-800 truncate text-xs">Curso do Ricardo</p>
+                    <p className="text-[10px] text-purple-600 font-bold">41 de 50 participações</p>
+                  </div>
+                  <span className="px-2 py-1 bg-purple-600 text-white text-[9px] font-black rounded-lg whitespace-nowrap">
+                    Faltam 9!
                   </span>
                 </div>
               </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-8 border border-[#DCE7F6] text-center text-slate-400 text-xs">
-                Nenhuma intent em andamento no momento.
-              </div>
-            )}
-          </div>
+            </div>
 
-          {/* B & C Columns - Right Column */}
-          <div className="lg:col-span-4 space-y-6">
-            
-            {/* B. Esperando por você */}
-            <div className="space-y-3">
-              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
-                <Shield className="w-4 h-4 text-amber-500" />
-                <span>Esperando por você</span>
-              </h3>
+            {/* Suggestions to follow ("Pessoas para acompanhar") */}
+            <div className="bg-white rounded-3xl p-5 border border-[#DCE7F6] space-y-4 shadow-2xs">
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-[#0055FF]" />
+                <span>Sugestões de Criadores</span>
+              </h4>
 
-              <div className="space-y-2.5">
-                {waitingForMe.length > 0 ? (
-                  waitingForMe.map((w) => (
-                    <div 
-                      key={w.id}
-                      onClick={() => setSelectedIntent(w)}
-                      className="p-4 bg-white rounded-2xl border border-amber-200 hover:border-[#0055FF] transition-all cursor-pointer flex items-center justify-between gap-3 shadow-2xs"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-800 text-xs truncate">{w.title}</p>
-                        <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3" />
-                          <span>Requer aprovação (Etapa 5)</span>
-                        </p>
-                      </div>
-                      <span className="px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-[#0055FF] text-[10px] font-bold">
-                        Aprovar
-                      </span>
+              <div className="space-y-3.5">
+                {/* Amanda Cruz */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-purple-500 text-white font-bold text-xs flex items-center justify-center">
+                      A
                     </div>
-                  ))
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center text-xs text-slate-400">
-                    Nenhuma aprovação ou convite pendente.
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">Amanda Cruz</p>
+                      <p className="text-[10px] text-slate-400 truncate">@amandacruz</p>
+                    </div>
                   </div>
-                )}
+                  <button
+                    onClick={() => setFollowingAmanda(!followingAmanda)}
+                    className={`px-3 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer whitespace-nowrap ${
+                      followingAmanda
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-[#0055FF] text-white'
+                    }`}
+                  >
+                    {followingAmanda ? '✓ Seguindo' : 'Seguir'}
+                  </button>
+                </div>
+
+                {/* Eduardo Lima */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-indigo-500 text-white font-bold text-xs flex items-center justify-center">
+                      E
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">Eduardo Lima</p>
+                      <p className="text-[10px] text-slate-400 truncate">@edulima</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setFollowingEduardo(!followingEduardo)}
+                    className={`px-3 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer whitespace-nowrap ${
+                      followingEduardo
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-[#0055FF] text-white'
+                    }`}
+                  >
+                    {followingEduardo ? '✓ Seguindo' : 'Seguir'}
+                  </button>
+                </div>
+
+                {/* Carol Reis */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-pink-500 text-white font-bold text-xs flex items-center justify-center">
+                      C
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">Carol Reis</p>
+                      <p className="text-[10px] text-slate-400 truncate">@carolreis</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setFollowingCarol(!followingCarol)}
+                    className={`px-3 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer whitespace-nowrap ${
+                      followingCarol
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'bg-[#0055FF] text-white'
+                    }`}
+                  >
+                    {followingCarol ? '✓ Seguindo' : 'Seguir'}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* C. Aconteceu recentemente */}
-            <div className="space-y-3">
-              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Revelados recentemente</span>
-              </h3>
+            {/* Topics in Movement ("Assuntos em movimento" / Trends) */}
+            <div className="bg-white rounded-3xl p-5 border border-[#DCE7F6] shadow-2xs space-y-4">
+              <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                Assuntos em Movimento
+              </h4>
 
-              <div className="space-y-2.5">
-                {recentlyCompleted.length > 0 ? (
-                  recentlyCompleted.map((rc) => (
-                    <div 
-                      key={rc.id}
-                      onClick={() => setSelectedIntent(rc)}
-                      className="p-4 bg-white rounded-2xl border border-emerald-100 hover:border-[#0055FF] transition-all cursor-pointer flex items-center gap-3 shadow-2xs"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                        <Unlock className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-800 text-xs truncate">{rc.title}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          Revelado por {rc.revealed_by || 'Sistema'}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-600">
-                        Revelado!
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center text-xs text-slate-400">
-                    Ainda nenhuma intent concluída hoje.
+              <div className="space-y-3">
+                {[
+                  { tag: '#PalpitesEsportivos', count: '14 intents seladas hoje' },
+                  { tag: '#AniversarioSurpresa', count: '8 intents comunitárias' },
+                  { tag: '#EbooksDoFuturo', count: '29 pessoas apoiando' },
+                  { tag: '#CofresInteligentes', count: '11 revelações agendadas' },
+                ].map((item) => (
+                  <div key={item.tag} className="space-y-0.5">
+                    <p className="text-xs font-black text-slate-800 hover:text-[#0055FF] transition-colors cursor-pointer">
+                      {item.tag}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold">{item.count}</p>
                   </div>
-                )}
+                ))}
               </div>
             </div>
 
           </div>
+
         </div>
       </div>
     );
