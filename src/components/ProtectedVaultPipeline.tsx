@@ -132,10 +132,9 @@ export function ProtectedVaultPipeline({
     try {
       const encPayload = await encryptPayload(
         rawContent,
-        passphrase,
         inputFileName,
         inputFileType,
-        inputFileSize
+        passphrase
       );
       setPayload(encPayload);
       setActivePipelineStep(3);

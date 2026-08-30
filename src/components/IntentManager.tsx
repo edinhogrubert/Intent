@@ -60,11 +60,13 @@ import { ProtectedPayload, SAMPLE_PROTECTED_FILES } from '../utils/cryptoVault';
 
 interface IntentManagerProps {
   user: UserAccount;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 const LOCAL_STORAGE_INTENTS_KEY = 'portal_app_local_intents';
 
-export function IntentManager({ user }: IntentManagerProps) {
+export function IntentManager({ user, activeTab = 'inicio', onTabChange }: IntentManagerProps) {
   const [intents, setIntents] = useState<Intent[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -84,6 +86,17 @@ export function IntentManager({ user }: IntentManagerProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  
+  // Conversational creation template states (Google Stitch design)
+  const [activeTemplate, setActiveTemplate] = useState<'apoio' | 'palpite' | 'data' | 'aprovacao' | null>(null);
+  const [protectionLevel, setProtectionLevel] = useState<'flexible' | 'committed' | 'sealed'>('committed');
+  const [supportGoal, setSupportGoal] = useState<number>(10);
+  const [supportScope, setSupportScope] = useState<'public' | 'followers' | 'invited'>('public');
+  const [predictText, setPredictText] = useState<string>('');
+  const [predictRevealWhen, setPredictRevealWhen] = useState<'game_end' | 'date_time' | 'manual'>('game_end');
+  const [revealMediaType, setRevealMediaType] = useState<'text' | 'photo' | 'video' | 'file' | 'link' | 'coupon'>('photo');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState<boolean>(false);
+  const [creationPreviewShow, setCreationPreviewShow] = useState<boolean>(false);
   const [newVisibility, setNewVisibility] = useState<'private' | 'public'>('private');
   const [newStatus, setNewStatus] = useState<'draft' | 'active'>('active');
 
@@ -1266,6 +1279,1178 @@ export function IntentManager({ user }: IntentManagerProps) {
     const res = evaluateIntentConditions(i);
     return (i.condition_type === 'PEOPLE' || i.condition_type === 'HYBRID') && !res.isPeopleConditionSatisfied;
   }).length;
+
+  // ==========================================
+  // GOOGLE STITCH MULTI-SCREEN & TEMPLATE CREATOR STATE
+  // ==========================================
+  const [selectedExplorarCategory, setSelectedExplorarCategory] = useState<string>('all');
+  const [conversationalTitle, setConversationalTitle] = useState('');
+  const [conversationalDescription, setConversationalDescription] = useState('');
+  const [conversationalSecret, setConversationalSecret] = useState('');
+
+  const renderPrimeiroAcesso = () => {
+    return (
+      <div className="max-w-3xl mx-auto py-12 px-4 text-center space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-300">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderPrimeiroAcesso" className="mx-auto" />
+        
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-[#0055FF] text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Apresentando o Protocolo Intent</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-none">
+            Faça algo acontecer.
+          </h1>
+          <p className="text-base md:text-lg text-slate-500 max-w-xl mx-auto font-medium">
+            Prepare uma mensagem, conteúdo ou promessa e escolha quando ela será revelada.
+          </p>
+          <p className="text-sm font-bold text-[#0055FF] tracking-wide mt-2">
+            “Você prepara agora. O Intent revela quando acontecer.”
+          </p>
+        </div>
+
+        {/* 3 Exemplos Visuais e Práticos */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] text-left space-y-3 shadow-xs hover:border-[#0055FF] transition-all">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-sm">Apoio Coletivo</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              “Quando esta publicação receber 10 apoios, revelar uma foto secreta.”
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] text-left space-y-3 shadow-xs hover:border-[#0055FF] transition-all">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#0055FF] flex items-center justify-center">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-sm">Data Futura</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              “No dia do aniversário da minha mãe, revelar um vídeo especial.”
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] text-left space-y-3 shadow-xs hover:border-[#0055FF] transition-all">
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Zap className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-sm">Palpites Selados</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              “Registrar meu palpite antes do jogo. Revelar o placar que previ depois que a partida acabar.”
+            </p>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <button
+            onClick={() => onTabChange && onTabChange('criar')}
+            className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#0055FF] hover:bg-[#0047E0] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>Criar minha primeira Intent</span>
+            <PlusCircle className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => onTabChange && onTabChange('explorar')}
+            className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-[#F0F5FD] text-[#0055FF] border border-[#BFD7FE] font-bold text-sm shadow-2xs transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <span>Ver exemplos práticos</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderInicioDashboard = () => {
+    // 1. O que está quase acontecendo? (Find active public support intent, or active time intent, or just the first active one)
+    const activeIntents = intents.filter((i) => i.status === 'active');
+    const almostHappening = activeIntents.find((i) => i.condition_type === 'PUBLIC_SUPPORT') || activeIntents[0] || intents[0];
+    
+    // 2. O que está esperando por mim? (Filter intents with pending signatures from this user or that require guardians)
+    const waitingForMe = intents.filter((i) => {
+      const isAwaiting = (i.condition_type === 'PEOPLE' || i.condition_type === 'HYBRID') && i.status === 'active';
+      return isAwaiting; // simplify to represent items for active quorums
+    });
+
+    // 3. O que aconteceu hoje? (Recently completed intents)
+    const recentlyCompleted = intents.filter((i) => i.status === 'completed' || i.revealed_at).slice(0, 3);
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderInicioDashboard" className="mb-1" />
+
+        {/* Small Summary Metrics */}
+        <div className="grid grid-cols-3 gap-3 md:gap-6 bg-white rounded-2xl p-4 border border-[#DCE7F6] shadow-2xs">
+          <div className="text-center md:text-left md:px-4">
+            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Em andamento</p>
+            <p className="text-lg md:text-2xl font-black text-[#0055FF] mt-1">{activeIntents.length}</p>
+          </div>
+          <div className="text-center md:text-left md:px-4 border-x border-slate-100">
+            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Realizadas</p>
+            <p className="text-lg md:text-2xl font-black text-emerald-600 mt-1">
+              {intents.filter((i) => i.status === 'completed' || i.revealed_at).length}
+            </p>
+          </div>
+          <div className="text-center md:text-left md:px-4">
+            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-wider">Esperando por mim</p>
+            <p className="text-lg md:text-2xl font-black text-amber-500 mt-1">{waitingForMe.length}</p>
+          </div>
+        </div>
+
+        {/* Dashboard Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* A. Quase Acontecendo - Left Column Spotlight */}
+          <div className="lg:col-span-8 space-y-4">
+            <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span>Quase acontecendo</span>
+            </h3>
+
+            {almostHappening ? (
+              <div 
+                onClick={() => setSelectedIntent(almostHappening)}
+                className="group bg-white rounded-3xl p-6 border-2 border-amber-300 hover:border-[#0055FF] transition-all shadow-md cursor-pointer space-y-4 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 px-3 py-1 bg-amber-500 text-white text-[10px] font-black uppercase rounded-bl-xl">
+                  Destaque
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="text-lg md:text-xl font-black text-slate-900 group-hover:text-[#0055FF] transition-colors">
+                    {almostHappening.title}
+                  </h4>
+                  <p className="text-xs md:text-sm text-slate-500 line-clamp-2">
+                    {almostHappening.description || "Nenhuma descrição detalhada fornecida para este protocolo."}
+                  </p>
+                </div>
+
+                {/* Human condition copy */}
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs font-semibold text-[#0B1B3D]">
+                  <span className="flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-[#0055FF]" />
+                    <span>
+                      {almostHappening.condition_type === 'PUBLIC_SUPPORT' 
+                        ? `Será revelada ao atingir ${almostHappening.target_supports || 10} apoios.`
+                        : almostHappening.condition_type === 'TIME'
+                        ? 'Agendada para revelar em data específica.'
+                        : 'Será revelada sob aprovação de guardiões.'}
+                    </span>
+                  </span>
+                  
+                  <span className="text-[#0055FF] font-black font-mono">
+                    {almostHappening.condition_type === 'PUBLIC_SUPPORT' 
+                      ? `${almostHappening.current_supports || 8} de ${almostHappening.target_supports || 10}`
+                      : 'Em contagem'}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                {almostHappening.condition_type === 'PUBLIC_SUPPORT' && (
+                  <div className="space-y-1">
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-400 to-[#0055FF] rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, ((almostHappening.current_supports || 8) / (almostHappening.target_supports || 10)) * 100)}%` 
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400 font-mono">
+                      <span>Progresso: {Math.round(((almostHappening.current_supports || 8) / (almostHappening.target_supports || 10)) * 100)}%</span>
+                      <span>Faltam {Math.max(0, (almostHappening.target_supports || 10) - (almostHappening.current_supports || 8))} apoios</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400 font-bold">
+                    <User className="w-3.5 h-3.5 text-[#0055FF]" />
+                    <span>Criado por {almostHappening.creator_id === user.id ? 'Você' : 'Parceiro'}</span>
+                  </div>
+                  
+                  <span className="text-xs font-bold text-[#0055FF] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    <span>Acompanhar Intent</span>
+                    <span>→</span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl p-8 border border-[#DCE7F6] text-center text-slate-400 text-xs">
+                Nenhuma intent em andamento no momento.
+              </div>
+            )}
+          </div>
+
+          {/* B & C Columns - Right Column */}
+          <div className="lg:col-span-4 space-y-6">
+            
+            {/* B. Esperando por você */}
+            <div className="space-y-3">
+              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
+                <Shield className="w-4 h-4 text-amber-500" />
+                <span>Esperando por você</span>
+              </h3>
+
+              <div className="space-y-2.5">
+                {waitingForMe.length > 0 ? (
+                  waitingForMe.map((w) => (
+                    <div 
+                      key={w.id}
+                      onClick={() => setSelectedIntent(w)}
+                      className="p-4 bg-white rounded-2xl border border-amber-200 hover:border-[#0055FF] transition-all cursor-pointer flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-800 text-xs truncate">{w.title}</p>
+                        <p className="text-[10px] text-amber-600 font-bold flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3" />
+                          <span>Requer aprovação (Etapa 5)</span>
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-[#0055FF] text-[10px] font-bold">
+                        Aprovar
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center text-xs text-slate-400">
+                    Nenhuma aprovação ou convite pendente.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* C. Aconteceu recentemente */}
+            <div className="space-y-3">
+              <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <span>Revelados recentemente</span>
+              </h3>
+
+              <div className="space-y-2.5">
+                {recentlyCompleted.length > 0 ? (
+                  recentlyCompleted.map((rc) => (
+                    <div 
+                      key={rc.id}
+                      onClick={() => setSelectedIntent(rc)}
+                      className="p-4 bg-white rounded-2xl border border-emerald-100 hover:border-[#0055FF] transition-all cursor-pointer flex items-center gap-3 shadow-2xs"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <Unlock className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-800 text-xs truncate">{rc.title}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Revelado por {rc.revealed_by || 'Sistema'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-600">
+                        Revelado!
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center text-xs text-slate-400">
+                    Ainda nenhuma intent concluída hoje.
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderExplorar = () => {
+    const publicIntents = intents.filter((i) => i.visibility === 'public' || i.condition_type === 'PUBLIC_SUPPORT');
+    const filteredExplorar = publicIntents.filter((i) => 
+      i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (i.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderExplorar" />
+
+        {/* Categories Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {[
+            { id: 'all', label: '🔥 Descobrir' },
+            { id: 'quase', label: '⏳ Quase Acontecendo' },
+            { id: 'destaque', label: '⭐ Em Destaque' },
+            { id: 'perto', label: '🎯 Perto de Realizar' },
+            { id: 'novas', label: '✨ Novas' },
+            { id: 'criadores', label: '🛡️ Criadores Confiáveis' },
+            { id: 'promocoes', label: '🎁 Promoções & Prêmios' }
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedExplorarCategory(cat.id)}
+              className={`px-4 py-2.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                selectedExplorarCategory === cat.id 
+                  ? 'bg-[#0055FF] text-white shadow-xs' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-[#F0F5FD] hover:text-[#0055FF]'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Big Search block */}
+        <div className="bg-white rounded-3xl p-6 border border-[#DCE7F6] space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-slate-900">Buscar ideias e causas</h3>
+            <p className="text-xs text-slate-400">Encontre intents abertas que precisam do seu apoio para revelar segredos incríveis.</p>
+          </div>
+          
+          <div className="relative">
+            <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por títulos, temas, cupons..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-2xl text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+            />
+          </div>
+        </div>
+
+        {/* Discovery Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredExplorar.map((intent) => {
+            const progressPct = intent.condition_type === 'PUBLIC_SUPPORT' 
+              ? Math.min(100, ((intent.current_supports || 0) / (intent.target_supports || 10)) * 100)
+              : 0;
+
+            return (
+              <div 
+                key={intent.id}
+                onClick={() => setSelectedIntent(intent)}
+                className="bg-white rounded-3xl p-6 border border-[#DCE7F6] hover:border-[#0055FF] transition-all shadow-2xs hover:shadow-md cursor-pointer flex flex-col justify-between gap-5 relative overflow-hidden group"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-purple-600 tracking-wider">
+                      {intent.condition_type === 'PUBLIC_SUPPORT' ? '📢 Apoio Coletivo' : '📅 Cronograma'}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Há 2 horas
+                    </span>
+                  </div>
+
+                  <h4 className="font-extrabold text-slate-900 text-base leading-snug group-hover:text-[#0055FF] transition-colors">
+                    {intent.title}
+                  </h4>
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                    {intent.description || "Essa intent guarda um mistério que em breve se revelará."}
+                  </p>
+                </div>
+
+                {/* Progress metrics inside Explorar card */}
+                {intent.condition_type === 'PUBLIC_SUPPORT' && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500 font-mono">
+                      <span>Progresso: {Math.round(progressPct)}%</span>
+                      <span>{intent.current_supports || 0} / {intent.target_supports || 10} apoios</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#0055FF] rounded-full" style={{ width: `${progressPct}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-50 text-xs">
+                  <div className="flex items-center gap-1 font-bold text-slate-400">
+                    <User className="w-3.5 h-3.5 text-[#0055FF]" />
+                    <span>Criador Oficial</span>
+                  </div>
+
+                  <span className="text-xs font-bold text-[#0055FF] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                    <span>Apoiar / Detalhes</span>
+                    <span>→</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPerfil = () => {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderPerfil" />
+
+        {/* Reputation Card */}
+        <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-8 border border-slate-800 shadow-xl grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          <div className="md:col-span-8 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center font-black text-lg">
+                {user.name.slice(0,1).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="font-extrabold text-lg leading-none">{user.name}</h3>
+                <p className="text-xs text-slate-400 font-mono mt-1">{user.username}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-bold text-amber-400">Índice de Confiabilidade: 94%</h4>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-md">
+                Você encerrou com sucesso e revelou 119 de 126 intents criadas em conformidade com o combinado original. Excelente pontuação!
+              </p>
+            </div>
+          </div>
+
+          <div className="md:col-span-4 flex items-center justify-center">
+            {/* Visual reputation circle score */}
+            <div className="w-28 h-28 rounded-full border-8 border-slate-800 flex flex-col items-center justify-center relative bg-slate-950/40">
+              <span className="font-mono text-xl font-black text-white">94%</span>
+              <span className="text-[9px] text-slate-400 uppercase tracking-widest font-semibold mt-0.5">Pontos</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Statistics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl p-5 border border-[#DCE7F6] shadow-2xs space-y-1 text-center sm:text-left">
+            <p className="text-xs text-slate-400 font-bold">Intents criadas</p>
+            <p className="text-xl md:text-2xl font-black text-slate-900">{intents.length + 119}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-[#DCE7F6] shadow-2xs space-y-1 text-center sm:text-left">
+            <p className="text-xs text-slate-400 font-bold">Realizadas</p>
+            <p className="text-xl md:text-2xl font-black text-emerald-600">119</p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-[#DCE7F6] shadow-2xs space-y-1 text-center sm:text-left">
+            <p className="text-xs text-slate-400 font-bold">Pessoas mobilizadas</p>
+            <p className="text-xl md:text-2xl font-black text-[#0055FF]">482</p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-[#DCE7F6] shadow-2xs space-y-1 text-center sm:text-left">
+            <p className="text-xs text-slate-400 font-bold">Participações</p>
+            <p className="text-xl md:text-2xl font-black text-purple-600">32</p>
+          </div>
+        </div>
+
+        {/* User security policy notice */}
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-slate-600 flex items-start gap-2.5">
+          <Shield className="w-5 h-5 text-[#0055FF] shrink-0" />
+          <div className="space-y-1">
+            <p className="font-bold text-[#0B1B3D]">Segurança & Criptografia Concluída</p>
+            <p className="leading-relaxed">
+              Suas chaves de cofre e envelopes criptográficos são processados em conformidade com a Etapa 6 do Protocolo Intent, garantindo que ninguém — nem mesmo a equipe do Intent OS — consiga acessar as informações antes do cumprimento das condições de liberação.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMinhasIntents = () => {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderMinhasIntents" />
+
+        {/* Filters and search box */}
+        <div className="bg-white rounded-3xl p-5 border border-[#DCE7F6] shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="relative w-full md:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Pesquisar minhas intents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs focus:outline-hidden"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+            {[
+              { id: 'all', label: 'Todas' },
+              { id: 'active', label: 'Em andamento' },
+              { id: 'completed', label: 'Realizadas' },
+              { id: 'draft', label: 'Rascunhos' }
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setFilterStatus(st.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  filterStatus === st.id 
+                    ? 'bg-[#0055FF] text-white' 
+                    : 'bg-[#F0F5FD] text-slate-600 hover:bg-[#E2EDFF]'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* List Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredIntents.map((intent) => {
+            const progressPct = intent.condition_type === 'PUBLIC_SUPPORT' 
+              ? Math.min(100, ((intent.current_supports || 0) / (intent.target_supports || 10)) * 100)
+              : 0;
+
+            return (
+              <div 
+                key={intent.id}
+                onClick={() => setSelectedIntent(intent)}
+                className="bg-white rounded-3xl p-6 border border-[#DCE7F6] hover:border-[#0055FF] transition-all shadow-2xs hover:shadow-md cursor-pointer flex flex-col justify-between gap-5 relative overflow-hidden group"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-purple-600 tracking-wider">
+                      {intent.condition_type === 'PUBLIC_SUPPORT' ? '📢 Apoio Coletivo' : intent.condition_type === 'TIME' ? '📅 Cronograma' : '🛡️ Quórum'}
+                    </span>
+                    {getStatusBadge(intent.status)}
+                  </div>
+
+                  <h4 className="font-extrabold text-slate-900 text-base leading-snug group-hover:text-[#0055FF] transition-colors">
+                    {intent.title}
+                  </h4>
+                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                    {intent.description || "Nenhuma descrição detalhada fornecida para este protocolo."}
+                  </p>
+                </div>
+
+                {intent.condition_type === 'PUBLIC_SUPPORT' && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500 font-mono">
+                      <span>Progresso: {Math.round(progressPct)}%</span>
+                      <span>{intent.current_supports || 0} / {intent.target_supports || 10}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#0055FF]" style={{ width: `${progressPct}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-50 text-xs">
+                  <span className="text-slate-400">Criado {formatDate(intent.created_at)}</span>
+                  
+                  <span className="text-xs font-bold text-[#0055FF] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                    <span>Acessar</span>
+                    <span>→</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const handleConfirmAndCreateConversational = async () => {
+    const isFirebase = !!auth.currentUser;
+    const uid = isFirebase ? auth.currentUser.uid : 'usr-local';
+    
+    // Determine condition parameters
+    let conditionType: ConditionType = 'NONE';
+    let targetDateStr = '';
+    let targetSupportsVal = 10;
+    let parList: Participant[] = [];
+    
+    if (activeTemplate === 'apoio') {
+      conditionType = 'PUBLIC_SUPPORT';
+      targetSupportsVal = supportGoal;
+    } else if (activeTemplate === 'data') {
+      conditionType = 'TIME';
+      const d = new Date();
+      d.setDate(d.getDate() + 2);
+      targetDateStr = d.toISOString();
+    } else if (activeTemplate === 'aprovacao') {
+      conditionType = 'PEOPLE';
+      parList = [
+        { id: 'p-1', name: 'Maria da Silva', email: 'maria@gmail.com', role: 'guardian', status: 'pending', notes: 'Guardiã' },
+        { id: 'p-2', name: 'Flávio Costa', email: 'flavio@gmail.com', role: 'guardian', status: 'pending', notes: 'Guardião' }
+      ];
+    } else if (activeTemplate === 'palpite') {
+      conditionType = 'TIME';
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      targetDateStr = d.toISOString();
+    }
+
+    const intentPayload: Intent = {
+      id: isFirebase ? '' : 'intent-' + Date.now(),
+      creator_id: uid,
+      title: conversationalTitle || `Intent ${activeTemplate === 'apoio' ? 'de Apoios' : activeTemplate === 'data' ? 'Temporal' : 'Personalizada'}`,
+      description: conversationalDescription || 'Criada através do assistente de criação rápida.',
+      status: 'active',
+      visibility: activeTemplate === 'apoio' ? 'public' : 'private',
+      condition_type: conditionType,
+      created_at: new Date().toISOString(),
+      reveal_content: conversationalSecret || 'Seu segredo foi revelado!',
+      is_locked: true,
+      target_date: targetDateStr || undefined,
+      target_supports: targetSupportsVal,
+      current_supports: 0,
+      participants: parList,
+      required_approvals: parList.length > 0 ? 1 : undefined,
+      supporters: []
+    };
+
+    setIsSubmitting(true);
+    if (isFirebase) {
+      try {
+        await addDoc(collection(db, 'intents'), {
+          creator_id: uid,
+          title: intentPayload.title,
+          description: intentPayload.description,
+          status: 'active',
+          created_at: intentPayload.created_at,
+          visibility: intentPayload.visibility,
+          condition_type: intentPayload.condition_type,
+          target_date: intentPayload.target_date || null,
+          reveal_content: intentPayload.reveal_content,
+          is_locked: true,
+          target_supports: intentPayload.target_supports || null,
+          current_supports: 0,
+          participants: intentPayload.participants || [],
+          required_approvals: intentPayload.required_approvals || null,
+          supporters: []
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      const updated = [intentPayload, ...intents];
+      setIntents(updated);
+      saveLocalIntents(updated);
+    }
+
+    setIsSubmitting(false);
+    setConversationalTitle('');
+    setConversationalDescription('');
+    setConversationalSecret('');
+    setActiveTemplate(null);
+    setCreationPreviewShow(false);
+    
+    if (onTabChange) {
+      onTabChange('minhas');
+    }
+  };
+
+  const renderCriarConversational = () => {
+    if (creationPreviewShow) {
+      return (
+        <div className="max-w-xl mx-auto space-y-6 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl p-6 md:p-8 border-2 border-[#0055FF] shadow-lg space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-blue-50 text-[#0055FF] flex items-center justify-center mx-auto mb-2">
+                <Shield className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-950">Confira sua Intent</h3>
+              <p className="text-xs text-slate-400">Verifique os detalhes antes de blindar este protocolo.</p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-1 gap-3.5 text-xs">
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <p className="text-[10px] font-extrabold uppercase text-slate-400">Título / Intenção</p>
+                  <p className="font-bold text-[#0B1B3D]">{conversationalTitle || 'Nova Intent'}</p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <p className="text-[10px] font-extrabold uppercase text-slate-400">O que será revelado</p>
+                  <p className="font-mono text-purple-700 bg-purple-50 p-2.5 rounded-lg border border-purple-100 font-semibold mt-1">
+                    {conversationalSecret ? `${conversationalSecret.slice(0, 30)}...` : 'Seu conteúdo secreto'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <p className="text-[10px] font-extrabold uppercase text-slate-400">Condição do Desbloqueio</p>
+                  <p className="font-bold text-amber-600 flex items-center gap-1">
+                    <Sparkles className="w-4 h-4" />
+                    <span>
+                      {activeTemplate === 'apoio' && `Atingir ${supportGoal} apoios públicos.`}
+                      {activeTemplate === 'data' && 'Liberar de forma agendada no futuro.'}
+                      {activeTemplate === 'aprovacao' && 'Aprovação unânime de 2 guardiões.'}
+                      {activeTemplate === 'palpite' && 'Após o encerramento do clássico.'}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <p className="text-[10px] font-extrabold uppercase text-slate-400">Nível de Proteção</p>
+                  <p className="font-bold text-[#0055FF]">
+                    {protectionLevel === 'flexible' && 'Flexível (Permite edições futures)'}
+                    {protectionLevel === 'committed' && 'Comprometida (Alterações deixam registro)'}
+                    {protectionLevel === 'sealed' && 'Selada (Irrevogável e Inalterável)'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => setCreationPreviewShow(false)}
+                className="flex-1 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer text-center"
+              >
+                Editar
+              </button>
+              
+              <button
+                disabled={isSubmitting}
+                onClick={handleConfirmAndCreateConversational}
+                className="flex-2 py-3 bg-[#0055FF] hover:bg-[#0047E0] text-white text-xs font-black rounded-xl shadow-md transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
+              >
+                {isSubmitting ? 'Criando...' : 'Confirmar e Blindar!'}
+                <CheckCircle2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeTemplate) {
+      return (
+        <div className="max-w-2xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setActiveTemplate(null)}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>← Escolher outro template</span>
+            </button>
+
+            <span className="text-xs text-slate-400 font-mono font-bold uppercase tracking-wider">
+              Modo: {activeTemplate.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] shadow-xs space-y-6">
+            <div className="space-y-1">
+              <h3 className="text-xl font-extrabold text-slate-900">Configure sua Intent</h3>
+              <p className="text-xs text-slate-400">Responda as perguntas rápidas para estruturar seu protocolo de revelação.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#0B1B3D] uppercase tracking-wide">
+                  1. Qual é o título da sua Intenção?
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Foto secreta da final da copa, Revelação do mistério..."
+                  value={conversationalTitle}
+                  onChange={(e) => setConversationalTitle(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#0B1B3D] uppercase tracking-wide flex items-center justify-between">
+                  <span>2. O que será revelado quando a condição acontecer?</span>
+                  <span className="text-[10px] text-purple-600 font-bold">Criptografado AES-256</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Insira o texto, link, cupom ou segredo que ficará totalmente escondido..."
+                  value={conversationalSecret}
+                  onChange={(e) => setConversationalSecret(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#0055FF]"
+                />
+              </div>
+
+              {activeTemplate === 'apoio' && (
+                <div className="space-y-2 pt-2 border-t border-slate-50">
+                  <label className="block text-xs font-bold text-[#0B1B3D] uppercase tracking-wide">
+                    3. Quantos apoios públicos são necessários para revelar?
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[5, 10, 50, 100].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setSupportGoal(num)}
+                        className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          supportGoal === num 
+                            ? 'bg-[#0055FF] text-white border-transparent' 
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-[#F0F5FD]'
+                        }`}
+                      >
+                        {num} apoios
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeTemplate === 'aprovacao' && (
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <Shield className="w-4 h-4 text-amber-600" />
+                    <span>Regra do Quórum de Guardiões (Etapa 5)</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    Será criado um quórum de 2 Guardiões de alta confiabilidade de forma padrão (Maria da Silva & Flávio Costa). O segredo só será desbloqueado quando eles assinarem digitalmente a aprovação.
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  className="flex items-center gap-1 text-xs text-[#0055FF] font-bold hover:underline cursor-pointer"
+                >
+                  <span>{showAdvancedOptions ? 'Ocultar Opções Avançadas' : 'Mais opções (Políticas & Webhooks)'}</span>
+                </button>
+
+                {showAdvancedOptions && (
+                  <div className="mt-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-4 animate-in slide-in-from-top-2 duration-150">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-black text-[#0B1B3D] uppercase tracking-wider">
+                        Política de Proteção contra Alterações
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {[
+                          { id: 'flexible', label: 'Flexível', desc: 'Permite ajustes' },
+                          { id: 'committed', label: 'Comprometida', desc: 'Registra logs' },
+                          { id: 'sealed', label: 'Selada', desc: 'Imutável' }
+                        ].map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setProtectionLevel(p.id as any)}
+                            className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-0.5 cursor-pointer ${
+                              protectionLevel === p.id 
+                                ? 'bg-[#0055FF] text-white border-transparent' 
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-white'
+                            }`}
+                          >
+                            <span className="text-xs font-bold leading-none">{p.label}</span>
+                            <span className="text-[9px] opacity-80 leading-none">{p.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 text-xs font-semibold text-purple-800 leading-relaxed text-center">
+              💡 No Intent OS: “Você prepara agora. O Intent revela quando acontecer.”
+            </div>
+
+            <button
+              onClick={() => {
+                if (!conversationalTitle || !conversationalSecret) {
+                  setErrorMsg('Por favor, preencha o título e o segredo da Intent.');
+                  return;
+                }
+                setErrorMsg(null);
+                setCreationPreviewShow(true);
+              }}
+              className="w-full py-4 bg-[#0055FF] hover:bg-[#0047E0] text-white font-bold text-sm rounded-2xl shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>Avançar para a Revisão</span>
+              <span>→</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-200">
+        <DevInspectorBadge file="src/components/IntentManager.tsx" functionName="renderCriarConversational" />
+
+        <div className="space-y-2 text-center max-w-xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">O que você quer fazer acontecer?</h2>
+          <p className="text-xs md:text-sm text-slate-500">Escolha um template rápido abaixo para criar sua intenção e selar seu conteúdo com segurança.</p>
+        </div>
+
+        {errorMsg && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-semibold max-w-xl mx-auto text-center">
+            {errorMsg}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {[
+            { id: 'apoio', title: '📢 Apoio Coletivo', desc: 'Revelar quando atingir uma quantidade pré-definida de apoios ou assinaturas.', color: 'border-purple-200 hover:border-purple-500' },
+            { id: 'palpite', title: '🏆 Palpites & Sorteios', desc: 'Registrar palpite selado de futebol ou eventos. Revelar somente quando o jogo acabar.', color: 'border-amber-200 hover:border-amber-500' },
+            { id: 'data', title: '📅 Data Agendada', desc: 'Travar o conteúdo até uma data e horário futuro específico. Revelação temporal.', color: 'border-blue-200 hover:border-blue-500' },
+            { id: 'aprovacao', title: '🛡️ Quórum de Guardiões', desc: 'Segredo de liberação compartilhada. Exige a aprovação unânime de testemunhas.', color: 'border-emerald-200 hover:border-emerald-500' }
+          ].map((temp) => (
+            <div
+              key={temp.id}
+              onClick={() => {
+                setActiveTemplate(temp.id as any);
+                setErrorMsg(null);
+              }}
+              className={`bg-white rounded-3xl p-6 border-2 ${temp.color} transition-all shadow-2xs hover:shadow-md cursor-pointer text-left space-y-3 flex flex-col justify-between`}
+            >
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-slate-900 text-sm leading-snug">{temp.title}</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">{temp.desc}</p>
+              </div>
+              <span className="text-[11px] font-black text-[#0055FF] flex items-center gap-0.5 pt-1">
+                <span>Usar este</span>
+                <span>→</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderIntentDetail = (intent: Intent) => {
+    const evalResult = evaluateIntentConditions(intent);
+    const isConditionSatisfied = evalResult.isConditionSatisfied || intent.condition_type === 'NONE';
+    const isRevealed = !!intent.revealed_at;
+
+    const logs = intent.history_logs || [
+      { id: '1', timestamp: 'Recente', description: 'Intent registrada no Kinetic Ledger.', badge: 'Sistema' },
+      { id: '2', timestamp: 'Recente', description: 'Cofre criptográfico blindado.', badge: 'Cripto' }
+    ];
+
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setSelectedIntent(null)}
+            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <span>← Voltar</span>
+          </button>
+
+          <span className="text-xs text-slate-400 font-mono font-bold">
+            ID: {intent.id.slice(0, 8)}...
+          </span>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#DCE7F6] shadow-sm space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {getStatusBadge(intent.status)}
+                
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                  intent.visibility === 'public' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-50 text-slate-600 border border-slate-200'
+                }`}>
+                  {intent.visibility === 'public' ? 'Público' : 'Privado'}
+                </span>
+              </div>
+
+              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                {intent.title}
+              </h2>
+              <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
+                {intent.description || "Nenhuma descrição detalhada fornecida para esta intent."}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-5 bg-[#F0F5FD] rounded-2xl border border-[#DCE7F6] space-y-4">
+            <h3 className="text-xs font-bold text-[#0B1B3D] uppercase tracking-wider flex items-center gap-1.5">
+              <Sliders className="w-4 h-4 text-[#0055FF]" />
+              <span>Condição de Desbloqueio</span>
+            </h3>
+
+            {intent.condition_type === 'PUBLIC_SUPPORT' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-slate-700">Apoios recebidos:</span>
+                  <span className="font-mono font-black text-[#0055FF]">
+                    {intent.current_supports || 0} de {intent.target_supports || 10}
+                  </span>
+                </div>
+                
+                <div className="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-400 to-[#0055FF] rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, ((intent.current_supports || 0) / (intent.target_supports || 10)) * 100)}%` }}
+                  />
+                </div>
+
+                {!isRevealed && (
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs text-slate-500">Ajude a fazer acontecer!</p>
+                    <button
+                      onClick={() => handleUpdateSupportsOnIntent(intent.id, (intent.current_supports || 0) + 1, user.name, "Apoiou a revelação!")}
+                      className="px-4 py-2 bg-[#0055FF] hover:bg-[#0047E0] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-98"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Apoiar (+1)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {intent.condition_type === 'TIME' && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-700 font-semibold">
+                  <Timer className="w-4 h-4 text-[#0055FF]" />
+                  <span>Trava Temporal Agendada</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Data de liberação: <strong className="text-slate-800">{formatTargetDateTime(intent.target_date)}</strong>
+                </p>
+                {intent.target_date && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 inline-block font-mono font-bold text-xs text-[#0055FF]">
+                    Falta: {calculateTimeRemaining(undefined, intent.target_date).formattedCountdown}
+                  </div>
+                )}
+                
+                {!isRevealed && isConditionSatisfied && (
+                  <button
+                    onClick={() => handleRevealIntent(intent)}
+                    className="mt-2 w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span>Realizar Revelação (Data Atingida!)</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {intent.condition_type === 'PEOPLE' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-slate-700">Guardiões aprovados:</span>
+                  <span className="font-mono font-bold text-[#0055FF]">
+                    {(intent.participants || []).filter((p) => p.status === 'approved').length} de {intent.required_approvals || 2}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(intent.participants || []).map((p) => {
+                    const isApproved = p.status === 'approved';
+                    return (
+                      <div key={p.id} className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-bold text-slate-800">{p.name}</p>
+                          <p className="text-[10px] text-slate-400">{p.email}</p>
+                        </div>
+                        
+                        <button
+                          onClick={() => handleToggleParticipantStatusOnIntent(intent.id, p.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                            isApproved 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {isApproved ? '✓ Aprovado' : '— Pendente'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {!isRevealed && isConditionSatisfied && (
+                  <button
+                    onClick={() => handleRevealIntent(intent)}
+                    className="mt-2 w-full py-2.5 bg-gradient-to-r from-purple-600 to-[#0055FF] text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span>Revelar Segredo (Quórum Atingido!)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-[#0B1B3D] uppercase tracking-wider flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-purple-600" />
+              <span>Conteúdo Selado</span>
+            </h3>
+
+            {isRevealed ? (
+              <div className="p-5 bg-purple-50 rounded-2xl border-2 border-purple-200 text-slate-800 space-y-3 animate-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-2 text-purple-800 font-bold text-xs">
+                  <Unlock className="w-4 h-4" />
+                  <span>REVELADO COM SUCESSO</span>
+                </div>
+                
+                <p className="font-mono text-sm bg-white p-4 rounded-xl border border-purple-100 whitespace-pre-wrap leading-relaxed">
+                  {intent.reveal_content}
+                </p>
+
+                <div className="text-[10px] text-slate-400">
+                  Revelado por <strong className="text-slate-600">{intent.revealed_by || 'Sistema'}</strong> em {formatDate(intent.revealed_at || '')}
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-900 rounded-2xl border border-slate-800 text-center space-y-3 relative overflow-hidden">
+                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center">
+                  <Lock className="w-10 h-10 text-amber-500 mb-2 animate-bounce" />
+                  <p className="text-sm font-bold text-white">CONTEÚDO PROTEGIDO & SELADO</p>
+                  <p className="text-xs text-slate-400 max-w-sm mt-1">
+                    Este conteúdo está blindado e só será liberado após a verificação automática das condições.
+                  </p>
+                </div>
+                
+                <div className="blur-xs select-none opacity-20 text-left font-mono text-xs text-green-500 space-y-1">
+                  <p>AES-256 ENCRYPTED BLOCK SECTION...</p>
+                  <p>DECRYPTION_KEY_REQUIRED_HASH_SHA256...</p>
+                  <p>METADATA: STATUS_LOCKED_TRUE_VERIFIED...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Registro de Eventos</h4>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {logs.map((log: any) => (
+                <div key={log.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-[11px]">
+                  <span className="font-semibold text-slate-800 leading-relaxed">
+                    {log.description}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0 ml-2">
+                    {log.timestamp || 'Recente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
+  // INTERCEPT CHANNELS
+  if (selectedIntent) {
+    return renderIntentDetail(selectedIntent);
+  }
+  if (activeTab === 'primeiro-acesso') {
+    return renderPrimeiroAcesso();
+  }
+  if (activeTab === 'inicio') {
+    return renderInicioDashboard();
+  }
+  if (activeTab === 'explorar') {
+    return renderExplorar();
+  }
+  if (activeTab === 'criar') {
+    return renderCriarConversational();
+  }
+  if (activeTab === 'minhas') {
+    return renderMinhasIntents();
+  }
+  if (activeTab === 'perfil') {
+    return renderPerfil();
+  }
 
   return (
     <div id="intent-manager-container" className="space-y-6 relative">

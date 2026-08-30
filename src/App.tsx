@@ -5,6 +5,7 @@ import { getGreetingConfig, formatCurrentDate } from './utils/time';
 import { AuthGate } from './components/AuthGate';
 import { IntentManager } from './components/IntentManager';
 import { Sidebar } from './components/Sidebar';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { DynamicGreetingCard } from './components/DynamicGreetingCard';
 import { AccountStatusCard } from './components/AccountStatusCard';
 import { BottomCardsRow } from './components/BottomCardsRow';
@@ -23,6 +24,9 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
+  
+  // Custom navigation state (Etapas 1-9 & Onboarding)
+  const [activeTab, setActiveTab] = useState<string>('primeiro-acesso');
 
   // Load session & sync with Firebase Auth
   useEffect(() => {
@@ -103,92 +107,106 @@ export default function App() {
   const greetingConfig = getGreetingConfig(currentHour);
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F7FC] flex flex-row overflow-x-hidden font-sans text-slate-900">
+    <div className="min-h-screen w-full bg-[#F4F7FC] flex flex-row overflow-x-hidden font-sans text-slate-900 pb-16 md:pb-0">
       {/* Left Navigation Sidebar */}
       <Sidebar
         user={currentUser}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         onLogout={handleLogout}
         onRequestDelete={() => setShowDeleteModal(true)}
-        onOpenProfile={() => setShowProfileModal(true)}
         onOpenChecklist={() => setShowChecklistModal(true)}
       />
 
       {/* Main Content View (Index) */}
-      <main className="flex-1 flex flex-col p-6 md:p-10 max-w-7xl mx-auto overflow-y-auto space-y-8">
+      <main className="flex-1 flex flex-col p-4 md:p-10 max-w-7xl mx-auto overflow-y-auto space-y-6 md:space-y-8">
         {/* Quick Profile Switcher Bar for Testers */}
         <TesterProfileSwitcherBar
           currentUser={currentUser}
           onUserChanged={(newUser) => setCurrentUser(newUser)}
         />
 
-        {/* Top Greeting Header matching the screenshot ("Bom dia, Rafael.") */}
-        <header className="relative">
-          <DevInspectorBadge
-            file="src/App.tsx"
-            functionName="App <header>"
-            className="mb-1"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1
-                id="page-title"
-                className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight"
-              >
-                {greetingConfig.heading}, {currentUser.name}.
-              </h1>
-              <p className="text-sm md:text-base text-slate-500 mt-1.5 flex items-center gap-2">
-                <span className="font-mono text-[#0055FF] font-bold">{currentUser.username}</span>
-                <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
-                <span>Hoje é {formatCurrentDate()}</span>
-                <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
-                <span>Sua sessão está ativa.</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                id="header-checklist-btn"
-                onClick={() => setShowChecklistModal(true)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#EAF2FF] hover:bg-[#DCE7F6] border border-[#BFD7FE] text-xs font-bold text-[#0055FF] shadow-2xs transition-all cursor-pointer"
-              >
-                <ListChecks className="w-4 h-4 text-[#0055FF]" />
-                <span>Checklist Etapas 1 a 8</span>
-                <span className="text-[10px] bg-[#0055FF] text-white px-1.5 py-0.5 rounded-md font-mono font-bold">8/8 ✓</span>
-              </button>
-              <button
-                id="header-profile-btn"
-                onClick={() => setShowProfileModal(true)}
-                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-[#DCE7F6] text-xs font-bold text-[#0055FF] shadow-xs transition-all cursor-pointer"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Gerenciar Perfil (Etapa 1)</span>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Primary Bento / Card Grid (Top: Dynamic Greeting Card & Account Status) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-8">
-            <DynamicGreetingCard user={currentUser} />
-          </div>
-          <div className="lg:col-span-4">
-            <AccountStatusCard
-              user={currentUser}
-              onLogout={handleLogout}
-              onRequestDelete={() => setShowDeleteModal(true)}
-              onOpenProfile={() => setShowProfileModal(true)}
+        {/* Top Greeting Header (only visible on inicio dashboard tab) */}
+        {activeTab === 'inicio' && (
+          <header className="relative">
+            <DevInspectorBadge
+              file="src/App.tsx"
+              functionName="App <header>"
+              className="mb-1"
             />
-          </div>
-        </div>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h1
+                  id="page-title"
+                  className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight"
+                >
+                  {greetingConfig.heading}, {currentUser.name}.
+                </h1>
+                <p className="text-sm md:text-base text-slate-500 mt-1.5 flex items-center gap-2">
+                  <span className="font-mono text-[#0055FF] font-bold">{currentUser.username}</span>
+                  <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
+                  <span>Hoje é {formatCurrentDate()}</span>
+                  <span className="inline-block w-1 h-1 rounded-full bg-slate-400"></span>
+                  <span>Sua sessão está ativa.</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  id="header-checklist-btn"
+                  onClick={() => setShowChecklistModal(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#EAF2FF] hover:bg-[#DCE7F6] border border-[#BFD7FE] text-xs font-bold text-[#0055FF] shadow-2xs transition-all cursor-pointer"
+                >
+                  <ListChecks className="w-4 h-4 text-[#0055FF]" />
+                  <span>Checklist Etapas 1 a 8</span>
+                  <span className="text-[10px] bg-[#0055FF] text-white px-1.5 py-0.5 rounded-md font-mono font-bold">8/8 ✓</span>
+                </button>
+                <button
+                  id="header-profile-btn"
+                  onClick={() => setActiveTab('perfil')}
+                  className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-2xl bg-white hover:bg-slate-50 border border-[#DCE7F6] text-xs font-bold text-[#0055FF] shadow-xs transition-all cursor-pointer"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Gerenciar Perfil (Etapa 1)</span>
+                </button>
+              </div>
+            </div>
+          </header>
+        )}
 
-        {/* Main Feature: Intent Manager (Etapa 2 - Intent CRUD) */}
+        {/* Primary Bento / Card Grid (Top: Dynamic Greeting Card & Account Status) only on Home/Início */}
+        {activeTab === 'inicio' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-8">
+              <DynamicGreetingCard user={currentUser} />
+            </div>
+            <div className="lg:col-span-4">
+              <AccountStatusCard
+                user={currentUser}
+                onLogout={handleLogout}
+                onRequestDelete={() => setShowDeleteModal(true)}
+                onOpenProfile={() => setActiveTab('perfil')}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Core Feature Content: Intent Manager (Handles tabs dynamically) */}
         <section id="intent-section">
-          <IntentManager user={currentUser} />
+          <IntentManager 
+            user={currentUser} 
+            activeTab={activeTab} 
+            onTabChange={setActiveTab} 
+          />
         </section>
 
-        {/* Bottom Cards Row */}
-        <BottomCardsRow user={currentUser} />
+        {/* Bottom Cards Row (only on inicio dashboard) */}
+        {activeTab === 'inicio' && (
+          <BottomCardsRow user={currentUser} />
+        )}
       </main>
+
+      {/* Sticky Mobile Bottom Navigation Bar */}
+      <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* User Profile & Identity Management Modal (Etapa 1) */}
       <UserProfileModal
