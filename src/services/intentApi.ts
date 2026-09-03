@@ -1,0 +1,129 @@
+import type { User as FirebaseUser } from 'firebase/auth';
+import { auth } from '../utils/firebase';
+import { createDefaultUserFields, getCurrentSessionUser, setCurrentSessionUser } from '../utils/storage';
+import type { UserAccount } from '../types';
+
+const API_PREFIX = '/api';
+
+interface ApiEnvelope<T> {
+  data: T;
+}
+
+interface ApiErrorEnvelope {
+  error?: {
+    code?: string;
+    message?: string;
+    requestId?: string;
+  };
+}
+
+interface ApiUser {
+  id: string;
+  firebaseUid: string;
+  email: string | null;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export class IntentApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code: string,
+    public readonly requestId?: string,
+  ) {
+    super(message);
+    this.name = 'IntentApiError';
+  }
+}
+
+async function authenticatedRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  firebaseUser: FirebaseUser | null = auth.currentUser,
+): Promise<T> {
+  if (!firebaseUser) {
+    throw new IntentApiError('Entre na sua conta para continuar.', 401, 'AUTH_REQUIRED');
+  }
+
+  const token = await firebaseUser.getIdToken();
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  headers.set('Accept', 'application/json');
+
+  if (init.body !== undefined && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(`${API_PREFIX}${path}`, {
+    ...init,
+    headers,
+  });
+
+  if (!response.ok) {
+    let payload: ApiErrorEnvelope = {};
+    try {
+      payload = await response.json() as ApiErrorEnvelope;
+    } catch {
+      // A mensagem segura abaixo cobre respostas que não sejam JSON.
+    }
+
+    throw new IntentApiError(
+      payload.error?.message || 'Não foi possível comunicar com o Intent.',
+      response.status,
+      payload.error?.code || 'API_ERROR',
+      payload.error?.requestId,
+    );
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function mapApiUser(user: ApiUser): UserAccount {
+  const cached = getCurrentSessionUser();
+  const status: UserAccount['status'] =
+    user.status === 'SUSPENDED'
+      ? 'suspended'
+      : user.status === 'INACTIVE'
+        ? 'inactive'
+        : 'active';
+
+  return createDefaultUserFields({
+    ...(cached?.id === user.id ? cached : {}),
+    id: user.id,
+    name: user.displayName,
+    username: `@${user.username.replace(/^@/, '')}`,
+    email: user.email || '',
+    avatarUrl: user.avatarUrl || undefined,
+    bio: user.bio || undefined,
+    createdAt: user.createdAt,
+    status,
+  });
+}
+
+export async function syncAuthenticatedUser(
+  firebaseUser: FirebaseUser | null = auth.currentUser,
+): Promise<UserAccount> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiUser>>(
+    '/v1/users/me/sync',
+    { method: 'POST' },
+    firebaseUser,
+  );
+  const account = mapApiUser(result.data);
+  setCurrentSessionUser(account);
+  return account;
+}
+
+export async function getAuthenticatedProfile(): Promise<UserAccount> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiUser>>('/v1/users/me');
+  const account = mapApiUser(result.data);
+  setCurrentSessionUser(account);
+  return account;
+}
+
+export { authenticatedRequest };
