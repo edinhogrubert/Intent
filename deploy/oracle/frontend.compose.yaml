@@ -1,0 +1,41 @@
+name: intent-frontend
+
+services:
+  frontend:
+    build:
+      context: ../..
+      dockerfile: deploy/oracle/frontend.Dockerfile
+    image: intent-frontend:local
+    container_name: intent-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    networks:
+      - intent-edge
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=1m,mode=0755
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/healthz
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  intent-edge:
+    external: true
+    name: intent-edge
