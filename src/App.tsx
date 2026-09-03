@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserAccount } from './types';
-import { getCurrentSessionUser, logoutUser, deleteUserAccount, createDefaultUserFields } from './utils/storage';
+import { logoutUser, deleteUserAccount, setCurrentSessionUser } from './utils/storage';
 import { getGreetingConfig, formatCurrentDate } from './utils/time';
 import { AuthGate } from './components/AuthGate';
 import { IntentManager } from './components/IntentManager';
@@ -20,6 +20,7 @@ import { MessagesView } from './components/MessagesView';
 import { UserProfileView } from './components/UserProfileView';
 import { SettingsView } from './components/SettingsView';
 import { auth, signOut, onAuthStateChanged } from './utils/firebase';
+import { syncAuthenticatedUser } from './services/intentApi';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
@@ -32,34 +33,27 @@ export default function App() {
   // Custom navigation state (Feed, Explorar, Criar, Minhas, Perfil, etc.)
   const [activeTab, setActiveTab] = useState<string>('inicio');
 
-  // Load session & sync with Firebase Auth
+  // Firebase é a fonte de identidade; a API mantém o perfil no PostgreSQL.
   useEffect(() => {
-    // 1. Check local session
-    const stored = getCurrentSessionUser();
-    if (stored) {
-      setCurrentUser(stored);
-    }
+    let isActive = true;
 
-    // 2. Listen to Firebase Auth state
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        // Firebase user authenticated
-        if (stored) {
-          setCurrentUser({
-            ...stored,
-            id: fbUser.uid,
-          });
-        } else {
-          const autoUser = createDefaultUserFields({
-            id: fbUser.uid,
-            name: fbUser.displayName || 'Usuário Intent',
-            email: fbUser.email || 'usuario@intent.app',
-            avatarUrl: fbUser.photoURL || undefined,
-          });
-          setCurrentUser(autoUser);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (!firebaseUser) {
+          setCurrentSessionUser(null);
+          if (isActive) setCurrentUser(null);
+          return;
         }
+
+        const account = await syncAuthenticatedUser(firebaseUser);
+        if (isActive) setCurrentUser(account);
+      } catch (error) {
+        console.error('Não foi possível sincronizar o perfil autenticado:', error);
+        setCurrentSessionUser(null);
+        if (isActive) setCurrentUser(null);
+      } finally {
+        if (isActive) setIsLoaded(true);
       }
-      setIsLoaded(true);
     });
 
     const interval = setInterval(() => {
@@ -67,6 +61,7 @@ export default function App() {
     }, 10000);
 
     return () => {
+      isActive = false;
       unsubscribe();
       clearInterval(interval);
     };
