@@ -109,7 +109,7 @@ export function createDefaultUserFields(
     name: cleanName,
     username: defaultUsername,
     email: base.email.trim().toLowerCase(),
-    password: base.password || '123',
+    password: base.password,
     avatarUrl: base.avatarUrl || undefined,
     bio: base.bio || 'Membro do Portal Intent e Guardião de Dados.',
     createdAt: base.createdAt || new Date().toISOString(),
