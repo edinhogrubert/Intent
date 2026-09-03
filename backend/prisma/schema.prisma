@@ -1,0 +1,83 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid()) @db.Uuid
+  firebaseUid    String        @unique @map("firebase_uid") @db.VarChar(128)
+  email          String?       @unique @db.VarChar(320)
+  username       String        @unique @db.VarChar(40)
+  displayName    String        @map("display_name") @db.VarChar(120)
+  bio            String?       @db.VarChar(500)
+  avatarUrl      String?       @map("avatar_url") @db.VarChar(2048)
+  status         String        @default("ACTIVE") @db.VarChar(20)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  intents        Intent[]
+  supports       Support[]
+  authoredEvents DomainEvent[] @relation("EventActor")
+
+  @@map("users")
+}
+
+model Intent {
+  id                 String        @id @default(uuid()) @db.Uuid
+  creatorId          String        @map("creator_id") @db.Uuid
+  type               String        @default("SUPPORT_REVEAL") @db.VarChar(40)
+  status             String        @default("PUBLISHED") @db.VarChar(20)
+  visibility         String        @default("PUBLIC") @db.VarChar(20)
+  title              String        @db.VarChar(160)
+  story              String        @db.Text
+  supportGoal        Int           @map("support_goal")
+  supportCount       Int           @default(0) @map("support_count")
+  revealCiphertext   String        @map("reveal_ciphertext") @db.Text
+  revealIv           String        @map("reveal_iv") @db.VarChar(64)
+  revealAuthTag      String        @map("reveal_auth_tag") @db.VarChar(64)
+  revealVersion      Int           @default(1) @map("reveal_version")
+  publishedAt        DateTime      @default(now()) @map("published_at") @db.Timestamptz(3)
+  realizedAt         DateTime?     @map("realized_at") @db.Timestamptz(3)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  creator            User          @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  supports           Support[]
+  events             DomainEvent[]
+
+  @@index([status, visibility, createdAt(sort: Desc)])
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@map("intents")
+}
+
+model Support {
+  id        String   @id @default(uuid()) @db.Uuid
+  intentId  String   @map("intent_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  intent    Intent   @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([intentId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("supports")
+}
+
+model DomainEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  intentId       String?  @map("intent_id") @db.Uuid
+  actorId        String?  @map("actor_id") @db.Uuid
+  type           String   @db.VarChar(80)
+  payload        Json
+  idempotencyKey String   @unique @map("idempotency_key") @db.VarChar(180)
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  intent         Intent?  @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  actor          User?    @relation("EventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([intentId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@map("domain_events")
+}

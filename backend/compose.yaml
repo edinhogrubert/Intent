@@ -1,0 +1,37 @@
+name: intent-api
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: intent-api
+    restart: unless-stopped
+    env_file:
+      - /opt/intent/runtime/backend.env
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - intent-private
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8080/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  intent-private:
+    external: true
+    name: intent-private
