@@ -12,6 +12,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     networks:
+      - intent-edge
       - intent-private
     healthcheck:
       test:
@@ -32,6 +33,9 @@ services:
         max-file: "3"
 
 networks:
+  intent-edge:
+    name: intent-edge
+    driver: bridge
   intent-private:
     external: true
     name: intent-private
