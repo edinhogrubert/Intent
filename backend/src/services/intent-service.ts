@@ -9,6 +9,7 @@ import { isSupportConditionSatisfied } from '../domain/support-condition.js';
 interface CreateIntentCommand {
   title: string;
   story: string;
+  category: string;
   supportGoal: number;
   revealContent: string;
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
@@ -19,6 +20,7 @@ const publicIntentSelection = {
   type: true,
   status: true,
   visibility: true,
+  category: true,
   title: true,
   story: true,
   supportGoal: true,
@@ -34,7 +36,7 @@ const publicIntentSelection = {
       avatarUrl: true,
     },
   },
-} satisfies Prisma.IntentSelect;
+} as Prisma.IntentSelect;
 
 export async function createIntent(creatorId: string, command: CreateIntentCommand) {
   const intentId = randomUUID();
@@ -52,13 +54,14 @@ export async function createIntent(creatorId: string, command: CreateIntentComma
         creatorId,
         title: command.title,
         story: command.story,
+        category: command.category,
         supportGoal: command.supportGoal,
         visibility: command.visibility,
         revealCiphertext: sealed.ciphertext,
         revealIv: sealed.iv,
         revealAuthTag: sealed.authTag,
         revealVersion,
-      },
+      } as Prisma.IntentUncheckedCreateInput,
       select: publicIntentSelection,
     });
 
@@ -71,6 +74,7 @@ export async function createIntent(creatorId: string, command: CreateIntentComma
         payload: {
           type: 'SUPPORT_REVEAL',
           supportGoal: command.supportGoal,
+          category: command.category,
           visibility: command.visibility,
           revealVersion,
         },
@@ -79,6 +83,25 @@ export async function createIntent(creatorId: string, command: CreateIntentComma
 
     return intent;
   });
+}
+
+export async function listUserIntents(creatorId: string, cursor?: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const items = await prisma.intent.findMany({
+    where: { creatorId },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: safeLimit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: publicIntentSelection,
+  });
+
+  const hasMore = items.length > safeLimit;
+  const page = hasMore ? items.slice(0, safeLimit) : items;
+
+  return {
+    items: page,
+    nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
+  };
 }
 
 export async function listPublicFeed(cursor?: string, limit = 20) {
