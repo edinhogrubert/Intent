@@ -215,7 +215,7 @@ export function Sidebar({ user, activeTab, onTabChange, onLogout, onRequestDelet
             <div className="absolute left-full bottom-0 ml-3 w-48 bg-white border border-[#D5E2F3] rounded-xl shadow-lg p-2.5 hidden group-hover:block z-50 animate-in fade-in zoom-in-95">
               <div className="px-2 py-1.5 border-b border-slate-100 mb-1.5">
                 <p className="text-xs font-semibold text-slate-800 truncate">{user.name}</p>
-                <p className="text-[10px] text-[#0055FF] font-mono font-bold truncate">{user.username || '@' + user.name.toLowerCase()}</p>
+                <p className="text-[10px] text-[#0055FF] font-mono font-bold truncate">{`@${(user.username || user.name.toLowerCase()).replace(/^@+/, '')}`}</p>
               </div>
               <button
                 id="sidebar-profile-btn"
