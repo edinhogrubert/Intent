@@ -4,16 +4,29 @@ import { firebaseAuth } from '../lib/firebase.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../errors.js';
 
-function normalizeUsername(value: string, firebaseUid: string): string {
-  const base = value
+function normalizeUsername(value: string): string {
+  return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    .slice(0, 20) || 'usuario';
+    .slice(0, 32) || 'usuario';
+}
 
-  return `${base}_${firebaseUid.slice(0, 8).toLowerCase()}`;
+async function findAvailableUsername(base: string): Promise<string> {
+  for (let suffix = 1; suffix <= 9999; suffix += 1) {
+    const suffixText = suffix === 1 ? '' : String(suffix);
+    const candidate = `${base.slice(0, 40 - suffixText.length)}${suffixText}`;
+    const existing = await prisma.user.findUnique({
+      where: { username: candidate },
+      select: { id: true },
+    });
+
+    if (!existing) return candidate;
+  }
+
+  throw new AppError(409, 'USERNAME_UNAVAILABLE', 'Não foi possível reservar um nome de usuário.');
 }
 
 async function verifyBearerToken(request: Request, required: boolean): Promise<DecodedIdToken | null> {
@@ -46,6 +59,7 @@ async function attachUser(request: Request, decoded: DecodedIdToken): Promise<vo
   const tokenPicture = typeof decoded.picture === 'string' ? decoded.picture : undefined;
   const normalizedEmail = typeof decoded.email === 'string' ? decoded.email.toLowerCase() : undefined;
   const displayName = tokenName || normalizedEmail?.split('@')[0] || 'Usuário Intent';
+  const usernameBase = normalizeUsername(displayName);
 
   request.auth = {
     firebaseUid: decoded.uid,
@@ -54,18 +68,36 @@ async function attachUser(request: Request, decoded: DecodedIdToken): Promise<vo
     ...(tokenPicture ? { picture: tokenPicture } : {}),
   };
 
-  request.appUser = await prisma.user.upsert({
+  const existingUser = await prisma.user.findUnique({
     where: { firebaseUid: decoded.uid },
-    create: {
+  });
+
+  if (existingUser) {
+    const legacyUsername = `${usernameBase}_${decoded.uid.slice(0, 8).toLowerCase()}`;
+    const shouldUpgradeUsername = existingUser.username === legacyUsername;
+    const username = shouldUpgradeUsername
+      ? await findAvailableUsername(usernameBase)
+      : existingUser.username;
+
+    request.appUser = await prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        ...(normalizedEmail ? { email: normalizedEmail } : {}),
+        displayName,
+        username,
+        ...(tokenPicture ? { avatarUrl: tokenPicture } : {}),
+      },
+    });
+    return;
+  }
+
+  const username = await findAvailableUsername(usernameBase);
+  request.appUser = await prisma.user.create({
+    data: {
       firebaseUid: decoded.uid,
       ...(normalizedEmail ? { email: normalizedEmail } : {}),
       displayName,
-      username: normalizeUsername(displayName, decoded.uid),
-      ...(tokenPicture ? { avatarUrl: tokenPicture } : {}),
-    },
-    update: {
-      ...(normalizedEmail ? { email: normalizedEmail } : {}),
-      displayName,
+      username,
       ...(tokenPicture ? { avatarUrl: tokenPicture } : {}),
     },
   });
