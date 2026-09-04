@@ -74,6 +74,10 @@ interface IntentManagerProps {
 
 const LOCAL_STORAGE_INTENTS_KEY = 'portal_app_local_intents';
 
+// Compatibilidade temporária: todas as Intents permanecem locais até cada
+// fluxo ser migrado explicitamente para a API/PostgreSQL.
+const FIRESTORE_SYNC_ENABLED = false;
+
 export function IntentManager({ user, activeTab = 'inicio', onTabChange }: IntentManagerProps) {
   const [intents, setIntents] = useState<Intent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -649,6 +653,13 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
+    if (!FIRESTORE_SYNC_ENABLED) {
+      setIsCloudSynced(false);
+      setIntents(getLocalIntents());
+      setLoading(false);
+      return;
+    }
+
     const setupFirestore = (uid: string) => {
       try {
         const intentsRef = collection(db, 'intents');
@@ -754,7 +765,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    const isFirebase = !!auth.currentUser;
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser;
     const uid = auth.currentUser ? auth.currentUser.uid : user.id;
 
     const newIntent: Intent = {
@@ -855,7 +866,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
     if (!selectedIntent || !editTitle.trim()) return;
     setIsSubmitting(true);
 
-    const isFirebase = !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
 
     const updatedData: Partial<Intent> = {
       title: editTitle.trim(),
@@ -917,7 +928,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
   const handleUpdateParticipantsOnIntent = async (updatedParticipants: Participant[]) => {
     if (!selectedIntent) return;
 
-    const isFirebase = !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
     const updatedIntent: Intent = {
       ...selectedIntent,
       participants: updatedParticipants,
@@ -960,7 +971,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
       return p;
     });
 
-    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !targetIntent.id.startsWith('intent-');
     if (isFirebase) {
       try {
         await updateDoc(doc(db, 'intents', targetIntent.id), {
@@ -1012,7 +1023,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
       supporters: updatedSupporters,
     };
 
-    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !targetIntent.id.startsWith('intent-');
     if (isFirebase) {
       try {
         await updateDoc(doc(db, 'intents', targetIntent.id), updatedFields);
@@ -1097,7 +1108,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
       predictions_count: newPredictions,
     };
 
-    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !targetIntent.id.startsWith('intent-');
     if (isFirebase) {
       try {
         await updateDoc(doc(db, 'intents', targetIntent.id), updatedFields);
@@ -1122,7 +1133,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
 
   // Etapa 5 & Etapa 7: Reveal Ceremony Trigger (Sets reveal timestamp and calculates reveal window expiration)
   const handleRevealIntent = async (targetIntent: Intent) => {
-    const isFirebase = !!auth.currentUser && !targetIntent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !targetIntent.id.startsWith('intent-');
     const nowIso = new Date().toISOString();
     const windowHours = targetIntent.reveal_window?.duration_hours || targetIntent.reveal_window_hours || 24;
     const expiresAtIso = new Date(Date.now() + windowHours * 3600 * 1000).toISOString();
@@ -1166,7 +1177,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
 
   // Instant simulation helper: Trigger immediate reveal for testing
   const handleSimulateInstantReveal = async (intent: Intent) => {
-    const isFirebase = !!auth.currentUser && !intent.id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !intent.id.startsWith('intent-');
     const pastDate = new Date(Date.now() - 1000).toISOString();
     const approvedParticipants = (intent.participants || []).map((p) =>
       p.role === 'guardian'
@@ -1210,7 +1221,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
 
   // Delete Intent
   const handleDeleteIntent = async (id: string) => {
-    const isFirebase = !!auth.currentUser && !id.startsWith('intent-');
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !id.startsWith('intent-');
 
     if (isFirebase) {
       try {
@@ -2495,7 +2506,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
   };
 
   const handleConfirmAndCreateConversational = async () => {
-    const isFirebase = !!auth.currentUser;
+    const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser;
     const uid = isFirebase ? auth.currentUser.uid : 'usr-local';
     
     // Determine condition parameters
@@ -4039,7 +4050,7 @@ export function IntentManager({ user, activeTab = 'inicio', onTabChange }: Inten
                         saveLocalIntents(updatedIntents);
 
                         // Persist to Firestore if synced
-                        const isFirebase = !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
+                        const isFirebase = FIRESTORE_SYNC_ENABLED && !!auth.currentUser && !selectedIntent.id.startsWith('intent-');
                         if (isFirebase) {
                           try {
                             await updateDoc(doc(db, 'intents', selectedIntent.id), {
