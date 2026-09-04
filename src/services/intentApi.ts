@@ -97,7 +97,7 @@ function mapApiUser(user: ApiUser): UserAccount {
     ...(cached?.id === user.id ? cached : {}),
     id: user.id,
     name: user.displayName,
-    username: `@${user.username.replace(/^@/, '')}`,
+    username: user.username.replace(/^@+/, ''),
     email: user.email || '',
     avatarUrl: user.avatarUrl || undefined,
     bio: user.bio || undefined,
