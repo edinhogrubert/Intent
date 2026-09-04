@@ -100,9 +100,9 @@ export function createDefaultUserFields(
   base: Partial<UserAccount> & { id: string; name: string; email: string }
 ): UserAccount {
   const cleanName = base.name.trim();
-  const defaultUsername = base.username
-    ? base.username
-    : '@' + cleanName.toLowerCase().replace(/\s+/g, '_');
+  const defaultUsername = (
+    base.username || cleanName.toLowerCase().replace(/\s+/g, '_')
+  ).replace(/^@+/, '');
 
   return {
     id: base.id,
@@ -243,7 +243,7 @@ export function registerNewUser(
   const newUser = createDefaultUserFields({
     id: firebaseUid || 'usr-' + Date.now(),
     name: name.trim(),
-    username: username || '@' + name.trim().toLowerCase().replace(/\s+/g, '_'),
+    username: username || name.trim().toLowerCase().replace(/\s+/g, '_'),
     email: email.trim().toLowerCase(),
     password: password || '123',
     bio: bio || 'Novo participante do Portal Intent.',
