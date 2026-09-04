@@ -3,6 +3,17 @@ import { z } from 'zod';
 export const createIntentSchema = z.object({
   title: z.string().trim().min(3).max(160),
   story: z.string().trim().min(3).max(5000),
+  category: z.enum([
+    'SPORTS',
+    'ENTERTAINMENT',
+    'TECHNOLOGY',
+    'EDUCATION',
+    'HEALTH_WELLNESS',
+    'CAREER_BUSINESS',
+    'COMMUNITY_CAUSES',
+    'PERSONAL_LIFE',
+    'OTHER',
+  ]).default('OTHER'),
   supportGoal: z.number().int().min(1).max(1_000_000),
   revealContent: z.string().min(1).max(10_000),
   visibility: z.enum(['PUBLIC', 'FOLLOWERS', 'PRIVATE']).default('PUBLIC'),
