@@ -46,6 +46,15 @@ export interface ApiIntent {
   realizedAt: string | null;
   createdAt: string;
   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
+  revealContent?: string | null;
+}
+
+export interface SupportIntentResult {
+  intentId: string;
+  supportCount: number;
+  supportGoal: number;
+  realized: boolean;
+  realizedNow: boolean;
 }
 
 export interface CreateSupportIntentInput {
@@ -127,6 +136,24 @@ export async function createSupportIntent(input: CreateSupportIntentInput): Prom
 
 export async function listMyIntents(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
   const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/mine');
+  return result.data;
+}
+
+export async function listPublicIntents(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/feed');
+  return result.data;
+}
+
+export async function getIntent(intentId: string): Promise<ApiIntent> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>(`/v1/intents/${encodeURIComponent(intentId)}`);
+  return result.data;
+}
+
+export async function supportIntent(intentId: string): Promise<SupportIntentResult> {
+  const result = await authenticatedRequest<ApiEnvelope<SupportIntentResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/supports`,
+    { method: 'POST' },
+  );
   return result.data;
 }
 
