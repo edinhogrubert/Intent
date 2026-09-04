@@ -11,7 +11,9 @@ RUN npx prisma generate
 
 COPY tsconfig.json ./
 COPY src ./src
+COPY tests ./tests
 RUN npm run build
+RUN npm test
 RUN npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
