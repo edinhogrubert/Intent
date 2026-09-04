@@ -32,6 +32,7 @@ model Intent {
   type               String        @default("SUPPORT_REVEAL") @db.VarChar(40)
   status             String        @default("PUBLISHED") @db.VarChar(20)
   visibility         String        @default("PUBLIC") @db.VarChar(20)
+  category           String        @default("OTHER") @db.VarChar(40)
   title              String        @db.VarChar(160)
   story              String        @db.Text
   supportGoal        Int           @map("support_goal")
