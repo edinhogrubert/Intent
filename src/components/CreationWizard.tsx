@@ -28,7 +28,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
   const [category, setCategory] = useState<IntentCategory>('SPORTS');
   const [supportGoal, setSupportGoal] = useState(1);
   const [revealContent, setRevealContent] = useState('');
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'FOLLOWERS'>('PUBLIC');
+  const visibility = 'PUBLIC' as const;
   const [error, setError] = useState('');
   const [publishing, setPublishing] = useState(false);
 
@@ -105,11 +105,11 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
       {step === 3 && <section className="space-y-6">
         <div className="text-center"><h2 className="text-2xl font-black text-[#1b1c1a]">Tudo pronto?</h2><p className="text-sm text-[#454652] mt-2">Confira antes de publicar.</p></div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <button type="button" onClick={() => setVisibility('PUBLIC')} className={`text-left rounded-2xl border p-4 ${visibility === 'PUBLIC' ? 'border-[#000666] bg-white ring-2 ring-[#000666]/10' : 'border-[#e4e2de] bg-white'}`}><p className="font-bold text-sm">Pública</p><p className="text-xs text-[#666] mt-1">Pode aparecer no feed e ser apoiada por todos.</p></button>
-          <button type="button" onClick={() => setVisibility('FOLLOWERS')} className={`text-left rounded-2xl border p-4 ${visibility === 'FOLLOWERS' ? 'border-[#000666] bg-white ring-2 ring-[#000666]/10' : 'border-[#e4e2de] bg-white'}`}><p className="font-bold text-sm">Seguidores</p><p className="text-xs text-[#666] mt-1">Visível para quem acompanha você.</p></button>
+          <div className="text-left rounded-2xl border border-[#000666] bg-white ring-2 ring-[#000666]/10 p-4"><p className="font-bold text-sm">Pública</p><p className="text-xs text-[#666] mt-1">Aparece no feed e pode ser apoiada por todos.</p></div>
+          <div className="text-left rounded-2xl border border-[#e4e2de] bg-[#f5f3ef] p-4 opacity-65"><p className="font-bold text-sm">Seguidores e grupos</p><p className="text-xs text-[#666] mt-1">Em breve, quando as relações sociais estiverem ativas.</p></div>
         </div>
         <article className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm p-6">
-          <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] flex items-center justify-center font-bold text-[#000666]">{currentUser.name.charAt(0).toUpperCase()}</div><div><p className="font-bold text-sm">{currentUser.name}</p><p className="text-xs text-[#666]">Agora mesmo · {visibility === 'PUBLIC' ? 'Pública' : 'Seguidores'}</p></div></div>
+          <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] flex items-center justify-center font-bold text-[#000666]">{currentUser.name.charAt(0).toUpperCase()}</div><div><p className="font-bold text-sm">{currentUser.name}</p><p className="text-xs text-[#666]">Agora mesmo · Pública</p></div></div>
           <span className="inline-block mt-5 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold">{categoryLabel}</span>
           <h3 className="text-xl font-black mt-3">{title}</h3><p className="text-sm text-[#454652] mt-2 whitespace-pre-wrap">{story}</p>
           <div className="mt-5 rounded-xl bg-[#f5f3ef] p-4 flex items-center gap-3"><Lock className="w-5 h-5 text-[#000666]"/><div><p className="text-sm font-bold">0 de {supportGoal} apoios</p><p className="text-xs text-[#666]">A revelação permanece protegida até a meta.</p></div></div>
