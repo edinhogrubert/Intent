@@ -1,245 +1,91 @@
-import { useState, useEffect } from 'react';
-import { UserAccount } from './types';
-import { logoutUser, deleteUserAccount, setCurrentSessionUser } from './utils/storage';
-import { getGreetingConfig, formatCurrentDate } from './utils/time';
+import { useEffect, useRef, useState } from 'react';
+import { Home, LogOut, PlusCircle, Target } from 'lucide-react';
+import type { UserAccount } from './types';
 import { AuthGate } from './components/AuthGate';
-import { IntentManager } from './components/IntentManager';
-import { Sidebar } from './components/Sidebar';
-import { MobileBottomNav } from './components/MobileBottomNav';
-import { DeleteAccountModal } from './components/DeleteAccountModal';
-import { UserProfileModal } from './components/UserProfileModal';
-import { StagesChecklistModal } from './components/StagesChecklistModal';
-import { LandingHeroView } from './components/LandingHeroView';
-import { ExploreFeedView } from './components/ExploreFeedView';
 import { CreationWizard } from './components/CreationWizard';
 import { MyIntentsDashboard } from './components/MyIntentsDashboard';
-import { IntentDetailView } from './components/IntentDetailView';
-import { IntentCelebrationView } from './components/IntentCelebrationView';
-import { NotificationsView } from './components/NotificationsView';
-import { MessagesView } from './components/MessagesView';
-import { UserProfileView } from './components/UserProfileView';
-import { SettingsView } from './components/SettingsView';
-import { auth, signOut, onAuthStateChanged } from './utils/firebase';
+import { MvpHomeFeed } from './components/MvpHomeFeed';
+import { MvpIntentDetail } from './components/MvpIntentDetail';
+import { auth, onAuthStateChanged, signOut } from './utils/firebase';
+import { logoutUser, setCurrentSessionUser } from './utils/storage';
 import { syncAuthenticatedUser } from './services/intentApi';
+
+type View = 'home' | 'create' | 'mine' | 'detail';
+type SessionStatus = 'checking' | 'unauthenticated' | 'authenticated' | 'error';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showChecklistModal, setShowChecklistModal] = useState(false);
-  const [currentHour, setCurrentHour] = useState(new Date().getHours());
-  
-  // Custom navigation state (Feed, Explorar, Criar, Minhas, Perfil, etc.)
-  const [activeTab, setActiveTab] = useState<string>('inicio');
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus>('checking');
+  const [sessionError, setSessionError] = useState('');
+  const [view, setView] = useState<View>('home');
+  const [selectedIntentId, setSelectedIntentId] = useState<string | null>(null);
+  const [toast, setToast] = useState('');
+  const manualAuthentication = useRef(false);
 
-  // Firebase é a fonte de identidade; a API mantém o perfil no PostgreSQL.
+  async function synchronizeSession() {
+    if (!auth.currentUser) {
+      setCurrentSessionUser(null); setCurrentUser(null); setSessionStatus('unauthenticated'); return;
+    }
+    setSessionStatus('checking'); setSessionError('');
+    try {
+      const account = await syncAuthenticatedUser(auth.currentUser);
+      setCurrentUser(account); setSessionStatus('authenticated');
+    } catch {
+      setCurrentUser(null); setSessionError('Sua identidade foi confirmada, mas o perfil não pôde ser carregado.'); setSessionStatus('error');
+    }
+  }
+
   useEffect(() => {
-    let isActive = true;
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (!firebaseUser) {
-          setCurrentSessionUser(null);
-          if (isActive) setCurrentUser(null);
-          return;
-        }
-
-        const account = await syncAuthenticatedUser(firebaseUser);
-        if (isActive) setCurrentUser(account);
-      } catch (error) {
-        console.error('Não foi possível sincronizar o perfil autenticado:', error);
-        setCurrentSessionUser(null);
-        if (isActive) setCurrentUser(null);
-      } finally {
-        if (isActive) setIsLoaded(true);
+      if (manualAuthentication.current) return;
+      if (!firebaseUser) {
+        setCurrentSessionUser(null); setCurrentUser(null); setSessionStatus('unauthenticated'); return;
       }
+      await synchronizeSession();
     });
-
-    const interval = setInterval(() => {
-      setCurrentHour(new Date().getHours());
-    }, 10000);
-
-    return () => {
-      isActive = false;
-      unsubscribe();
-      clearInterval(interval);
-    };
+    return unsubscribe;
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch {
-      // ignore
-    }
-    logoutUser();
-    setCurrentUser(null);
-  };
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
-  const handleConfirmDeleteAccount = async () => {
-    if (currentUser) {
-      try {
-        await signOut(auth);
-      } catch {
-        // ignore
-      }
-      deleteUserAccount(currentUser.id);
-      setCurrentUser(null);
-      setShowDeleteModal(false);
-    }
-  };
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen w-full bg-[#F4F7FC] flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-[#0055FF] border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+  async function handleLogout() {
+    await signOut(auth);
+    logoutUser(); setCurrentUser(null); setView('home'); setSessionStatus('unauthenticated');
   }
 
-  // If user is not logged in, render the Auth Gate (nobody accesses index without login/cadastrar)
-  if (!currentUser) {
-    return <AuthGate onAuthenticated={(user) => setCurrentUser(user)} />;
-  }
+  function selectIntent(id: string) { setSelectedIntentId(id); setView('detail'); }
 
-  const greetingConfig = getGreetingConfig(currentHour);
+  if (sessionStatus === 'checking') return <div className="min-h-screen bg-[#f5f6fb] flex items-center justify-center"><div className="w-9 h-9 border-4 border-[#000666] border-t-transparent rounded-full animate-spin"/></div>;
 
-  return (
-    <div className="min-h-screen w-full bg-[#F4F7FC] flex flex-row overflow-x-hidden font-sans text-slate-900 pb-16 md:pb-0">
-      {/* Left Navigation Sidebar */}
-      <Sidebar
-        user={currentUser}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onLogout={handleLogout}
-        onRequestDelete={() => setShowDeleteModal(true)}
-        onOpenChecklist={() => setShowChecklistModal(true)}
-        onUserChanged={(newUser) => setCurrentUser(newUser)}
-      />
+  if (sessionStatus === 'error') return <div className="min-h-screen bg-[#f5f6fb] flex items-center justify-center p-4"><div className="max-w-md w-full bg-white border border-[#e4e2de] rounded-2xl p-6 text-center"><h1 className="font-black text-lg">Não foi possível abrir o Intent</h1><p className="text-sm text-[#666] mt-2">{sessionError}</p><button onClick={() => void synchronizeSession()} className="w-full mt-5 py-3 bg-[#000666] text-white rounded-xl text-sm font-bold">Tentar novamente</button><button onClick={() => void handleLogout()} className="mt-4 text-sm font-bold text-[#666]">Sair desta conta</button></div></div>;
 
-      {/* Main Content View */}
-      <main className="flex-1 flex flex-col p-3 sm:p-6 md:p-8 max-w-7xl mx-auto overflow-y-auto w-full">
-        {/* Route: Landing / Primeiro Acesso */}
-        {activeTab === 'primeiro-acesso' && (
-          <LandingHeroView
-            onStart={() => setActiveTab('inicio')}
-            onExplore={() => setActiveTab('explorar')}
-            onViewDemo={() => setActiveTab('detalhe')}
-          />
-        )}
+  if (sessionStatus === 'unauthenticated' || !currentUser) return <AuthGate
+    onAuthFlowStart={() => { manualAuthentication.current = true; }}
+    onAuthFlowEnd={() => { manualAuthentication.current = false; }}
+    onAuthenticated={(account) => { setCurrentUser(account); setSessionStatus('authenticated'); setView('home'); }}
+  />;
 
-        {/* Route: Explorar Feed */}
-        {activeTab === 'explorar' && (
-          <ExploreFeedView
-            onSelectIntent={(_id) => setActiveTab('detalhe')}
-          />
-        )}
+  const items: Array<{ id: View; label: string; icon: typeof Home }> = [
+    { id: 'home', label: 'Início', icon: Home },
+    { id: 'create', label: 'Criar', icon: PlusCircle },
+    { id: 'mine', label: 'Minhas Intents', icon: Target },
+  ];
 
-        {/* Route: Criar Nova Intent */}
-        {activeTab === 'criar' && (
-          <CreationWizard
-            currentUser={currentUser}
-            onCancel={() => setActiveTab('inicio')}
-            onComplete={(_created) => setActiveTab('minhas')}
-          />
-        )}
+  return <div className="min-h-screen bg-[#f7f6fc] text-[#1b1c1a]">
+    <header className="sticky top-0 z-30 bg-white border-b border-[#e4e2de]"><div className="max-w-5xl mx-auto h-16 px-4 flex items-center justify-between"><button onClick={() => setView('home')} className="text-xl font-black tracking-tight text-[#000666]">INTENT</button><nav className="hidden sm:flex items-center gap-1">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setView(id)} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${view === id ? 'bg-[#e0e0ff] text-[#000666]' : 'text-[#666] hover:bg-[#f5f3ef]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav><div className="flex items-center gap-3"><div className="hidden md:block text-right"><p className="text-xs font-bold">{currentUser.name}</p><p className="text-[11px] text-[#666]">@{currentUser.username.replace(/^@+/, '')}</p></div><button onClick={() => void handleLogout()} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Sair"><LogOut className="w-5 h-5"/></button></div></div></header>
 
-        {/* Route: Minhas Intents Dashboard */}
-        {activeTab === 'minhas' && (
-          <MyIntentsDashboard
-            currentUser={currentUser}
-            onCreateNew={() => setActiveTab('criar')}
-            onSelectIntent={(_id) => setActiveTab('detalhe')}
-          />
-        )}
+    <main className="pb-24 sm:pb-8">
+      {view === 'home' && <MvpHomeFeed currentUser={currentUser} onCreate={() => setView('create')} onSelectIntent={selectIntent}/>} 
+      {view === 'create' && <CreationWizard currentUser={currentUser} onCancel={() => setView('home')} onComplete={(created) => { setToast('Intent publicada com sucesso.'); setSelectedIntentId(created.id); setView('detail'); }}/>} 
+      {view === 'mine' && <MyIntentsDashboard currentUser={currentUser} onCreateNew={() => setView('create')} onSelectIntent={selectIntent}/>} 
+      {view === 'detail' && selectedIntentId && <MvpIntentDetail intentId={selectedIntentId} currentUser={currentUser} onBack={() => setView('home')}/>} 
+    </main>
 
-        {/* Route: Detalhes da Intent em Andamento */}
-        {activeTab === 'detalhe' && (
-          <IntentDetailView
-            onBack={() => setActiveTab('inicio')}
-            onCelebrationView={() => setActiveTab('celebracao')}
-          />
-        )}
-
-        {/* Route: Revelação & Celebração (100% Desbloqueado) */}
-        {activeTab === 'celebracao' && (
-          <IntentCelebrationView
-            onBack={() => setActiveTab('detalhe')}
-          />
-        )}
-
-        {/* Route: Mensagens / Chat Direto */}
-        {activeTab === 'mensagens' && (
-          <MessagesView
-            currentUser={currentUser}
-            onOpenIntent={(_id) => setActiveTab('detalhe')}
-          />
-        )}
-
-        {/* Route: Notificações */}
-        {activeTab === 'notificacoes' && (
-          <NotificationsView
-            onViewReveal={() => setActiveTab('celebracao')}
-          />
-        )}
-
-        {/* Route: Perfil do Usuário */}
-        {activeTab === 'perfil' && (
-          <UserProfileView
-            user={currentUser}
-            onEditProfile={() => setActiveTab('configuracoes')}
-            onSelectIntent={(_id) => setActiveTab('detalhe')}
-          />
-        )}
-
-        {/* Route: Configurações */}
-        {activeTab === 'configuracoes' && (
-          <SettingsView
-            currentUser={currentUser}
-            onUpdateUser={(updated) =>
-              setCurrentUser((prev) => (prev ? { ...prev, ...updated } : prev))
-            }
-          />
-        )}
-
-        {/* Route: Início & Stage Workflows (IntentManager) */}
-        {activeTab === 'inicio' || activeTab.startsWith('etapa') ? (
-          <section id="intent-section" className="w-full">
-            <IntentManager
-              user={currentUser}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
-          </section>
-        ) : null}
-      </main>
-
-      {/* Sticky Mobile Bottom Navigation Bar */}
-      <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* User Profile & Identity Management Modal (Etapa 1) */}
-      <UserProfileModal
-        isOpen={showProfileModal}
-        user={currentUser}
-        onClose={() => setShowProfileModal(false)}
-        onUpdateUser={(updated) => setCurrentUser(updated)}
-      />
-
-      {/* Account Deletion / Unsubscription Modal */}
-      <DeleteAccountModal
-        isOpen={showDeleteModal}
-        user={currentUser}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleConfirmDeleteAccount}
-      />
-
-      {/* Architectural Checklist & Concrete Tests Modal (Etapas 1 a 8) */}
-      <StagesChecklistModal
-        isOpen={showChecklistModal}
-        onClose={() => setShowChecklistModal(false)}
-      />
-    </div>
-  );
+    <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#e4e2de] px-3 py-2 flex justify-around">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setView(id)} className={`min-w-20 py-1 flex flex-col items-center gap-1 text-[11px] font-bold ${view === id ? 'text-[#000666]' : 'text-[#777]'}`}><Icon className="w-5 h-5"/>{label}</button>)}</nav>
+    {toast && <div role="status" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#1b1c1a] text-white px-5 py-3 rounded-xl shadow-lg text-sm font-bold">{toast}</div>}
+  </div>;
 }
-
