@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, CheckCircle2, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { auth, createUserWithEmailAndPassword, googleProvider, signInWithEmailAndPassword, signInWithPopup, updateProfile } from '../utils/firebase';
@@ -44,7 +44,7 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
     finally { onAuthFlowEnd(); setLoading(false); }
   }
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError(''); onAuthFlowStart();
     try {
       const normalizedEmail = email.trim().toLowerCase();
