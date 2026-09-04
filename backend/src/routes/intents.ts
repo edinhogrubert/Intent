@@ -5,6 +5,7 @@ import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middlewa
 import {
   createIntent,
   getIntent,
+  listUserIntents,
   listPublicFeed,
   supportIntent,
 } from '../services/intent-service.js';
@@ -19,6 +20,21 @@ intentsRouter.get('/feed', async (request, response, next) => {
     const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
     const feed = await listPublicFeed(cursor, Number.isFinite(limit) ? limit : 20);
     response.json({ data: feed });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.get('/mine', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const cursor = typeof request.query.cursor === 'string' ? request.query.cursor : undefined;
+    const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
+    const intents = await listUserIntents(
+      request.appUser!.id,
+      cursor,
+      Number.isFinite(limit) ? limit : 20,
+    );
+    response.json({ data: intents });
   } catch (error) {
     next(error);
   }
