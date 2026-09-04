@@ -1,201 +1,48 @@
-import React, { useState } from 'react';
-import { Plus, MoreVertical, Lock, Users, Megaphone, CheckCircle2, Flame, Lightbulb, Sparkles } from 'lucide-react';
-import { UserAccount } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Lock, Plus, RefreshCw, Users } from 'lucide-react';
+import type { UserAccount } from '../types';
+import { IntentApiError, listMyIntents, type ApiIntent, type IntentCategory } from '../services/intentApi';
 
-interface MyIntentsDashboardProps {
-  currentUser: UserAccount;
-  onCreateNew: () => void;
-  onSelectIntent: (id: string) => void;
-}
+interface MyIntentsDashboardProps { currentUser: UserAccount; onCreateNew: () => void; onSelectIntent: (id: string) => void }
+
+const categoryLabels: Record<IntentCategory, string> = {
+  SPORTS: 'Esportes', ENTERTAINMENT: 'Entretenimento', TECHNOLOGY: 'Tecnologia', EDUCATION: 'Educação',
+  HEALTH_WELLNESS: 'Saúde e bem-estar', CAREER_BUSINESS: 'Carreira e negócios', COMMUNITY_CAUSES: 'Comunidade e causas',
+  PERSONAL_LIFE: 'Vida pessoal', OTHER: 'Outros',
+};
 
 export function MyIntentsDashboard({ currentUser, onCreateNew, onSelectIntent }: MyIntentsDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'ativas' | 'rascunhos' | 'concluidas' | 'participando'>('ativas');
+  const [intents, setIntents] = useState<ApiIntent[]>([]);
+  const [filter, setFilter] = useState<'active' | 'realized'>('active');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const intentsList = [
-    {
-      id: 'book-launch',
-      title: 'Lançamento do Livro "Design Essencial"',
-      status: 'Em Andamento',
-      statusColor: 'bg-[#E0F2F1] text-[#006a62]',
-      progress: 75,
-      supporters: '1.2k',
-      locked: true,
-    },
-    {
-      id: 'ui-course',
-      title: 'Curso Gratuito de UI Avançado',
-      status: 'Em Andamento',
-      statusColor: 'bg-[#E0F2F1] text-[#006a62]',
-      progress: 42,
-      supporters: '840',
-      locked: true,
-    },
-    {
-      id: 'template-pack',
-      title: 'Template Social Media 2026',
-      status: 'Estagnada',
-      statusColor: 'bg-[#ffdad6] text-[#ba1a1a]',
-      progress: 15,
-      supporters: '150',
-      locked: true,
-    },
-  ];
+  async function loadIntents() {
+    setLoading(true); setError('');
+    try { setIntents((await listMyIntents()).items); }
+    catch (caught) { setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar suas Intents.'); }
+    finally { setLoading(false); }
+  }
 
-  return (
-    <div className="w-full max-w-6xl mx-auto bg-[#fbf9f5] min-h-screen py-4 px-4 sm:px-6 antialiased font-sans">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left/Center Feed Column */}
-        <div className="lg:col-span-8 space-y-6">
-          <div>
-            <h2 className="text-2xl font-black text-[#000666] tracking-tight mb-1">
-              Minhas Intents
-            </h2>
-            <p className="text-xs text-[#454652]">
-              Gerencie suas expectativas e acompanhe o progresso da sua comunidade.
-            </p>
-          </div>
+  useEffect(() => { void loadIntents(); }, []);
+  const visible = useMemo(() => intents.filter((intent) => filter === 'active' ? intent.status === 'PUBLISHED' : intent.status === 'REALIZED'), [intents, filter]);
+  const totalSupports = intents.reduce((sum, intent) => sum + intent.supportCount, 0);
 
-          {/* Tabs */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {[
-              { id: 'ativas', label: 'Ativas' },
-              { id: 'rascunhos', label: 'Rascunhos' },
-              { id: 'concluidas', label: 'Concluídas' },
-              { id: 'participando', label: 'Participando' },
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id as any)}
-                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === t.id
-                    ? 'bg-[#000666] text-white shadow-xs'
-                    : 'bg-white text-[#454652] hover:bg-[#f5f3ef] border border-[#e4e2de]'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Bento Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {intentsList.map((intent) => (
-              <article
-                key={intent.id}
-                onClick={() => onSelectIntent(intent.id)}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between border border-[#e4e2de] cursor-pointer group space-y-4"
-              >
-                <div className="flex justify-between items-start">
-                  <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${intent.statusColor}`}>
-                    {intent.status}
-                  </span>
-                  <button className="text-[#c6c5d4] hover:text-[#000666] transition-colors p-1">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-[#1b1c1a] group-hover:text-[#000666] transition-colors line-clamp-2">
-                    {intent.title}
-                  </h3>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold">
-                    <span className="text-[#454652]">Progresso de Revelação</span>
-                    <span className="text-[#006a62]">{intent.progress}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-[#E0F2F1] rounded-full overflow-hidden">
-                    <div className="h-full bg-[#006a62] rounded-full" style={{ width: `${intent.progress}%` }}></div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-[#f5f3ef] text-xs">
-                  <div className="flex items-center gap-1.5 text-[#666666]">
-                    <Users className="w-4 h-4" />
-                    <span className="font-semibold">{intent.supporters} mobilizados</span>
-                  </div>
-
-                  <div className="w-7 h-7 rounded-lg bg-[#f5f3ef] flex items-center justify-center border border-[#e4e2de] text-[#666666]">
-                    <Lock className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </article>
-            ))}
-
-            {/* Add New Intent Card */}
-            <article
-              onClick={onCreateNew}
-              className="bg-[#f5f3ef]/60 rounded-2xl border-2 border-dashed border-[#c6c5d4] p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-[#f5f3ef] transition-colors min-h-[220px] text-center group"
-            >
-              <div className="w-12 h-12 rounded-full bg-[#000666] text-white flex items-center justify-center mb-1 group-hover:scale-105 transition-transform shadow-xs">
-                <Plus className="w-6 h-6 stroke-[2.5]" />
-              </div>
-              <h3 className="text-sm font-bold text-[#000666]">Criar Nova Intent</h3>
-              <p className="text-xs text-[#454652] max-w-[200px]">
-                Mobilize sua comunidade para alcançar um novo marco.
-              </p>
-            </article>
-          </div>
-        </div>
-
-        {/* Right Column: Impact & Community Tip */}
-        <aside className="hidden lg:block lg:col-span-4 space-y-6">
-          {/* Your Impact Card */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#e4e2de] space-y-5">
-            <h3 className="text-base font-bold text-[#000666]">Seu Impacto</h3>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#81f3e5] text-[#00201d] flex items-center justify-center shrink-0">
-                  <Megaphone className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#454652]">Total Mobilizado</p>
-                  <p className="text-lg font-black text-[#1b1c1a]">
-                    2.190 <span className="text-xs text-[#666666] font-normal">pessoas</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#e0e0ff] text-[#000767] flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#454652]">Intents Concluídas</p>
-                  <p className="text-lg font-black text-[#1b1c1a]">12</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#ffdbd0] text-[#3a0a00] flex items-center justify-center shrink-0">
-                  <Flame className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs text-[#454652]">Taxa de Engajamento</p>
-                  <p className="text-lg font-black text-[#1b1c1a]">8.4%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Community Tip Card */}
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#e4e2de]">
-            <div className="h-20 bg-gradient-to-r from-[#1a237e] to-[#000666] p-4 flex items-center">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
-                <Lightbulb className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="p-5">
-              <h4 className="text-sm font-bold text-[#1b1c1a] mb-1.5">Dica da Comunidade</h4>
-              <p className="text-xs text-[#454652] leading-relaxed">
-                Intents com metas intermediárias (milestones) engajam <strong>40% mais</strong> do que aquelas com apenas um objetivo final.
-              </p>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
+  return <div className="w-full max-w-6xl mx-auto bg-[#fbf9f5] min-h-screen py-4 px-4 sm:px-6 antialiased font-sans">
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6"><div><h2 className="text-2xl font-black text-[#000666]">Minhas Intents</h2><p className="text-sm text-[#454652] mt-1">Aqui aparecem somente Intents realmente gravadas na sua conta.</p></div><button onClick={onCreateNew} className="px-5 py-3 bg-[#000666] text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4"/>Criar nova</button></div>
+    <div className="grid sm:grid-cols-3 gap-3 mb-6"><div className="bg-white border border-[#e4e2de] rounded-2xl p-4"><p className="text-xs text-[#666]">Intents publicadas</p><p className="text-2xl font-black mt-1">{intents.length}</p></div><div className="bg-white border border-[#e4e2de] rounded-2xl p-4"><p className="text-xs text-[#666]">Apoios recebidos</p><p className="text-2xl font-black mt-1">{totalSupports}</p></div><div className="bg-white border border-[#e4e2de] rounded-2xl p-4"><p className="text-xs text-[#666]">Realizadas</p><p className="text-2xl font-black mt-1">{intents.filter((item) => item.status === 'REALIZED').length}</p></div></div>
+    <div className="flex gap-2 mb-5"><button onClick={() => setFilter('active')} className={`px-4 py-2 rounded-full text-xs font-bold ${filter === 'active' ? 'bg-[#000666] text-white' : 'bg-white border border-[#e4e2de]'}`}>Ativas</button><button onClick={() => setFilter('realized')} className={`px-4 py-2 rounded-full text-xs font-bold ${filter === 'realized' ? 'bg-[#000666] text-white' : 'bg-white border border-[#e4e2de]'}`}>Realizadas</button><button onClick={() => void loadIntents()} className="ml-auto p-2 rounded-full bg-white border border-[#e4e2de]" aria-label="Atualizar"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button></div>
+    {loading && <div className="bg-white border border-[#e4e2de] rounded-2xl p-10 text-center text-sm text-[#666]">Carregando suas Intents...</div>}
+    {!loading && error && <div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5 flex items-start gap-3"><AlertCircle className="w-5 h-5 shrink-0"/><div><p className="font-bold">Não foi possível carregar</p><p className="text-sm mt-1">{error}</p><button onClick={() => void loadIntents()} className="mt-3 underline text-sm font-bold">Tentar novamente</button></div></div>}
+    {!loading && !error && visible.length === 0 && <div className="bg-white border-2 border-dashed border-[#c6c5d4] rounded-2xl p-10 text-center"><div className="w-12 h-12 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center mx-auto"><Plus className="w-6 h-6"/></div><h3 className="font-bold mt-4">{filter === 'active' ? 'Nenhuma Intent ativa' : 'Nenhuma Intent realizada ainda'}</h3><p className="text-sm text-[#666] mt-2">{currentUser.name}, crie uma Intent simples e acompanhe os apoios aqui.</p>{filter === 'active' && <button onClick={onCreateNew} className="mt-5 px-5 py-3 bg-[#000666] text-white rounded-xl text-sm font-bold">Criar minha primeira Intent</button>}</div>}
+    {!loading && !error && visible.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{visible.map((intent) => {
+      const progress = Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal));
+      return <article key={intent.id} onClick={() => onSelectIntent(intent.id)} className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm hover:shadow-md p-5 cursor-pointer">
+        <div className="flex justify-between items-center"><span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${intent.status === 'REALIZED' ? 'bg-[#e8f5e9] text-[#2e7d32]' : 'bg-[#e0e0ff] text-[#000666]'}`}>{intent.status === 'REALIZED' ? 'Realizada' : 'Em andamento'}</span><span className="text-xs text-[#666]">{categoryLabels[intent.category] || 'Outros'}</span></div>
+        <h3 className="font-bold mt-4 line-clamp-2">{intent.title}</h3><p className="text-sm text-[#666] mt-2 line-clamp-2">{intent.story}</p>
+        <div className="mt-5"><div className="flex justify-between text-xs font-bold"><span>{intent.supportCount} de {intent.supportGoal} apoios</span><span className="text-[#006a62]">{progress}%</span></div><div className="h-2 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#f0efec] text-xs text-[#666]"><span className="flex items-center gap-1.5"><Users className="w-4 h-4"/>{intent.supportCount} mobilizados</span><span className="flex items-center gap-1.5"><Lock className="w-4 h-4"/>{intent.status === 'REALIZED' ? 'Revelada' : 'Protegida'}</span></div>
+      </article>;
+    })}</div>}
+  </div>;
 }
