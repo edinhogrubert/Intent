@@ -60,7 +60,7 @@ export function UserProfileView({ user, onEditProfile, onSelectIntent }: UserPro
                   <CheckCircle2 className="w-5 h-5 text-[#006a62] fill-current text-white" />
                 </h1>
                 <p className="text-xs text-[#454652] font-mono font-semibold">
-                  {user.username || `@${user.name.toLowerCase().replace(/\s+/g, '')}`}
+                  {`@${(user.username || user.name.toLowerCase().replace(/\s+/g, '')).replace(/^@+/, '')}`}
                 </p>
               </div>
 
