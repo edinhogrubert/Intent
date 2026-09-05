@@ -19,11 +19,48 @@ BACKEND_DIR="${SOURCE_DIR}/backend"
 COMPOSE_FILE="${BACKEND_DIR}/compose.yaml"
 RUNTIME_ENV="${RUNTIME_DIR}/backend.env"
 
-FIREBASE_PROJECT_ID="powerful-turbine-gq6d2"
-CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+FIREBASE_PROJECT_ID="intent-86155"
+CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100"
 API_CONTAINER="intent-api"
+COMPOSE_IMAGE="intent-api-api:latest"
+ROLLBACK_IMAGE_TAG=""
+DEPLOYMENT_STARTED=0
 
-trap 'echo; echo "ERRO NA LINHA ${LINENO}. Verifique os logs antes de repetir."; exit 1' ERR
+rollback_on_error() {
+    local exit_code=$?
+    local failed_line=$1
+    trap - ERR
+
+    echo
+    echo "ERRO NA LINHA ${failed_line}. Iniciando recuperação segura."
+
+    if [[ "${DEPLOYMENT_STARTED}" -eq 1 && -n "${ROLLBACK_IMAGE_TAG}" ]] \
+        && docker image inspect "${ROLLBACK_IMAGE_TAG}" >/dev/null 2>&1; then
+        echo "Restaurando a imagem anterior..."
+        docker tag "${ROLLBACK_IMAGE_TAG}" "${COMPOSE_IMAGE}"
+        docker compose -f "${COMPOSE_FILE}" up -d --no-build --force-recreate || true
+
+        local rollback_status=""
+        for _attempt in {1..24}; do
+            rollback_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${API_CONTAINER}" 2>/dev/null || true)"
+            [[ "${rollback_status}" == "healthy" ]] && break
+            sleep 5
+        done
+
+        if [[ "${rollback_status}" == "healthy" ]]; then
+            echo "Rollback concluído; a API anterior voltou a ficar saudável."
+        else
+            echo "ATENÇÃO: o rollback não ficou saudável. Estado: ${rollback_status:-indisponível}."
+            docker logs --tail 120 "${API_CONTAINER}" || true
+        fi
+    else
+        echo "Nenhuma imagem anterior estava disponível para rollback."
+    fi
+
+    exit "${exit_code}"
+}
+
+trap 'rollback_on_error ${LINENO}' ERR
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "Execute usando sudo."
@@ -35,6 +72,13 @@ echo "INTENT — IMPLANTAÇÃO INTERNA DO BACKEND"
 echo "================================================================"
 
 echo "[1/8] Validando arquivos..."
+
+for command in docker curl openssl python3 ss; do
+    if ! command -v "${command}" >/dev/null 2>&1; then
+        echo "Comando obrigatório ausente: ${command}"
+        exit 1
+    fi
+done
 
 for required in "${DATA_ENV}" "${COMPOSE_FILE}" "${BACKEND_DIR}/Dockerfile"; do
     if [[ ! -f "${required}" ]]; then
@@ -88,6 +132,14 @@ else
     REVEAL_ENCRYPTION_KEY="$(openssl rand -base64 32 | tr -d '\n')"
 fi
 
+urlencode() {
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+}
+
+ENCODED_POSTGRES_USER="$(urlencode "${POSTGRES_USER}")"
+ENCODED_POSTGRES_PASSWORD="$(urlencode "${POSTGRES_PASSWORD}")"
+ENCODED_POSTGRES_DB="$(urlencode "${POSTGRES_DB}")"
+
 umask 0077
 {
     printf 'NODE_ENV=production\n'
@@ -95,7 +147,7 @@ umask 0077
     printf 'LOG_LEVEL=info\n'
     printf 'CORS_ORIGINS=%s\n' "${CORS_ORIGINS}"
     printf 'DATABASE_URL=postgresql://%s:%s@intent-postgres:5432/%s?schema=public\n' \
-        "${POSTGRES_USER}" "${POSTGRES_PASSWORD}" "${POSTGRES_DB}"
+        "${ENCODED_POSTGRES_USER}" "${ENCODED_POSTGRES_PASSWORD}" "${ENCODED_POSTGRES_DB}"
     printf 'FIREBASE_PROJECT_ID=%s\n' "${FIREBASE_PROJECT_ID}"
     printf 'REVEAL_ENCRYPTION_KEY=%s\n' "${REVEAL_ENCRYPTION_KEY}"
 } > "${RUNTIME_ENV}"
@@ -114,8 +166,18 @@ else
     exit 1
 fi
 
-echo "[5/8] Construindo a imagem ARM64..."
+echo "[5/8] Preservando a versão atual e construindo a imagem ARM64..."
 
+CURRENT_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${API_CONTAINER}" 2>/dev/null || true)"
+if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
+    ROLLBACK_IMAGE_TAG="intent-api-api:rollback-$(date +%Y%m%d-%H%M%S)"
+    docker tag "${CURRENT_IMAGE_ID}" "${ROLLBACK_IMAGE_TAG}"
+    echo "Imagem anterior preservada em ${ROLLBACK_IMAGE_TAG}."
+else
+    echo "Primeira implantação: ainda não existe imagem anterior."
+fi
+
+DEPLOYMENT_STARTED=1
 docker compose -f "${COMPOSE_FILE}" build --pull
 
 echo "[6/8] Iniciando API e aplicando migrações..."
@@ -162,6 +224,9 @@ if grep -Eq '(^|[[:space:]])(0\.0\.0\.0|\*):8080' <<< "${LISTEN_ADDRESS}"; then
     exit 1
 fi
 
+DEPLOYMENT_STARTED=0
+trap - ERR
+
 echo
 echo "================================================================"
 echo "BACKEND IMPLANTADO INTERNAMENTE"
@@ -172,4 +237,7 @@ echo "PostgreSQL:      conectado"
 echo "Migrações:       aplicadas"
 echo "Acesso externo:  bloqueado"
 echo "Portas 80/443:   inalteradas"
+if [[ -n "${ROLLBACK_IMAGE_TAG}" ]]; then
+    echo "Rollback salvo:  ${ROLLBACK_IMAGE_TAG}"
+fi
 echo "================================================================"
