@@ -2,7 +2,7 @@
 
 > **Objetivo:** oferecer uma visão simples e confiável do que já funciona, do que está sendo validado e do que ainda será desenvolvido.  
 > **Última atualização:** 05 de setembro de 2026  
-> **Versão implantada na Oracle:** `a859de7bdcd5633233597120ec19b3f49f80da56`  
+> **Versão implantada na Oracle:** `6ebc62d2c3c79bc45c1db25d81f3e7ff217b55e6`  
 > **Branch de desenvolvimento:** `codex/mvp-backend-base`  
 > **Pull Request:** `#2` para a `main`
 
@@ -59,7 +59,8 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Firebase Authentication | ✅ Implantado e validado | Projeto ativo: `intent-86155` |
 | Login com Google | ✅ Implantado e validado | Cancelamento do popup devolve o controle à tela de login |
 | Login com e-mail e senha | ✅ Implantado e validado | Continua disponível após cancelamento do Google |
-| Validação do token no backend | ✅ Implantado e validado | Rotas protegidas usam a identidade confirmada pelo Firebase |
+| Validação do token no backend | ✅ Implantado e validado | Assinatura, emissor, audiência e validade confirmados pelo Firebase |
+| Revogação imediata de sessão | 🔧 No GitHub, aguardando implantação | Exige conta de serviço dedicada com papel `Firebase Authentication Viewer`, armazenada somente na Oracle |
 | Perfil interno no PostgreSQL | ✅ Implantado e validado | Usuário Firebase é sincronizado com a conta do Intent |
 | Nome de usuário simples | ✅ Implantado e validado | Padrão `@nome_sobrenome`; colisões recebem número incremental |
 | CORS para túneis locais | ✅ Implantado e validado | `localhost:3000` e `localhost:3100` preservados |
@@ -131,6 +132,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Controle | Estado | Observação |
 |---|---|---|
 | Segredos fora do Git | ✅ Implantado e validado | Configuração protegida na VM |
+| Credencial Firebase Admin | 🔧 No GitHub, aguardando implantação | Arquivo externo ao Git e à imagem, montado somente para leitura; criação manual pendente |
 | Banco e Redis sem exposição pública | ✅ Implantado e validado | Somente redes Docker internas |
 | API e frontend restritos ao localhost | ✅ Implantado e validado | Acesso atual por túnel SSH |
 | Firewall com entrada negada por padrão | ✅ Implantado e validado | SSH restrito à faixa autorizada |
