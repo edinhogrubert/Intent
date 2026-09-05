@@ -110,6 +110,7 @@ export async function listPublicFeed(cursor?: string, limit = 20) {
     where: {
       visibility: 'PUBLIC',
       status: { in: ['PUBLISHED', 'REALIZED'] },
+      creator: { status: 'ACTIVE' },
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: safeLimit + 1,
@@ -162,7 +163,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
     },
   });
 
-  if (!intent) {
+  if (!intent || (intent.creator.status !== 'ACTIVE' && intent.creatorId !== viewerId)) {
     throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
   }
 
