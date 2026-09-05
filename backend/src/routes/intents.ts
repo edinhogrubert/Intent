@@ -7,6 +7,7 @@ import {
   getIntent,
   listUserIntents,
   listPublicFeed,
+  removeSupport,
   supportIntent,
 } from '../services/intent-service.js';
 
@@ -65,6 +66,16 @@ intentsRouter.post('/:id/supports', requireAuthenticatedUser, async (request, re
     const intentId = identifierSchema.parse(request.params.id);
     const result = await supportIntent(intentId, request.appUser!.id);
     response.status(201).json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.delete('/:id/supports', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const result = await removeSupport(intentId, request.appUser!.id);
+    response.json({ data: result });
   } catch (error) {
     next(error);
   }

@@ -47,6 +47,7 @@ export interface ApiIntent {
   createdAt: string;
   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
   revealContent?: string | null;
+  viewerHasSupported?: boolean;
 }
 
 export interface ApiSocialProfile {
@@ -74,6 +75,8 @@ export interface SupportIntentResult {
   intentId: string;
   supportCount: number;
   supportGoal: number;
+  supported: boolean;
+  removed?: boolean;
   realized: boolean;
   realizedNow: boolean;
 }
@@ -196,6 +199,14 @@ export async function supportIntent(intentId: string): Promise<SupportIntentResu
   const result = await authenticatedRequest<ApiEnvelope<SupportIntentResult>>(
     `/v1/intents/${encodeURIComponent(intentId)}/supports`,
     { method: 'POST' },
+  );
+  return result.data;
+}
+
+export async function removeIntentSupport(intentId: string): Promise<SupportIntentResult> {
+  const result = await authenticatedRequest<ApiEnvelope<SupportIntentResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/supports`,
+    { method: 'DELETE' },
   );
   return result.data;
 }

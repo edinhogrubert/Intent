@@ -144,6 +144,13 @@ export async function getIntent(intentId: string, viewerId?: string) {
     throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode acessar esta Intent.');
   }
 
+  const viewerSupport = viewerId
+    ? await prisma.support.findUnique({
+        where: { intentId_userId: { intentId, userId: viewerId } },
+        select: { id: true },
+      })
+    : null;
+
   const {
     revealCiphertext,
     revealIv,
@@ -152,7 +159,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
   } = intent;
 
   if (intent.status !== 'REALIZED') {
-    return { ...publicIntent, revealContent: null };
+    return { ...publicIntent, revealContent: null, viewerHasSupported: Boolean(viewerSupport) };
   }
 
   const revealContent = openReveal(
@@ -165,7 +172,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
     revealAssociatedData(intent.id, intent.revealVersion),
   );
 
-  return { ...publicIntent, revealContent };
+  return { ...publicIntent, revealContent, viewerHasSupported: Boolean(viewerSupport) };
 }
 
 export async function supportIntent(intentId: string, supporterId: string) {
@@ -238,6 +245,7 @@ export async function supportIntent(intentId: string, supporterId: string) {
         intentId,
         supportCount: updated.supportCount,
         supportGoal: updated.supportGoal,
+        supported: true,
         realized: realizedNow || updated.status === 'REALIZED',
         realizedNow,
       };
@@ -248,4 +256,70 @@ export async function supportIntent(intentId: string, supporterId: string) {
     }
     throw error;
   }
+}
+
+export async function removeSupport(intentId: string, supporterId: string) {
+  return prisma.$transaction(async (transaction) => {
+    const intent = await transaction.intent.findUnique({ where: { id: intentId } });
+
+    if (!intent) {
+      throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
+    }
+
+    if (intent.creatorId === supporterId) {
+      throw new AppError(409, 'CREATOR_CANNOT_SUPPORT', 'O criador não participa do apoio à própria Intent.');
+    }
+
+    if (intent.status !== 'PUBLISHED') {
+      throw new AppError(409, 'SUPPORT_LOCKED_AFTER_REVEAL', 'O apoio não pode ser alterado depois da realização.');
+    }
+
+    const support = await transaction.support.findUnique({
+      where: { intentId_userId: { intentId, userId: supporterId } },
+    });
+
+    if (!support) {
+      return {
+        intentId,
+        supportCount: intent.supportCount,
+        supportGoal: intent.supportGoal,
+        supported: false,
+        removed: false,
+        realized: false,
+        realizedNow: false,
+      };
+    }
+
+    await transaction.support.delete({ where: { id: support.id } });
+    const updated = await transaction.intent.update({
+      where: { id: intentId },
+      data: {
+        supportCount: intent.supportCount > 0 ? { decrement: 1 } : 0,
+      },
+    });
+
+    await transaction.domainEvent.create({
+      data: {
+        intentId,
+        actorId: supporterId,
+        type: 'SUPPORT_REMOVED',
+        idempotencyKey: `support-removed:${support.id}`,
+        payload: {
+          supportId: support.id,
+          supportCount: updated.supportCount,
+          supportGoal: updated.supportGoal,
+        },
+      },
+    });
+
+    return {
+      intentId,
+      supportCount: updated.supportCount,
+      supportGoal: updated.supportGoal,
+      supported: false,
+      removed: true,
+      realized: false,
+      realizedNow: false,
+    };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
