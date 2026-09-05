@@ -48,7 +48,7 @@ async function verifyBearerToken(request: Request, required: boolean): Promise<D
   }
 
   try {
-    return await firebaseAuth.verifyIdToken(token);
+    return await firebaseAuth.verifyIdToken(token, true);
   } catch {
     throw new AppError(401, 'AUTH_INVALID', 'Sua sessão não é válida ou expirou.');
   }
@@ -73,6 +73,10 @@ async function attachUser(request: Request, decoded: DecodedIdToken): Promise<vo
   });
 
   if (existingUser) {
+    if (existingUser.status !== 'ACTIVE') {
+      throw new AppError(403, 'ACCOUNT_INACTIVE', 'Esta conta não está ativa.');
+    }
+
     const legacyUsername = `${usernameBase}_${decoded.uid.slice(0, 8).toLowerCase()}`;
     const shouldUpgradeUsername = existingUser.username === legacyUsername;
     const username = shouldUpgradeUsername
@@ -83,9 +87,7 @@ async function attachUser(request: Request, decoded: DecodedIdToken): Promise<vo
       where: { id: existingUser.id },
       data: {
         ...(normalizedEmail ? { email: normalizedEmail } : {}),
-        displayName,
         username,
-        ...(tokenPicture ? { avatarUrl: tokenPicture } : {}),
       },
     });
     return;
