@@ -14,7 +14,7 @@
 | 🧪 Implantado, falta validação humana | Está tecnicamente ativo, mas o fluxo completo ainda precisa ser testado por usuários |
 | 🟡 Próxima prioridade | Deve ser uma das próximas entregas do MVP |
 | ⏳ Planejado | Faz parte do produto, mas ainda não será implementado |
-| 🚫 Fora do MVP atual | Foi conscientemente adiado para evitar complexidade prematura |
+| 🔧 No GitHub, aguardando implantação | Implementado na branch, mas ainda não está ativo na Oracle |\n| 🚫 Fora do MVP atual | Foi conscientemente adiado para evitar complexidade prematura |
 
 ## Regra de manutenção
 
@@ -98,7 +98,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Revelação após a realização | ✅ Implantado e validado | Conteúdo somente é aberto depois da condição |
 | Histórico de eventos essenciais | ✅ Implantado e validado | Criação, apoio, retirada e realização registrados |
 | Visibilidade pública | ✅ Implantado e validado | Aparece no feed geral |
-| Visibilidade para seguidores | 🧪 Implantado, falta validação humana | Backend verifica o vínculo real antes de permitir acesso |
+| Visibilidade para seguidores | 🔧 No GitHub, aguardando implantação | Backend já verifica o vínculo; wizard agora permite escolher “Somente seguidores” |
 | Visibilidade privada completa | ⏳ Planejado | Regras de destinatários ainda não fazem parte do MVP limpo |
 | Condição por data | 🟡 Próxima prioridade | Deve impedir datas retroativas e respeitar timezone |
 | Condição por aprovadores/guardiões | 🟡 Próxima prioridade | Exigirá escolha explícita dos aprovadores e regra N de M |
@@ -159,7 +159,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 
 ## Validação humana ainda pendente
 
-Executar com pelo menos três contas:
+A implantação do seletor “Somente seguidores” é necessária antes deste teste. Depois, executar com pelo menos três contas:
 
 1. A conta A cria uma Intent com visibilidade **Seguidores**.
 2. A conta B segue a conta A e deve visualizar a Intent na aba **Seguindo**.
