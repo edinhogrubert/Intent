@@ -29,7 +29,6 @@ export function createApp() {
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
   }));
-  app.use(express.json({ limit: '128kb' }));
   app.use(pinoHttp({
     logger,
     genReqId(request, response) {
@@ -41,6 +40,7 @@ export function createApp() {
       return requestId;
     },
   }));
+  app.use(express.json({ limit: '128kb' }));
 
   app.get('/health', (_request, response) => {
     response.json({ status: 'ok', service: 'intent-api' });
@@ -56,6 +56,29 @@ export function createApp() {
   });
 
   app.use((error: unknown, request: Request, response: Response, _next: NextFunction) => {
+    const parserError = error as { status?: number; type?: string };
+    if (error instanceof SyntaxError && parserError.status === 400) {
+      response.status(400).json({
+        error: {
+          code: 'INVALID_JSON',
+          message: 'O corpo da requisição contém JSON inválido.',
+          requestId: request.id,
+        },
+      });
+      return;
+    }
+
+    if (parserError.type === 'entity.too.large') {
+      response.status(413).json({
+        error: {
+          code: 'BODY_TOO_LARGE',
+          message: 'O corpo da requisição excede o limite permitido.',
+          requestId: request.id,
+        },
+      });
+      return;
+    }
+
     if (error instanceof ZodError) {
       response.status(400).json({
         error: {
