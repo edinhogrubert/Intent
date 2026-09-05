@@ -126,6 +126,32 @@ export async function listPublicFeed(cursor?: string, limit = 20) {
   };
 }
 
+export async function listFollowingFeed(viewerId: string, cursor?: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const items = await prisma.intent.findMany({
+    where: {
+      visibility: { in: ['PUBLIC', 'FOLLOWERS'] },
+      status: { in: ['PUBLISHED', 'REALIZED'] },
+      creator: {
+        status: 'ACTIVE',
+        followers: { some: { followerId: viewerId } },
+      },
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: safeLimit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: publicIntentSelection,
+  });
+
+  const hasMore = items.length > safeLimit;
+  const page = hasMore ? items.slice(0, safeLimit) : items;
+
+  return {
+    items: page,
+    nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
+  };
+}
+
 export async function getIntent(intentId: string, viewerId?: string) {
   const intent = await prisma.intent.findUnique({
     where: { id: intentId },
@@ -140,8 +166,26 @@ export async function getIntent(intentId: string, viewerId?: string) {
     throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
   }
 
-  if (intent.visibility !== 'PUBLIC' && intent.creatorId !== viewerId) {
+  if (intent.visibility === 'PRIVATE' && intent.creatorId !== viewerId) {
     throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode acessar esta Intent.');
+  }
+
+  if (intent.visibility === 'FOLLOWERS' && intent.creatorId !== viewerId) {
+    const followsCreator = viewerId
+      ? await prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: viewerId,
+              followingId: intent.creatorId,
+            },
+          },
+          select: { id: true },
+        })
+      : null;
+
+    if (!followsCreator) {
+      throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent é visível somente para seguidores.');
+    }
   }
 
   const viewerSupport = viewerId

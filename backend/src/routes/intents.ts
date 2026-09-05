@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createIntentSchema } from '../domain/intent-schemas.js';
+import { AppError } from '../errors.js';
 import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middleware/auth.js';
 import {
   createIntent,
   getIntent,
   listUserIntents,
+  listFollowingFeed,
   listPublicFeed,
   removeSupport,
   supportIntent,
@@ -14,12 +16,21 @@ import {
 export const intentsRouter = Router();
 
 const identifierSchema = z.string().uuid();
+const feedQuerySchema = z.object({
+  scope: z.enum(['public', 'following']).default('public'),
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
-intentsRouter.get('/feed', async (request, response, next) => {
+intentsRouter.get('/feed', optionalAuthenticatedUser, async (request, response, next) => {
   try {
-    const cursor = typeof request.query.cursor === 'string' ? request.query.cursor : undefined;
-    const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
-    const feed = await listPublicFeed(cursor, Number.isFinite(limit) ? limit : 20);
+    const query = feedQuerySchema.parse(request.query);
+    if (query.scope === 'following' && !request.appUser) {
+      throw new AppError(401, 'AUTH_REQUIRED', 'Entre na sua conta para ver quem você segue.');
+    }
+    const feed = query.scope === 'following'
+      ? await listFollowingFeed(request.appUser!.id, query.cursor, query.limit)
+      : await listPublicFeed(query.cursor, query.limit);
     response.json({ data: feed });
   } catch (error) {
     next(error);

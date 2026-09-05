@@ -217,8 +217,17 @@ export async function listMyIntents(): Promise<{ items: ApiIntent[]; nextCursor:
   return result.data;
 }
 
-export async function listPublicIntents(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
-  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/feed');
+export type FeedScope = 'public' | 'following';
+
+export async function listPublicIntents(
+  scope: FeedScope = 'public',
+  cursor?: string,
+): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ scope, limit: '20' });
+  if (cursor) query.set('cursor', cursor);
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>(
+    `/v1/intents/feed?${query.toString()}`,
+  );
   return result.data;
 }
 
