@@ -219,9 +219,54 @@ export async function getIntent(intentId: string, viewerId?: string) {
   return { ...publicIntent, revealContent, viewerHasSupported: Boolean(viewerSupport) };
 }
 
+const SERIALIZABLE_RETRY_LIMIT = 3;
+
+async function runSerializableTransaction<T>(
+  operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; attempt <= SERIALIZABLE_RETRY_LIMIT; attempt += 1) {
+    try {
+      return await prisma.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+      if (!retryable || attempt === SERIALIZABLE_RETRY_LIMIT) throw error;
+    }
+  }
+
+  throw new Error('Limite de repetição transacional excedido.');
+}
+
+async function ensureSupportAccess(
+  transaction: Prisma.TransactionClient,
+  intent: { creatorId: string; visibility: string },
+  supporterId: string,
+): Promise<void> {
+  if (intent.visibility === 'PRIVATE') {
+    throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode apoiar uma Intent privada.');
+  }
+
+  if (intent.visibility === 'FOLLOWERS') {
+    const followsCreator = await transaction.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: supporterId,
+          followingId: intent.creatorId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!followsCreator) {
+      throw new AppError(403, 'INTENT_FORBIDDEN', 'Somente seguidores podem apoiar esta Intent.');
+    }
+  }
+}
+
 export async function supportIntent(intentId: string, supporterId: string) {
   try {
-    return await prisma.$transaction(async (transaction) => {
+    return await runSerializableTransaction(async (transaction) => {
       const existing = await transaction.intent.findUnique({ where: { id: intentId } });
 
       if (!existing) {
@@ -235,6 +280,8 @@ export async function supportIntent(intentId: string, supporterId: string) {
       if (existing.status !== 'PUBLISHED') {
         throw new AppError(409, 'INTENT_NOT_OPEN', 'Esta Intent não está aberta para novos apoios.');
       }
+
+      await ensureSupportAccess(transaction, existing, supporterId);
 
       const support = await transaction.support.create({
         data: { intentId, userId: supporterId },
@@ -293,7 +340,7 @@ export async function supportIntent(intentId: string, supporterId: string) {
         realized: realizedNow || updated.status === 'REALIZED',
         realizedNow,
       };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new AppError(409, 'SUPPORT_ALREADY_EXISTS', 'Você já apoiou esta Intent.');
@@ -303,7 +350,7 @@ export async function supportIntent(intentId: string, supporterId: string) {
 }
 
 export async function removeSupport(intentId: string, supporterId: string) {
-  return prisma.$transaction(async (transaction) => {
+  return runSerializableTransaction(async (transaction) => {
     const intent = await transaction.intent.findUnique({ where: { id: intentId } });
 
     if (!intent) {
@@ -365,5 +412,5 @@ export async function removeSupport(intentId: string, supporterId: string) {
       realized: false,
       realizedNow: false,
     };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
 }
