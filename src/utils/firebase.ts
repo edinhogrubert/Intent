@@ -8,6 +8,7 @@ import {
   signInWithPopup,
   signOut,
   updateProfile,
+  updateCurrentUser,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
@@ -26,6 +27,7 @@ export {
   signInWithPopup,
   signOut,
   updateProfile,
+  updateCurrentUser,
 };
 export type { FirebaseUser };
 
