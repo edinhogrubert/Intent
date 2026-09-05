@@ -20,6 +20,7 @@ BACKUP_DIR="${BASE_DIR}/backups/postgres"
 BACKEND_DIR="${SOURCE_DIR}/backend"
 COMPOSE_FILE="${BACKEND_DIR}/compose.yaml"
 RUNTIME_ENV="${RUNTIME_DIR}/backend.env"
+FIREBASE_CREDENTIALS_FILE="${BASE_DIR}/secrets/firebase-admin.json"
 
 FIREBASE_PROJECT_ID="intent-86155"
 CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100"
@@ -117,7 +118,7 @@ echo "================================================================"
 
 echo "[1/8] Validando ambiente..."
 
-for command in docker curl openssl python3 ss; do
+for command in docker curl openssl python3 ss stat; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "Comando obrigatório ausente: ${command}"
         exit 1
@@ -130,6 +131,37 @@ for required in "${DATA_ENV}" "${COMPOSE_FILE}" "${BACKEND_DIR}/Dockerfile"; do
         exit 1
     fi
 done
+
+if [[ ! -f "${FIREBASE_CREDENTIALS_FILE}" || -L "${FIREBASE_CREDENTIALS_FILE}" ]]; then
+    echo "Credencial Firebase ausente ou inválida: ${FIREBASE_CREDENTIALS_FILE}"
+    exit 1
+fi
+
+CREDENTIAL_OWNER="$(stat -c '%u:%g' "${FIREBASE_CREDENTIALS_FILE}")"
+CREDENTIAL_MODE="$(stat -c '%a' "${FIREBASE_CREDENTIALS_FILE}")"
+if [[ "${CREDENTIAL_OWNER}" != "0:10001" || "${CREDENTIAL_MODE}" != "440" ]]; then
+    echo "Permissões inseguras na credencial Firebase."
+    echo "Esperado: proprietário root, grupo 10001 e modo 440."
+    exit 1
+fi
+
+python3 - "${FIREBASE_CREDENTIALS_FILE}" "${FIREBASE_PROJECT_ID}" <<'PY'
+import json
+import sys
+
+path, expected_project = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as credential_file:
+    credential = json.load(credential_file)
+
+if credential.get('type') != 'service_account':
+    raise SystemExit('A credencial não é uma conta de serviço.')
+if credential.get('project_id') != expected_project:
+    raise SystemExit('A credencial pertence a outro projeto Firebase.')
+if not credential.get('client_email') or not credential.get('private_key'):
+    raise SystemExit('A credencial Firebase está incompleta.')
+PY
+
+echo "Credencial administrativa validada sem exibir conteúdo."
 
 if [[ ! -d "${SOURCE_DIR}/.git" ]]; then
     echo "Repositório Git não encontrado em ${SOURCE_DIR}."
@@ -193,6 +225,7 @@ umask 0077
     printf 'DATABASE_URL=postgresql://%s:%s@intent-postgres:5432/%s?schema=public\n' \
         "${ENCODED_POSTGRES_USER}" "${ENCODED_POSTGRES_PASSWORD}" "${ENCODED_POSTGRES_DB}"
     printf 'FIREBASE_PROJECT_ID=%s\n' "${FIREBASE_PROJECT_ID}"
+    printf 'GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-admin.json\n'
     printf 'REVEAL_ENCRYPTION_KEY=%s\n' "${REVEAL_ENCRYPTION_KEY}"
 } > "${RUNTIME_ENV}"
 
