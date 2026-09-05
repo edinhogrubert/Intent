@@ -158,7 +158,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
     where: { id: intentId },
     include: {
       creator: {
-        select: { id: true, username: true, displayName: true, avatarUrl: true },
+        select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
       },
     },
   });
