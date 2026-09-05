@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, CheckCircle2, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { auth, createUserWithEmailAndPassword, googleProvider, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile } from '../utils/firebase';
+import { auth, createUserWithEmailAndPassword, googleProvider, signInWithEmailAndPassword, signInWithPopup, signOut, updateCurrentUser, updateProfile, type FirebaseUser } from '../utils/firebase';
 import { IntentApiError, syncAuthenticatedUser } from '../services/intentApi';
 
 interface AuthGateProps {
@@ -48,7 +48,8 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
   const [error, setError] = useState('');
   const googleAttempt = useRef(0);
   const activeFlows = useRef(0);
-  const acceptedUserUid = useRef<string | null>(null);
+  const acceptedFirebaseUser = useRef<FirebaseUser | null>(null);
+  const formFlowActive = useRef(false);
   const mounted = useRef(true);
 
   useEffect(() => () => { mounted.current = false; }, []);
@@ -64,6 +65,7 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
   }
 
   async function finish(firebaseUser: Parameters<typeof syncAuthenticatedUser>[0]) {
+    acceptedFirebaseUser.current = firebaseUser;
     onAuthenticated(await syncAuthenticatedUser(firebaseUser));
   }
 
@@ -78,8 +80,10 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
     let timeoutId: number | undefined;
     const popup = signInWithPopup(auth, googleProvider).then(async (credential) => {
       if (attempt !== googleAttempt.current) {
-        const acceptedUid = acceptedUserUid.current;
-        if (auth.currentUser?.uid === credential.user.uid && acceptedUid !== credential.user.uid) {
+        const acceptedUser = acceptedFirebaseUser.current;
+        if (acceptedUser && acceptedUser.uid !== credential.user.uid) {
+          await updateCurrentUser(auth, acceptedUser);
+        } else if (!acceptedUser && !formFlowActive.current && auth.currentUser?.uid === credential.user.uid) {
           await signOut(auth);
         }
         throw new Error('STALE_GOOGLE_ATTEMPT');
@@ -96,7 +100,6 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
 
     try {
       const credential = await Promise.race([popup, timeout]);
-      acceptedUserUid.current = credential.user.uid;
       await finish(credential.user);
     } catch (caught) {
       const staleAttempt = caught instanceof Error && caught.message === 'STALE_GOOGLE_ATTEMPT';
@@ -116,6 +119,7 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
       googleAttempt.current += 1;
       setGoogleLoading(false);
     }
+    formFlowActive.current = true;
     setFormLoading(true);
     setError('');
     beginAuthFlow();
@@ -124,18 +128,17 @@ export function AuthGate({ onAuthenticated, onAuthFlowStart, onAuthFlowEnd }: Au
       if (register) {
         if (name.trim().length < 2) throw new Error('INVALID_NAME');
         const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-        acceptedUserUid.current = credential.user.uid;
         await updateProfile(credential.user, { displayName: name.trim() });
         await credential.user.getIdToken(true);
         await finish(credential.user);
       } else {
         const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-        acceptedUserUid.current = credential.user.uid;
         await finish(credential.user);
       }
     } catch (caught) {
       setError(caught instanceof Error && caught.message === 'INVALID_NAME' ? 'Informe seu nome.' : authMessage(caught));
     } finally {
+      formFlowActive.current = false;
       endAuthFlow();
       if (mounted.current) setFormLoading(false);
     }
