@@ -14,6 +14,7 @@ SOURCE_DIR="${BASE_DIR}/source"
 DATA_ENV="${BASE_DIR}/.env"
 RUNTIME_DIR="${BASE_DIR}/runtime"
 BACKUP_SCRIPT="${BASE_DIR}/scripts/executar-backup-postgres.sh"
+BACKUP_DIR="${BASE_DIR}/backups/postgres"
 
 BACKEND_DIR="${SOURCE_DIR}/backend"
 COMPOSE_FILE="${BACKEND_DIR}/compose.yaml"
@@ -24,6 +25,7 @@ CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,
 API_CONTAINER="intent-api"
 COMPOSE_IMAGE="intent-api-api:latest"
 ROLLBACK_IMAGE_TAG=""
+PRE_DEPLOY_BACKUP=""
 DEPLOYMENT_STARTED=0
 
 rollback_on_error() {
@@ -36,6 +38,23 @@ rollback_on_error() {
 
     if [[ "${DEPLOYMENT_STARTED}" -eq 1 && -n "${ROLLBACK_IMAGE_TAG}" ]] \
         && docker image inspect "${ROLLBACK_IMAGE_TAG}" >/dev/null 2>&1; then
+        echo "Interrompendo a API com falha..."
+        docker stop "${API_CONTAINER}" >/dev/null 2>&1 || true
+
+        if [[ -n "${PRE_DEPLOY_BACKUP}" && -f "${PRE_DEPLOY_BACKUP}" ]]; then
+            echo "Restaurando o PostgreSQL a partir de ${PRE_DEPLOY_BACKUP}..."
+            if docker exec -i intent-postgres pg_restore \
+                --clean --if-exists --no-owner --no-privileges \
+                --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" \
+                < "${PRE_DEPLOY_BACKUP}"; then
+                echo "Banco anterior restaurado."
+            else
+                echo "ATENÇÃO: a restauração do banco falhou; revise o backup antes de liberar a API."
+            fi
+        else
+            echo "ATENÇÃO: backup anterior não localizado para restauração do banco."
+        fi
+
         echo "Restaurando a imagem anterior..."
         docker tag "${ROLLBACK_IMAGE_TAG}" "${COMPOSE_IMAGE}"
         docker compose -f "${COMPOSE_FILE}" up -d --no-build --force-recreate || true
@@ -166,6 +185,13 @@ else
     exit 1
 fi
 
+PRE_DEPLOY_BACKUP="$(ls -1t "${BACKUP_DIR}"/intent_*.dump 2>/dev/null | head -n 1 || true)"
+if [[ -z "${PRE_DEPLOY_BACKUP}" || ! -s "${PRE_DEPLOY_BACKUP}" ]]; then
+    echo "O backup anterior à implantação não foi localizado ou está vazio."
+    exit 1
+fi
+echo "Backup de rollback confirmado: ${PRE_DEPLOY_BACKUP}"
+
 echo "[5/8] Preservando a versão atual e construindo a imagem ARM64..."
 
 CURRENT_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${API_CONTAINER}" 2>/dev/null || true)"
@@ -239,5 +265,6 @@ echo "Acesso externo:  bloqueado"
 echo "Portas 80/443:   inalteradas"
 if [[ -n "${ROLLBACK_IMAGE_TAG}" ]]; then
     echo "Rollback salvo:  ${ROLLBACK_IMAGE_TAG}"
+    echo "Backup associado: ${PRE_DEPLOY_BACKUP}"
 fi
 echo "================================================================"
