@@ -14,7 +14,8 @@
 | 🧪 Implantado, falta validação humana | Está tecnicamente ativo, mas o fluxo completo ainda precisa ser testado por usuários |
 | 🟡 Próxima prioridade | Deve ser uma das próximas entregas do MVP |
 | ⏳ Planejado | Faz parte do produto, mas ainda não será implementado |
-| 🔧 No GitHub, aguardando implantação | Implementado na branch, mas ainda não está ativo na Oracle |\n| 🚫 Fora do MVP atual | Foi conscientemente adiado para evitar complexidade prematura |
+| 🔧 No GitHub, aguardando implantação | Implementado na branch, mas ainda não está ativo na Oracle |
+| 🚫 Fora do MVP atual | Foi conscientemente adiado para evitar complexidade prematura |
 
 ## Regra de manutenção
 
