@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserMinus, UserPlus, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { followProfile, getSocialProfile, IntentApiError, unfollowProfile, type ApiSocialProfile } from '../services/intentApi';
@@ -22,16 +22,21 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, 
   const [relationshipLoading, setRelationshipLoading] = useState(false);
   const [error, setError] = useState('');
   const [connectionsMode, setConnectionsMode] = useState<'followers' | 'following' | null>(null);
+  const loadGeneration = useRef(0);
 
   async function loadProfile() {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError('');
     try {
-      setProfile(await getSocialProfile(userId === currentUser.id ? undefined : userId));
+      const loadedProfile = await getSocialProfile(userId === currentUser.id ? undefined : userId);
+      if (generation === loadGeneration.current) setProfile(loadedProfile);
     } catch (caught) {
-      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar o perfil.');
+      if (generation === loadGeneration.current) {
+        setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar o perfil.');
+      }
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
 
