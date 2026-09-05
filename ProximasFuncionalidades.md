@@ -335,7 +335,50 @@ A API pública e os webhooks serão ativados somente depois de autenticação de
 - hash chains;
 - provas criptográficas avançadas somente quando houver necessidade real.
 
-## 4.6 Plataforma e operação
+## 4.6 Jornada do Seguidor: boas-vindas e despedida
+
+O criador poderá preparar uma experiência automática para o início e o encerramento do vínculo com um seguidor.
+
+Ao seguir ou inscrever-se, a pessoa poderá receber:
+
+- mensagem de boas-vindas;
+- uma Intent especial de boas-vindas;
+- conteúdo exclusivo;
+- recompensa simbólica;
+- cupom, arquivo ou link, quando esse tipo de conteúdo estiver disponível;
+- convite para acompanhar uma Intent ou objetivo específico.
+
+Ao deixar de seguir ou encerrar a inscrição, poderá receber:
+
+- mensagem respeitosa de despedida;
+- resumo opcional da participação;
+- possibilidade de informar o motivo da saída, sem obrigação;
+- orientação sobre como voltar a acompanhar no futuro.
+
+### Regras de produto
+
+- boas-vindas e despedida são configuráveis e opcionais;
+- a mensagem de despedida não pode constranger, culpabilizar ou dificultar a saída;
+- bloquear uma pessoa, suspender uma conta ou moderar um vínculo não dispara mensagem;
+- recompensas devem ter validade, disponibilidade e critério explícitos;
+- seguir, deixar de seguir e repetir a ação não pode gerar recompensas ilimitadas;
+- cada campanha define se a recompensa é concedida uma única vez por pessoa;
+- deve existir período de segurança contra ciclos de seguir e deixar de seguir;
+- mensagens automáticas precisam ser claramente identificadas;
+- o usuário destinatário poderá controlar notificações desse tipo;
+- todas as decisões de elegibilidade pertencem ao backend.
+
+### Eventos futuros necessários
+
+- `USER_FOLLOWED`;
+- `WELCOME_JOURNEY_STARTED`;
+- `WELCOME_REWARD_GRANTED`;
+- `USER_UNFOLLOWED`;
+- `FAREWELL_MESSAGE_AVAILABLE`.
+
+Essa função pode evoluir para criadores, empresas, escolas, clubes e projetos sem transformar o Intent em uma ferramenta genérica de marketing. A experiência deve continuar ligada a acontecimentos, participação e relacionamento público.
+
+## 4.7 Plataforma e operação
 
 - domínio e HTTPS;
 - publicação controlada;
