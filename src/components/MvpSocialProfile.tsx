@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserCheck, UserPlus, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserMinus, UserPlus, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { followProfile, getSocialProfile, IntentApiError, unfollowProfile, type ApiSocialProfile } from '../services/intentApi';
 
@@ -70,7 +70,7 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }
           <div className="w-20 h-20 rounded-full border-4 border-white bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center text-2xl font-black">
             {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover"/> : profile.displayName.charAt(0).toUpperCase()}
           </div>
-          {!profile.isMe && <button onClick={() => void toggleFollow()} disabled={relationshipLoading} className={`mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-60 ${profile.isFollowing ? 'border border-[#c6c5d4] text-[#000666]' : 'bg-[#000666] text-white'}`}>{profile.isFollowing ? <UserCheck className="w-4 h-4"/> : <UserPlus className="w-4 h-4"/>}{relationshipLoading ? 'Atualizando...' : profile.isFollowing ? 'Seguindo' : 'Seguir'}</button>}
+          {!profile.isMe && <button onClick={() => void toggleFollow()} disabled={relationshipLoading} className={`mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-60 ${profile.isFollowing ? 'border border-[#c6c5d4] text-[#8c1d18] bg-white' : 'bg-[#000666] text-white'}`}>{profile.isFollowing ? <UserMinus className="w-4 h-4"/> : <UserPlus className="w-4 h-4"/>}{relationshipLoading ? 'Atualizando...' : profile.isFollowing ? 'Deixar de seguir' : 'Seguir'}</button>}
         </div>
 
         <h1 className="text-2xl font-black mt-4">{profile.displayName}</h1>
