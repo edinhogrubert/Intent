@@ -22,8 +22,8 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 RUN apk add --no-cache openssl \
-    && addgroup -S intent \
-    && adduser -S -G intent intent
+    && addgroup -S -g 10001 intent \
+    && adduser -S -D -H -u 10001 -G intent intent
 
 COPY --from=build --chown=intent:intent /app/node_modules ./node_modules
 COPY --from=build --chown=intent:intent /app/dist ./dist
