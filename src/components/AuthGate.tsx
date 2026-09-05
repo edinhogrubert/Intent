@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, CheckCircle2, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { auth, createUserWithEmailAndPassword, googleProvider, signInWithEmailAndPassword, signInWithPopup, updateProfile } from '../utils/firebase';
+import { auth, createUserWithEmailAndPassword, googleProvider, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile } from '../utils/firebase';
 import { IntentApiError, syncAuthenticatedUser } from '../services/intentApi';
 
 interface AuthGateProps {
