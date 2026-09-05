@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, Lock, Plus, RefreshCw, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import {
@@ -33,19 +33,26 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const loadGeneration = useRef(0);
 
   async function loadFeed(cursor?: string) {
+    const generation = ++loadGeneration.current;
     cursor ? setLoadingMore(true) : setLoading(true);
     setError('');
     try {
       const page = await listPublicIntents(scope, cursor);
+      if (generation !== loadGeneration.current) return;
       setIntents((current) => cursor ? [...current, ...page.items] : page.items);
       setNextCursor(page.nextCursor);
     } catch (caught) {
-      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar o feed.');
+      if (generation === loadGeneration.current) {
+        setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar o feed.');
+      }
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (generation === loadGeneration.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }
 
