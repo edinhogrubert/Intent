@@ -76,8 +76,8 @@ export async function getSocialProfile(targetUserId: string, viewerUserId: strin
   ] = await Promise.all([
     prisma.intent.count({ where: createdIntentScope }),
     prisma.intent.count({ where: { ...createdIntentScope, status: 'REALIZED' } }),
-    prisma.follow.count({ where: { followingId: targetUserId } }),
-    prisma.follow.count({ where: { followerId: targetUserId } }),
+    prisma.follow.count({ where: { followingId: targetUserId, follower: { status: 'ACTIVE' } } }),
+    prisma.follow.count({ where: { followerId: targetUserId, following: { status: 'ACTIVE' } } }),
     prisma.support.count({ where: supportedIntentScope }),
     prisma.support.count({ where: receivedSupportScope }),
     isMe
