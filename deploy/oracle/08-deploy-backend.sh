@@ -3,9 +3,10 @@
 set -Eeuo pipefail
 
 # ================================================================
-# INTENT — IMPLANTAÇÃO INTERNA DO BACKEND
+# INTENT — IMPLANTAÇÃO INTERNA SEGURA DO BACKEND
 # A API fica disponível somente em 127.0.0.1:8080.
-# Este script não altera UFW, NSG, portas 80/443 ou a branch Git.
+# O build ocorre com a versão anterior ativa. A janela de manutenção
+# começa antes do backup e termina somente após os testes de saúde.
 # ================================================================
 
 APP_USER="ubuntu"
@@ -24,62 +25,86 @@ FIREBASE_PROJECT_ID="intent-86155"
 CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3100,http://127.0.0.1:3100"
 API_CONTAINER="intent-api"
 COMPOSE_IMAGE="intent-api-api:latest"
+
 ROLLBACK_IMAGE_TAG=""
 PRE_DEPLOY_BACKUP=""
 DEPLOYMENT_STARTED=0
+DATABASE_MAY_HAVE_CHANGED=0
 
 rollback_on_error() {
-    local exit_code=$?
-    local failed_line=$1
-    trap - ERR
+    local exit_code="$1"
+    local failed_line="$2"
+    local restore_ok=1
+    local rollback_status=""
 
+    trap - ERR
     echo
     echo "ERRO NA LINHA ${failed_line}. Iniciando recuperação segura."
 
-    if [[ "${DEPLOYMENT_STARTED}" -eq 1 && -n "${ROLLBACK_IMAGE_TAG}" ]] \
-        && docker image inspect "${ROLLBACK_IMAGE_TAG}" >/dev/null 2>&1; then
-        echo "Interrompendo a API com falha..."
-        docker stop "${API_CONTAINER}" >/dev/null 2>&1 || true
+    if [[ "${DEPLOYMENT_STARTED}" -ne 1 ]]; then
+        echo "A janela de manutenção ainda não havia começado; a API anterior permanece ativa."
+        exit "${exit_code}"
+    fi
 
-        if [[ -n "${PRE_DEPLOY_BACKUP}" && -f "${PRE_DEPLOY_BACKUP}" ]]; then
-            echo "Restaurando o PostgreSQL a partir de ${PRE_DEPLOY_BACKUP}..."
+    docker stop "${API_CONTAINER}" >/dev/null 2>&1 || true
+
+    if [[ "${DATABASE_MAY_HAVE_CHANGED}" -eq 1 ]]; then
+        if [[ -z "${PRE_DEPLOY_BACKUP}" || ! -s "${PRE_DEPLOY_BACKUP}" ]]; then
+            echo "FALHA CRÍTICA: backup anterior não localizado. A API permanecerá parada."
+            restore_ok=0
+        else
+            echo "Restaurando o PostgreSQL em transação única..."
             if docker exec -i intent-postgres pg_restore \
-                --clean --if-exists --no-owner --no-privileges \
+                --clean --if-exists --single-transaction --no-owner --no-privileges \
                 --username "${POSTGRES_USER}" --dbname "${POSTGRES_DB}" \
                 < "${PRE_DEPLOY_BACKUP}"; then
-                echo "Banco anterior restaurado."
+                echo "Banco anterior restaurado e validado pelo pg_restore."
             else
-                echo "ATENÇÃO: a restauração do banco falhou; revise o backup antes de liberar a API."
+                echo "FALHA CRÍTICA: o banco não foi restaurado. A API permanecerá parada."
+                restore_ok=0
             fi
-        else
-            echo "ATENÇÃO: backup anterior não localizado para restauração do banco."
-        fi
-
-        echo "Restaurando a imagem anterior..."
-        docker tag "${ROLLBACK_IMAGE_TAG}" "${COMPOSE_IMAGE}"
-        docker compose -f "${COMPOSE_FILE}" up -d --no-build --force-recreate || true
-
-        local rollback_status=""
-        for _attempt in {1..24}; do
-            rollback_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${API_CONTAINER}" 2>/dev/null || true)"
-            [[ "${rollback_status}" == "healthy" ]] && break
-            sleep 5
-        done
-
-        if [[ "${rollback_status}" == "healthy" ]]; then
-            echo "Rollback concluído; a API anterior voltou a ficar saudável."
-        else
-            echo "ATENÇÃO: o rollback não ficou saudável. Estado: ${rollback_status:-indisponível}."
-            docker logs --tail 120 "${API_CONTAINER}" || true
         fi
     else
-        echo "Nenhuma imagem anterior estava disponível para rollback."
+        echo "Nenhuma migração foi iniciada; o banco não precisa ser restaurado."
+    fi
+
+    if [[ "${restore_ok}" -ne 1 ]]; then
+        echo "Não reinicie a aplicação antes de recuperar e validar o PostgreSQL."
+        exit "${exit_code}"
+    fi
+
+    if [[ -z "${ROLLBACK_IMAGE_TAG}" ]] \
+        || ! docker image inspect "${ROLLBACK_IMAGE_TAG}" >/dev/null 2>&1; then
+        echo "FALHA CRÍTICA: imagem anterior indisponível. A API permanecerá parada."
+        exit "${exit_code}"
+    fi
+
+    echo "Restaurando a imagem anterior..."
+    docker tag "${ROLLBACK_IMAGE_TAG}" "${COMPOSE_IMAGE}"
+    if ! docker compose -f "${COMPOSE_FILE}" up -d --no-build --force-recreate; then
+        echo "FALHA CRÍTICA: não foi possível reiniciar a imagem anterior."
+        exit "${exit_code}"
+    fi
+
+    for _attempt in {1..24}; do
+        rollback_status="$(docker inspect \
+            --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+            "${API_CONTAINER}" 2>/dev/null || true)"
+        [[ "${rollback_status}" == "healthy" ]] && break
+        sleep 5
+    done
+
+    if [[ "${rollback_status}" == "healthy" ]]; then
+        echo "Rollback concluído; banco e API anteriores voltaram a ficar saudáveis."
+    else
+        echo "FALHA CRÍTICA: a API anterior não ficou saudável. Estado: ${rollback_status:-indisponível}."
+        docker logs --tail 120 "${API_CONTAINER}" || true
     fi
 
     exit "${exit_code}"
 }
 
-trap 'rollback_on_error ${LINENO}' ERR
+trap 'rollback_on_error "$?" "${LINENO}"' ERR
 
 if [[ "${EUID}" -ne 0 ]]; then
     echo "Execute usando sudo."
@@ -87,10 +112,10 @@ if [[ "${EUID}" -ne 0 ]]; then
 fi
 
 echo "================================================================"
-echo "INTENT — IMPLANTAÇÃO INTERNA DO BACKEND"
+echo "INTENT — IMPLANTAÇÃO INTERNA SEGURA DO BACKEND"
 echo "================================================================"
 
-echo "[1/8] Validando arquivos..."
+echo "[1/8] Validando ambiente..."
 
 for command in docker curl openssl python3 ss; do
     if ! command -v "${command}" >/dev/null 2>&1; then
@@ -116,7 +141,7 @@ if [[ -n "$(sudo -u "${APP_USER}" git -C "${SOURCE_DIR}" status --porcelain)" ]]
     exit 1
 fi
 
-echo "[2/8] Validando PostgreSQL e rede privada..."
+echo "[2/8] Validando serviços de dados..."
 
 if [[ "$(docker inspect --format='{{.State.Health.Status}}' intent-postgres 2>/dev/null || true)" != "healthy" ]]; then
     echo "PostgreSQL não está saudável."
@@ -173,10 +198,27 @@ umask 0077
 
 chown root:docker "${RUNTIME_ENV}"
 chmod 0640 "${RUNTIME_ENV}"
+echo "Configuração gravada sem exibir credenciais."
 
-echo "Credenciais gravadas sem exibição na tela."
+echo "[4/8] Preservando a versão atual e construindo a nova imagem..."
 
-echo "[4/8] Criando backup anterior à migração..."
+CURRENT_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${API_CONTAINER}" 2>/dev/null || true)"
+if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
+    ROLLBACK_IMAGE_TAG="intent-api-api:rollback-$(date +%Y%m%d-%H%M%S)"
+    docker tag "${CURRENT_IMAGE_ID}" "${ROLLBACK_IMAGE_TAG}"
+    echo "Imagem anterior preservada em ${ROLLBACK_IMAGE_TAG}."
+else
+    echo "Não existe API anterior; esta será a primeira implantação."
+fi
+
+docker compose -f "${COMPOSE_FILE}" build --pull
+
+echo "[5/8] Abrindo janela de manutenção e criando backup consistente..."
+
+DEPLOYMENT_STARTED=1
+if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
+    docker stop "${API_CONTAINER}" >/dev/null
+fi
 
 if [[ -x "${BACKUP_SCRIPT}" ]]; then
     "${BACKUP_SCRIPT}"
@@ -190,30 +232,17 @@ if [[ -z "${PRE_DEPLOY_BACKUP}" || ! -s "${PRE_DEPLOY_BACKUP}" ]]; then
     echo "O backup anterior à implantação não foi localizado ou está vazio."
     exit 1
 fi
-echo "Backup de rollback confirmado: ${PRE_DEPLOY_BACKUP}"
-
-echo "[5/8] Preservando a versão atual e construindo a imagem ARM64..."
-
-CURRENT_IMAGE_ID="$(docker inspect --format='{{.Image}}' "${API_CONTAINER}" 2>/dev/null || true)"
-if [[ -n "${CURRENT_IMAGE_ID}" ]]; then
-    ROLLBACK_IMAGE_TAG="intent-api-api:rollback-$(date +%Y%m%d-%H%M%S)"
-    docker tag "${CURRENT_IMAGE_ID}" "${ROLLBACK_IMAGE_TAG}"
-    echo "Imagem anterior preservada em ${ROLLBACK_IMAGE_TAG}."
-else
-    echo "Primeira implantação: ainda não existe imagem anterior."
-fi
-
-DEPLOYMENT_STARTED=1
-docker compose -f "${COMPOSE_FILE}" build --pull
+echo "Backup consistente confirmado: ${PRE_DEPLOY_BACKUP}"
 
 echo "[6/8] Iniciando API e aplicando migrações..."
 
+DATABASE_MAY_HAVE_CHANGED=1
 docker compose -f "${COMPOSE_FILE}" up -d
 
 echo "[7/8] Aguardando saúde da API..."
 
 API_STATUS="starting"
-for attempt in {1..24}; do
+for _attempt in {1..24}; do
     API_STATUS="$(docker inspect \
         --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
         "${API_CONTAINER}" 2>/dev/null || true)"
@@ -235,7 +264,7 @@ if [[ "${API_STATUS}" != "healthy" ]]; then
     exit 1
 fi
 
-echo "[8/8] Executando testes de fumaça..."
+echo "[8/8] Executando testes de fumaça e isolamento..."
 
 curl --fail --silent --show-error http://127.0.0.1:8080/health
 echo
@@ -251,6 +280,7 @@ if grep -Eq '(^|[[:space:]])(0\.0\.0\.0|\*):8080' <<< "${LISTEN_ADDRESS}"; then
 fi
 
 DEPLOYMENT_STARTED=0
+DATABASE_MAY_HAVE_CHANGED=0
 trap - ERR
 
 echo
