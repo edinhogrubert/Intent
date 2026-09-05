@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - codex/mvp-backend-base
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Preparar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+
+      - name: Verificar TypeScript
+        run: bun run lint
+
+      - name: Gerar build
+        run: bun run build
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Verificar TypeScript
+        run: npm run lint
+
+      - name: Executar testes
+        run: npm test
+
+      - name: Gerar build
+        run: npm run build
+
+  deployment-scripts:
+    name: Scripts Oracle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+
+      - name: Validar sintaxe Bash
+        run: bash -n deploy/oracle/*.sh
