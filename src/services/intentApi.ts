@@ -71,6 +71,17 @@ export interface ApiSocialProfile {
   recentIntents: ApiIntent[];
 }
 
+export interface ApiSocialConnection {
+  id: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  followedAt: string;
+  isMe: boolean;
+  isFollowing: boolean;
+}
+
 export interface SupportIntentResult {
   intentId: string;
   supportCount: number;
@@ -170,6 +181,27 @@ export async function unfollowProfile(userId: string): Promise<ApiSocialProfile>
     { method: 'DELETE' },
   );
   return result.data;
+}
+
+async function listProfileConnections(
+  userId: string,
+  kind: 'followers' | 'following',
+  cursor?: string,
+): Promise<{ items: ApiSocialConnection[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ limit: '20' });
+  if (cursor) query.set('cursor', cursor);
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiSocialConnection[]; nextCursor: string | null }>>(
+    `/v1/users/${encodeURIComponent(userId)}/${kind}?${query.toString()}`,
+  );
+  return result.data;
+}
+
+export function listProfileFollowers(userId: string, cursor?: string) {
+  return listProfileConnections(userId, 'followers', cursor);
+}
+
+export function listProfileFollowing(userId: string, cursor?: string) {
+  return listProfileConnections(userId, 'following', cursor);
 }
 
 export async function createSupportIntent(input: CreateSupportIntentInput): Promise<ApiIntent> {

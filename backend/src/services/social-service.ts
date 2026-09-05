@@ -156,3 +156,66 @@ export async function unfollowUser(followerId: string, followingId: string) {
   await prisma.follow.deleteMany({ where: { followerId, followingId } });
   return getSocialProfile(followingId, followerId);
 }
+
+export async function listConnections(
+  targetUserId: string,
+  viewerUserId: string,
+  kind: 'followers' | 'following',
+  cursor?: string,
+  limit = 20,
+) {
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, status: true },
+  });
+
+  if (!target || target.status !== 'ACTIVE') {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Perfil não encontrado.');
+  }
+
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const rows = await prisma.follow.findMany({
+    where: kind === 'followers'
+      ? { followingId: targetUserId, follower: { status: 'ACTIVE' } }
+      : { followerId: targetUserId, following: { status: 'ACTIVE' } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: safeLimit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: {
+      id: true,
+      createdAt: true,
+      follower: {
+        select: { id: true, username: true, displayName: true, bio: true, avatarUrl: true },
+      },
+      following: {
+        select: { id: true, username: true, displayName: true, bio: true, avatarUrl: true },
+      },
+    },
+  });
+
+  const hasMore = rows.length > safeLimit;
+  const page = hasMore ? rows.slice(0, safeLimit) : rows;
+  const personIds = page
+    .map((row) => kind === 'followers' ? row.follower.id : row.following.id)
+    .filter((id) => id !== viewerUserId);
+  const viewerRelations = personIds.length > 0
+    ? await prisma.follow.findMany({
+        where: { followerId: viewerUserId, followingId: { in: personIds } },
+        select: { followingId: true },
+      })
+    : [];
+  const viewerFollowingIds = new Set(viewerRelations.map((relation) => relation.followingId));
+
+  return {
+    items: page.map((row) => {
+      const person = kind === 'followers' ? row.follower : row.following;
+      return {
+        ...person,
+        followedAt: row.createdAt,
+        isMe: person.id === viewerUserId,
+        isFollowing: viewerFollowingIds.has(person.id),
+      };
+    }),
+    nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
+  };
+}

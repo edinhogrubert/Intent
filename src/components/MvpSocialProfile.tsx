@@ -2,23 +2,26 @@ import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserMinus, UserPlus, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { followProfile, getSocialProfile, IntentApiError, unfollowProfile, type ApiSocialProfile } from '../services/intentApi';
+import { MvpConnectionsList } from './MvpConnectionsList';
 
 interface MvpSocialProfileProps {
   userId: string;
   currentUser: UserAccount;
   onBack: () => void;
   onSelectIntent: (id: string) => void;
+  onSelectProfile: (id: string) => void;
 }
 
 function memberSince(value: string) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(value));
 }
 
-export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }: MvpSocialProfileProps) {
+export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, onSelectProfile }: MvpSocialProfileProps) {
   const [profile, setProfile] = useState<ApiSocialProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
   const [error, setError] = useState('');
+  const [connectionsMode, setConnectionsMode] = useState<'followers' | 'following' | null>(null);
 
   async function loadProfile() {
     setLoading(true);
@@ -32,7 +35,10 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }
     }
   }
 
-  useEffect(() => { void loadProfile(); }, [userId]);
+  useEffect(() => {
+    setConnectionsMode(null);
+    void loadProfile();
+  }, [userId]);
 
   async function toggleFollow() {
     if (!profile || profile.isMe || relationshipLoading) return;
@@ -51,10 +57,12 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }
 
   if (!profile) return <div className="max-w-xl mx-auto px-4 py-10"><div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5"><AlertCircle className="w-5 h-5 mb-2"/><p className="font-bold">Perfil indisponível</p><p className="text-sm mt-1">{error}</p><button onClick={onBack} className="mt-4 text-sm font-bold underline">Voltar</button></div></div>;
 
-  const metrics = [
+  if (connectionsMode) return <MvpConnectionsList profileId={profile.id} mode={connectionsMode} onBack={() => setConnectionsMode(null)} onSelectProfile={onSelectProfile}/>;
+
+  const metrics: Array<{ label: string; value: number; connection?: 'followers' | 'following' }> = [
     { label: 'Intents', value: profile.stats.intentsCreated },
-    { label: 'Seguidores', value: profile.stats.followersCount },
-    { label: 'Seguindo', value: profile.stats.followingCount },
+    { label: 'Seguidores', value: profile.stats.followersCount, connection: 'followers' },
+    { label: 'Seguindo', value: profile.stats.followingCount, connection: 'following' },
     { label: 'Realizadas', value: profile.stats.intentsRealized },
     { label: 'Mobilização', value: profile.stats.supportsReceived },
     { label: 'Participação', value: profile.stats.supportsGiven },
@@ -81,7 +89,9 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }
         {error && <div role="alert" className="mt-4 p-3 bg-[#ffdad6] text-[#8c1d18] rounded-xl text-sm">{error}</div>}
 
         <div className="grid grid-cols-3 gap-px bg-[#e4e2de] border border-[#e4e2de] rounded-2xl overflow-hidden mt-6">
-          {metrics.map((metric) => <div key={metric.label} className="bg-[#fbf9f5] px-2 py-4 text-center"><p className="text-lg font-black text-[#000666]">{metric.value}</p><p className="text-[11px] text-[#666] mt-1">{metric.label}</p></div>)}
+          {metrics.map((metric) => metric.connection
+            ? <button type="button" key={metric.label} onClick={() => setConnectionsMode(metric.connection!)} className="bg-[#fbf9f5] px-2 py-4 text-center hover:bg-[#f0efff] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#000666]" aria-label={`Abrir ${metric.label.toLowerCase()}`}><p className="text-lg font-black text-[#000666]">{metric.value}</p><p className="text-[11px] text-[#000666] font-bold mt-1 underline">{metric.label}</p></button>
+            : <div key={metric.label} className="bg-[#fbf9f5] px-2 py-4 text-center"><p className="text-lg font-black text-[#000666]">{metric.value}</p><p className="text-[11px] text-[#666] mt-1">{metric.label}</p></div>)}
         </div>
 
         <div className="mt-5 p-4 rounded-2xl bg-[#e8f5e9] flex items-center justify-between gap-4"><div><p className="text-xs font-bold text-[#28642f] flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4"/>Taxa de realização</p><p className="text-xs text-[#47664b] mt-1">Percentual real das Intents concluídas</p></div><strong className="text-2xl text-[#28642f]">{profile.stats.realizationRate}%</strong></div>

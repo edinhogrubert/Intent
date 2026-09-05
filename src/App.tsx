@@ -87,7 +87,7 @@ export default function App() {
       {view === 'create' && <CreationWizard currentUser={currentUser} onCancel={() => setView('home')} onComplete={(created) => { setToast('Intent publicada com sucesso.'); setSelectedIntentId(created.id); setView('detail'); }}/>} 
       {view === 'mine' && <MyIntentsDashboard currentUser={currentUser} onCreateNew={() => setView('create')} onSelectIntent={selectIntent}/>} 
       {view === 'detail' && selectedIntentId && <MvpIntentDetail intentId={selectedIntentId} currentUser={currentUser} onBack={() => setView('home')}/>} 
-      {view === 'profile' && <MvpSocialProfile userId={selectedProfileId || currentUser.id} currentUser={currentUser} onBack={() => setView('home')} onSelectIntent={selectIntent}/>} 
+      {view === 'profile' && <MvpSocialProfile userId={selectedProfileId || currentUser.id} currentUser={currentUser} onBack={() => setView('home')} onSelectIntent={selectIntent} onSelectProfile={selectProfile}/>} 
     </main>
 
     <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#e4e2de] px-2 py-2 flex justify-around">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { if (id === 'profile') setSelectedProfileId(currentUser.id); setView(id); }} className={`min-w-16 py-1 flex flex-col items-center gap-1 text-[10px] font-bold ${view === id ? 'text-[#000666]' : 'text-[#777]'}`}><Icon className="w-5 h-5"/>{label}</button>)}</nav>

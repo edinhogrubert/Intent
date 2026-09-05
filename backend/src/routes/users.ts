@@ -4,10 +4,14 @@ import { z } from 'zod';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
 import { updateProfileSchema } from '../domain/intent-schemas.js';
 import { prisma } from '../lib/prisma.js';
-import { followUser, getSocialProfile, unfollowUser } from '../services/social-service.js';
+import { followUser, getSocialProfile, listConnections, unfollowUser } from '../services/social-service.js';
 
 export const usersRouter = Router();
 const userIdSchema = z.string().uuid();
+const connectionQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 usersRouter.use(requireAuthenticatedUser);
 
@@ -33,6 +37,28 @@ usersRouter.get('/:id/social', async (request, response, next) => {
     const userId = userIdSchema.parse(request.params.id);
     const profile = await getSocialProfile(userId, request.appUser!.id);
     response.json({ data: profile });
+  } catch (error) {
+    next(error);
+  }
+});
+
+usersRouter.get('/:id/followers', async (request, response, next) => {
+  try {
+    const userId = userIdSchema.parse(request.params.id);
+    const query = connectionQuerySchema.parse(request.query);
+    const connections = await listConnections(userId, request.appUser!.id, 'followers', query.cursor, query.limit);
+    response.json({ data: connections });
+  } catch (error) {
+    next(error);
+  }
+});
+
+usersRouter.get('/:id/following', async (request, response, next) => {
+  try {
+    const userId = userIdSchema.parse(request.params.id);
+    const query = connectionQuerySchema.parse(request.query);
+    const connections = await listConnections(userId, request.appUser!.id, 'following', query.cursor, query.limit);
+    response.json({ data: connections });
   } catch (error) {
     next(error);
   }
