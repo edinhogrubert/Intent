@@ -34,7 +34,7 @@ export function createApp() {
     logger,
     genReqId(request, response) {
       const supplied = request.headers['x-request-id'];
-      const requestId = typeof supplied === 'string' && supplied.length <= 100
+      const requestId = typeof supplied === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(supplied)
         ? supplied
         : randomUUID();
       response.setHeader('X-Request-Id', requestId);
