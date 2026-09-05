@@ -1,0 +1,97 @@
+import { useEffect, useState } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserCheck, UserPlus, Users } from 'lucide-react';
+import type { UserAccount } from '../types';
+import { followProfile, getSocialProfile, IntentApiError, unfollowProfile, type ApiSocialProfile } from '../services/intentApi';
+
+interface MvpSocialProfileProps {
+  userId: string;
+  currentUser: UserAccount;
+  onBack: () => void;
+  onSelectIntent: (id: string) => void;
+}
+
+function memberSince(value: string) {
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(value));
+}
+
+export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent }: MvpSocialProfileProps) {
+  const [profile, setProfile] = useState<ApiSocialProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [relationshipLoading, setRelationshipLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function loadProfile() {
+    setLoading(true);
+    setError('');
+    try {
+      setProfile(await getSocialProfile(userId === currentUser.id ? undefined : userId));
+    } catch (caught) {
+      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar o perfil.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadProfile(); }, [userId]);
+
+  async function toggleFollow() {
+    if (!profile || profile.isMe || relationshipLoading) return;
+    setRelationshipLoading(true);
+    setError('');
+    try {
+      setProfile(profile.isFollowing ? await unfollowProfile(profile.id) : await followProfile(profile.id));
+    } catch (caught) {
+      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar este vínculo.');
+    } finally {
+      setRelationshipLoading(false);
+    }
+  }
+
+  if (loading) return <div className="max-w-3xl mx-auto px-4 py-12 text-center text-sm text-[#666]"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3"/>Carregando perfil real...</div>;
+
+  if (!profile) return <div className="max-w-xl mx-auto px-4 py-10"><div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5"><AlertCircle className="w-5 h-5 mb-2"/><p className="font-bold">Perfil indisponível</p><p className="text-sm mt-1">{error}</p><button onClick={onBack} className="mt-4 text-sm font-bold underline">Voltar</button></div></div>;
+
+  const metrics = [
+    { label: 'Intents', value: profile.stats.intentsCreated },
+    { label: 'Seguidores', value: profile.stats.followersCount },
+    { label: 'Seguindo', value: profile.stats.followingCount },
+    { label: 'Realizadas', value: profile.stats.intentsRealized },
+    { label: 'Mobilização', value: profile.stats.supportsReceived },
+    { label: 'Participação', value: profile.stats.supportsGiven },
+  ];
+
+  return <div className="max-w-3xl mx-auto w-full px-4 py-6 sm:py-8">
+    <button onClick={onBack} className="mb-4 text-sm font-bold text-[#000666] flex items-center gap-2"><ArrowLeft className="w-4 h-4"/>Voltar</button>
+
+    <section className="bg-white border border-[#e4e2de] rounded-3xl shadow-sm overflow-hidden">
+      <div className="h-24 bg-gradient-to-r from-[#000666] via-[#3434a5] to-[#8787e8]"/>
+      <div className="px-5 sm:px-7 pb-7">
+        <div className="flex items-end justify-between gap-4 -mt-10">
+          <div className="w-20 h-20 rounded-full border-4 border-white bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center text-2xl font-black">
+            {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover"/> : profile.displayName.charAt(0).toUpperCase()}
+          </div>
+          {!profile.isMe && <button onClick={() => void toggleFollow()} disabled={relationshipLoading} className={`mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-60 ${profile.isFollowing ? 'border border-[#c6c5d4] text-[#000666]' : 'bg-[#000666] text-white'}`}>{profile.isFollowing ? <UserCheck className="w-4 h-4"/> : <UserPlus className="w-4 h-4"/>}{relationshipLoading ? 'Atualizando...' : profile.isFollowing ? 'Seguindo' : 'Seguir'}</button>}
+        </div>
+
+        <h1 className="text-2xl font-black mt-4">{profile.displayName}</h1>
+        <p className="text-sm text-[#666]">@{profile.username.replace(/^@+/, '')}</p>
+        {profile.bio && <p className="text-sm mt-4 whitespace-pre-wrap">{profile.bio}</p>}
+        <p className="text-xs text-[#666] mt-4 flex items-center gap-2"><CalendarDays className="w-4 h-4"/>Membro desde {memberSince(profile.createdAt)}</p>
+
+        {error && <div role="alert" className="mt-4 p-3 bg-[#ffdad6] text-[#8c1d18] rounded-xl text-sm">{error}</div>}
+
+        <div className="grid grid-cols-3 gap-px bg-[#e4e2de] border border-[#e4e2de] rounded-2xl overflow-hidden mt-6">
+          {metrics.map((metric) => <div key={metric.label} className="bg-[#fbf9f5] px-2 py-4 text-center"><p className="text-lg font-black text-[#000666]">{metric.value}</p><p className="text-[11px] text-[#666] mt-1">{metric.label}</p></div>)}
+        </div>
+
+        <div className="mt-5 p-4 rounded-2xl bg-[#e8f5e9] flex items-center justify-between gap-4"><div><p className="text-xs font-bold text-[#28642f] flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4"/>Taxa de realização</p><p className="text-xs text-[#47664b] mt-1">Percentual real das Intents concluídas</p></div><strong className="text-2xl text-[#28642f]">{profile.stats.realizationRate}%</strong></div>
+      </div>
+    </section>
+
+    <section className="mt-7">
+      <div className="flex items-center gap-2 mb-4"><Target className="w-5 h-5 text-[#000666]"/><div><h2 className="font-black">Intents públicas recentes</h2><p className="text-xs text-[#666]">Atividade real deste perfil</p></div></div>
+      {profile.recentIntents.length === 0 && <div className="bg-white border-2 border-dashed border-[#c6c5d4] rounded-2xl p-7 text-center text-sm text-[#666]">Este perfil ainda não publicou Intents públicas.</div>}
+      <div className="space-y-3">{profile.recentIntents.map((intent) => <button key={intent.id} onClick={() => onSelectIntent(intent.id)} className="w-full bg-white border border-[#e4e2de] rounded-2xl p-4 text-left flex items-center justify-between gap-4 hover:border-[#000666]"><div className="min-w-0"><p className="font-bold truncate">{intent.title}</p><p className="text-xs text-[#666] mt-1 flex items-center gap-1.5">{intent.status === 'REALIZED' ? <CheckCircle2 className="w-3.5 h-3.5 text-[#28642f]"/> : <Users className="w-3.5 h-3.5"/>}{intent.supportCount} de {intent.supportGoal} apoios · {intent.status === 'REALIZED' ? 'Realizada' : 'Em andamento'}</p></div><ArrowRight className="w-5 h-5 text-[#000666] shrink-0"/></button>)}</div>
+    </section>
+  </div>;
+}

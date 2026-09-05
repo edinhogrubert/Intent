@@ -7,6 +7,7 @@ interface MvpHomeFeedProps {
   currentUser: UserAccount;
   onCreate: () => void;
   onSelectIntent: (id: string) => void;
+  onSelectProfile: (id: string) => void;
 }
 
 const categoryLabels: Record<IntentCategory, string> = {
@@ -19,7 +20,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
-export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent }: MvpHomeFeedProps) {
+export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectProfile }: MvpHomeFeedProps) {
   const [intents, setIntents] = useState<ApiIntent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent }: MvpHomeFe
       const progress = Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal));
       const isMine = intent.creator.id === currentUser.id;
       return <article key={intent.id} className="bg-white border border-[#e4e2de] rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center font-black">{intent.creator.displayName.charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-sm font-bold truncate">{intent.creator.displayName}{isMine && <span className="ml-2 text-[10px] text-[#000666] bg-[#e0e0ff] px-2 py-0.5 rounded-full">Sua</span>}</p><p className="text-xs text-[#666]">@{intent.creator.username.replace(/^@+/, '')} · {formatDate(intent.createdAt)}</p></div></div>
+        <button type="button" onClick={() => onSelectProfile(intent.creator.id)} className="flex items-center gap-3 text-left max-w-full rounded-xl focus:outline-none focus:ring-2 focus:ring-[#000666]"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center font-black">{intent.creator.displayName.charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-sm font-bold truncate">{intent.creator.displayName}{isMine && <span className="ml-2 text-[10px] text-[#000666] bg-[#e0e0ff] px-2 py-0.5 rounded-full">Você</span>}</p><p className="text-xs text-[#666]">@{intent.creator.username.replace(/^@+/, '')} · {formatDate(intent.createdAt)}</p></div></button>
         <span className="inline-block mt-4 px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-[11px] font-bold">{categoryLabels[intent.category] || 'Outros'}</span>
         <h3 className="text-lg font-black mt-3">{intent.title}</h3><p className="text-sm text-[#454652] mt-2 whitespace-pre-wrap">{intent.story}</p>
         <div className="mt-5"><div className="flex justify-between text-xs font-bold"><span>{intent.supportCount} de {intent.supportGoal} apoios</span><span>{progress}%</span></div><div className="h-2 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>

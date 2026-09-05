@@ -49,6 +49,27 @@ export interface ApiIntent {
   revealContent?: string | null;
 }
 
+export interface ApiSocialProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+  isMe: boolean;
+  isFollowing: boolean;
+  stats: {
+    intentsCreated: number;
+    intentsRealized: number;
+    followersCount: number;
+    followingCount: number;
+    supportsGiven: number;
+    supportsReceived: number;
+    realizationRate: number;
+  };
+  recentIntents: ApiIntent[];
+}
+
 export interface SupportIntentResult {
   intentId: string;
   supportCount: number;
@@ -124,6 +145,28 @@ export async function getAuthenticatedProfile(): Promise<UserAccount> {
   const account = mapApiUser(result.data);
   setCurrentSessionUser(account);
   return account;
+}
+
+export async function getSocialProfile(userId?: string): Promise<ApiSocialProfile> {
+  const path = userId ? `/v1/users/${encodeURIComponent(userId)}/social` : '/v1/users/me/social';
+  const result = await authenticatedRequest<ApiEnvelope<ApiSocialProfile>>(path);
+  return result.data;
+}
+
+export async function followProfile(userId: string): Promise<ApiSocialProfile> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiSocialProfile>>(
+    `/v1/users/${encodeURIComponent(userId)}/follow`,
+    { method: 'POST' },
+  );
+  return result.data;
+}
+
+export async function unfollowProfile(userId: string): Promise<ApiSocialProfile> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiSocialProfile>>(
+    `/v1/users/${encodeURIComponent(userId)}/follow`,
+    { method: 'DELETE' },
+  );
+  return result.data;
 }
 
 export async function createSupportIntent(input: CreateSupportIntentInput): Promise<ApiIntent> {

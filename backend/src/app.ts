@@ -26,7 +26,7 @@ export function createApp() {
       callback(new AppError(403, 'ORIGIN_FORBIDDEN', 'Origem não autorizada.'));
     },
     credentials: false,
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
   }));
   app.use(express.json({ limit: '128kb' }));
