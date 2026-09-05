@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, RefreshCw, UserCheck, Users } from 'lucide-react';
 import { IntentApiError, listProfileFollowers, listProfileFollowing, type ApiSocialConnection } from '../services/intentApi';
 
@@ -15,21 +15,28 @@ export function MvpConnectionsList({ profileId, mode, onBack, onSelectProfile }:
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const loadGeneration = useRef(0);
 
   async function load(cursor?: string) {
+    const generation = ++loadGeneration.current;
     cursor ? setLoadingMore(true) : setLoading(true);
     setError('');
     try {
       const page = mode === 'followers'
         ? await listProfileFollowers(profileId, cursor)
         : await listProfileFollowing(profileId, cursor);
+      if (generation !== loadGeneration.current) return;
       setItems((current) => cursor ? [...current, ...page.items] : page.items);
       setNextCursor(page.nextCursor);
     } catch (caught) {
-      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar esta lista.');
+      if (generation === loadGeneration.current) {
+        setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar esta lista.');
+      }
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (generation === loadGeneration.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }
 
