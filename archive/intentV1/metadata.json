@@ -1,0 +1,6 @@
+{
+  "name": "Intent",
+  "description": "Intent - A rede social de expectativas. Transforme intenções em realidade com o apoio, acompanhamento e celebração da sua comunidade.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
