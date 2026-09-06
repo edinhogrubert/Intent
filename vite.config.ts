@@ -15,7 +15,9 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (id.includes('node_modules/firebase')) return 'firebase';
+            if (id.includes('node_modules/@firebase/auth')) return 'firebase-auth';
+            if (id.includes('node_modules/@firebase/app')) return 'firebase-app';
+            if (id.includes('node_modules/firebase')) return 'firebase-core';
             if (id.includes('node_modules/react')) return 'react';
             if (id.includes('node_modules/lucide-react')) return 'icons';
             if (id.includes('/src/components/')) {
