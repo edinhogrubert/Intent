@@ -14,11 +14,17 @@ export default defineConfig(() => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            firebase: ['firebase/app', 'firebase/auth'],
-            react: ['react', 'react-dom'],
-            icons: ['lucide-react'],
+          manualChunks(id) {
+            if (id.includes('node_modules/firebase')) return 'firebase';
+            if (id.includes('node_modules/react')) return 'react';
+            if (id.includes('node_modules/lucide-react')) return 'icons';
+            if (id.includes('/src/components/')) {
+              const name = id.split('/src/components/')[1].split('/')[0].split('.')[0];
+              return `component-${name.toLowerCase()}`;
+            }
+            return undefined;
           },
+          chunkFileNames: 'assets/[name]-[hash].js',
         },
       },
     },
