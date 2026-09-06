@@ -1,8 +1,8 @@
 # Intent — Estado das Funcionalidades e Próximos Passos
 
 > **Objetivo:** oferecer uma visão simples e confiável do que já funciona, do que está sendo validado e do que ainda será desenvolvido.  
-> **Última atualização:** 05 de setembro de 2026  
-> **Versão implantada na Oracle:** `6ebc62d2c3c79bc45c1db25d81f3e7ff217b55e6`  
+> **Última atualização:** 06 de setembro de 2026  
+> **Versão implantada na Oracle:** `09add9f0e257b2df5a877b37eb4a59ae76b80709`  
 > **Branch de desenvolvimento:** `codex/mvp-backend-base`  
 > **Pull Request:** `#2` para a `main`
 
@@ -60,7 +60,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Login com Google | ✅ Implantado e validado | Cancelamento do popup devolve o controle à tela de login |
 | Login com e-mail e senha | ✅ Implantado e validado | Continua disponível após cancelamento do Google |
 | Validação do token no backend | ✅ Implantado e validado | Assinatura, emissor, audiência e validade confirmados pelo Firebase |
-| Revogação imediata de sessão | 🔧 No GitHub, aguardando implantação | Exige conta de serviço dedicada com papel `Firebase Authentication Viewer`, armazenada somente na Oracle |
+| Revogação imediata de sessão | ✅ Implantado e validado | Conta dedicada `intent-auth-verifier` com papel `Firebase Authentication Viewer`; credencial somente na Oracle e teste com perfis diferentes aprovado |
 | Perfil interno no PostgreSQL | ✅ Implantado e validado | Usuário Firebase é sincronizado com a conta do Intent |
 | Nome de usuário simples | ✅ Implantado e validado | Padrão `@nome_sobrenome`; colisões recebem número incremental |
 | CORS para túneis locais | ✅ Implantado e validado | `localhost:3000` e `localhost:3100` preservados |
@@ -82,7 +82,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Lista de seguidores | ✅ Implantado e validado | API e PostgreSQL |
 | Lista de pessoas seguidas | ✅ Implantado e validado | API e PostgreSQL |
 | Feed “Para você” | ✅ Implantado e validado | Somente Intents públicas reais |
-| Feed “Seguindo” | 🧪 Implantado, falta validação humana | Código e segurança validados; falta teste completo com contas diferentes |
+| Feed “Seguindo” | ✅ Implantado e validado | Testado com três contas e diferentes combinações de seguir, não seguir e deixar de seguir |
 | Telas antigas com dados fictícios | ✅ Removidas do fluxo ativo | Não fazem parte da navegação nem do bundle ativo |
 
 ## 1.4 Intents e revelação
@@ -100,7 +100,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Revelação após a realização | ✅ Implantado e validado | Conteúdo somente é aberto depois da condição |
 | Histórico de eventos essenciais | ✅ Implantado e validado | Criação, apoio, retirada e realização registrados |
 | Visibilidade pública | ✅ Implantado e validado | Aparece no feed geral |
-| Visibilidade para seguidores | 🔧 No GitHub, aguardando implantação | Backend já verifica o vínculo; wizard agora permite escolher “Somente seguidores” |
+| Visibilidade para seguidores | ✅ Implantado e validado | Seletor “Somente seguidores”, autorização no backend e testes de inclusão, exclusão e direção do vínculo aprovados |
 | Visibilidade privada completa | ⏳ Planejado | Regras de destinatários ainda não fazem parte do MVP limpo |
 | Condição por data | 🟡 Próxima prioridade | Deve impedir datas retroativas e respeitar timezone |
 | Condição por aprovadores/guardiões | 🟡 Próxima prioridade | Exigirá escolha explícita dos aprovadores e regra N de M |
@@ -121,7 +121,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Intents criadas e realizadas | ✅ Implantado e validado | Métricas reais |
 | Apoios dados e recebidos | ✅ Implantado e validado | Métricas reais |
 | Taxa de realização | ✅ Implantado e validado | Percentual simples e explicável |
-| Feed de pessoas seguidas | 🧪 Implantado, falta validação humana | Inclui Intents públicas e exclusivas para seguidores |
+| Feed de pessoas seguidas | ✅ Implantado e validado | Inclui Intents públicas e exclusivas para seguidores; validado com três contas |
 | Confiabilidade | ⏳ Planejado | Não será exibida com nota artificial |
 | Mobilização por pessoas únicas | ⏳ Planejado | Fórmula ainda precisa ser especificada e versionada |
 | Frequência e participação histórica | ⏳ Planejado | Métricas futuras |
@@ -132,7 +132,7 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 | Controle | Estado | Observação |
 |---|---|---|
 | Segredos fora do Git | ✅ Implantado e validado | Configuração protegida na VM |
-| Credencial Firebase Admin | 🔧 No GitHub, aguardando implantação | Arquivo externo ao Git e à imagem, montado somente para leitura; criação manual pendente |
+| Credencial Firebase Admin | ✅ Implantado e validado | Conta mínima dedicada; JSON externo ao Git e à imagem, montado somente para leitura na Oracle |
 | Banco e Redis sem exposição pública | ✅ Implantado e validado | Somente redes Docker internas |
 | API e frontend restritos ao localhost | ✅ Implantado e validado | Acesso atual por túnel SSH |
 | Firewall com entrada negada por padrão | ✅ Implantado e validado | SSH restrito à faixa autorizada |
@@ -160,25 +160,28 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 - Verificação técnica do commit `a859de7`: 26 verificações aprovadas e nenhuma falha.
 - PostgreSQL, Redis, API, frontend, Firebase, CORS, portas e backup validados.
 
-## Validação humana ainda pendente
+## Validação humana concluída em 06 de setembro de 2026
 
-A implantação do seletor “Somente seguidores” é necessária antes deste teste. Depois, executar com pelo menos três contas:
+O fluxo social básico foi aprovado manualmente com três contas reais:
 
-1. A conta A cria uma Intent com visibilidade **Seguidores**.
-2. A conta B segue a conta A e deve visualizar a Intent na aba **Seguindo**.
-3. A conta C não segue a conta A e não deve visualizar nem abrir a Intent.
-4. A conta B deixa de seguir a conta A e perde o acesso à Intent exclusiva.
-5. A Intent pública da conta A continua visível para B e C no feed geral.
+1. Intents públicas permaneceram visíveis no feed geral.
+2. Intents com visibilidade **Seguidores** foram exibidas somente para contas que seguiam o criador.
+3. Contas sem vínculo não visualizaram nem abriram a Intent exclusiva.
+4. Deixar de seguir removeu o acesso à Intent exclusiva.
+5. Foram testadas combinações mútuas e assimétricas de seguir, não seguir e deixar de seguir.
+6. Intents em grupo e validações por participantes continuaram funcionando.
+7. Login, sincronização do perfil e feed foram testados com perfis diferentes.
 
+**Comportamento atual aprovado:** ao começar a seguir um criador, a pessoa também pode visualizar as Intents anteriores que foram publicadas para seguidores. O controle temporal desse acesso está preservado como funcionalidade futura.
 ---
 
 # 3. Próximas prioridades recomendadas
 
 ## Prioridade 1 — concluir a fatia social básica
 
-### 1. Testar completamente o feed “Seguindo”
+### 1. Feed “Seguindo” — concluído
 
-Critério de conclusão: todos os cinco passos da validação humana acima aprovados.
+Critério aprovado em 06 de setembro de 2026 com três contas e relacionamentos mútuos e assimétricos.
 
 ### 2. Curtidas e comentários reais
 
@@ -381,7 +384,31 @@ Ao deixar de seguir ou encerrar a inscrição, poderá receber:
 
 Essa função pode evoluir para criadores, empresas, escolas, clubes e projetos sem transformar o Intent em uma ferramenta genérica de marketing. A experiência deve continuar ligada a acontecimentos, participação e relacionamento público.
 
-## 4.7 Plataforma e operação
+## 4.7 Controle temporal da audiência de seguidores
+
+O criador poderá escolher como o momento em que uma pessoa começou a segui-lo afeta o acesso às Intents exclusivas.
+
+Modos futuros planejados:
+
+1. **Todos os seguidores atuais:** comportamento existente; quem começar a seguir poderá visualizar também Intents anteriores destinadas a seguidores.
+2. **Somente a partir do vínculo:** o seguidor visualizará apenas Intents criadas ou publicadas depois de começar a seguir o criador.
+3. **Somente novos seguidores:** a Intent será destinada exclusivamente a pessoas que começarem a seguir depois de sua criação ou publicação, sem incluir seguidores que já existiam naquele momento.
+
+Requisitos de produto e segurança:
+
+- registrar histórico confiável do vínculo, incluindo `followed_at` e `unfollowed_at`;
+- armazenar em cada Intent a política temporal de audiência escolhida pelo criador;
+- realizar toda autorização no backend;
+- não depender somente do contador ou do estado atual de seguir;
+- definir o comportamento ao deixar de seguir e voltar a seguir;
+- impedir ciclos artificiais de seguir e deixar de seguir para obter conteúdo ou recompensas;
+- mostrar ao criador, em linguagem simples, quem terá acesso antes da publicação;
+- testar acesso direto, feed, compartilhamento por link e alteração posterior do vínculo;
+- preservar por padrão o comportamento atual até que o criador escolha outra política.
+
+Essa evolução complementa a **Jornada do Seguidor**, permitindo experiências voltadas a seguidores antigos, seguidores futuros ou somente ao período posterior ao início do vínculo.
+
+## 4.8 Plataforma e operação
 
 - domínio e HTTPS;
 - publicação controlada;
@@ -417,9 +444,9 @@ Não implementar agora:
 
 # 6. Próxima decisão do projeto
 
-A próxima decisão deve ocorrer somente após o teste humano do feed “Seguindo”.
+O teste humano do feed **Seguindo** foi aprovado em 06 de setembro de 2026.
 
-Se o teste for aprovado, a recomendação é iniciar **curtidas e comentários reais**, pois essa entrega transforma o feed existente em um espaço de interação social sem antecipar a complexidade de chat, ranking ou motor avançado de condições.
+A próxima recomendação é iniciar **curtidas e comentários reais**, pois essa entrega transforma o feed existente em um espaço de interação social sem antecipar a complexidade de chat, ranking ou motor avançado de condições. O controle temporal da audiência de seguidores permanece planejado para uma fase futura.
 
 ---
 
