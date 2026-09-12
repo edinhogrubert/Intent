@@ -8,6 +8,7 @@ import {
   type FeedScope,
   type IntentCategory,
 } from '../services/intentApi';
+import { APP_VERSION_CONTEXT, APP_VERSION_LABEL } from '../appVersion';
 
 interface MvpHomeFeedProps {
   currentUser: UserAccount;
@@ -77,7 +78,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
   return <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
     <section className="bg-white border border-[#e4e2de] rounded-2xl p-5 mb-6 shadow-sm">
       <p className="text-xs font-bold text-[#000666]">Olá, {currentUser.name.split(' ')[0]}</p>
-      <div className="flex items-center justify-between gap-4 mt-2"><div><h1 className="text-xl sm:text-2xl font-black text-[#1b1c1a]">O que você quer fazer acontecer?</h1><p className="text-sm text-[#666] mt-1">Crie uma Intent ou acompanhe o que já está acontecendo.</p></div><button onClick={onCreate} className="shrink-0 w-11 h-11 rounded-full bg-[#000666] text-white flex items-center justify-center" aria-label="Criar Intent"><Plus className="w-5 h-5"/></button></div>
+      <div className="flex items-center justify-between gap-4 mt-2"><div><h1 className="text-xl sm:text-2xl font-black text-[#1b1c1a]">O que você quer fazer acontecer?</h1><p className="text-sm text-[#666] mt-1">Crie uma Intent ou acompanhe o que já está acontecendo.</p><span className="inline-flex items-center mt-3 px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-[11px] font-bold">Versao {APP_VERSION_LABEL} · {APP_VERSION_CONTEXT}</span></div><button onClick={onCreate} className="shrink-0 w-11 h-11 rounded-full bg-[#000666] text-white flex items-center justify-center" aria-label="Criar Intent"><Plus className="w-5 h-5"/></button></div>
     </section>
 
     <div className="flex items-end justify-between gap-4 mb-4"><div><h2 className="text-lg font-black">Acontecendo agora</h2><p className="text-xs text-[#666]">{isFollowingFeed ? 'Intents das pessoas que você segue' : 'Intents públicas reais'}</p></div><button onClick={() => void loadFeed()} className="p-2 rounded-full bg-white border border-[#e4e2de]" aria-label="Atualizar feed"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button></div>
