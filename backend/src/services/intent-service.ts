@@ -97,7 +97,7 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
       data: {
         id: intentId,
         creatorId,
-        type: 'CONDITIONAL_REVEAL',
+        type: 'SUPPORT_REVEAL',
         conditionType: command.conditionType,
         status: 'PUBLISHED',
         supportCount: 0,
@@ -126,7 +126,7 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
         type: 'INTENT_CREATED',
         idempotencyKey: `intent-created:${intentId}:v1`,
         payload: {
-          type: 'CONDITIONAL_REVEAL',
+          type: 'SUPPORT_REVEAL',
           conditionType: command.conditionType,
           supportGoal: command.supportGoal ?? null,
           revealAt: command.revealAt?.toISOString() ?? null,
