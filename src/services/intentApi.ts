@@ -6,7 +6,17 @@ import type { UserAccount } from '../types';
 const API_PREFIX = '/api';
 
 interface ApiEnvelope<T> { data: T }
-interface ApiErrorEnvelope { error?: { code?: string; message?: string; requestId?: string } }
+interface ApiErrorEnvelope {
+  error?: {
+    code?: string;
+    message?: string;
+    requestId?: string;
+    fields?: {
+      formErrors?: string[];
+      fieldErrors?: Record<string, string[] | undefined>;
+    };
+  }
+}
 
 interface ApiUser {
   id: string;
@@ -128,6 +138,17 @@ export class IntentApiError extends Error {
   }
 }
 
+function firstValidationMessage(payload: ApiErrorEnvelope) {
+  const fieldErrors = payload.error?.fields?.fieldErrors;
+  if (fieldErrors) {
+    for (const messages of Object.values(fieldErrors)) {
+      const message = messages?.find(Boolean);
+      if (message) return message;
+    }
+  }
+  return payload.error?.fields?.formErrors?.find(Boolean);
+}
+
 async function authenticatedRequest<T>(path: string, init: RequestInit = {}, firebaseUser: FirebaseUser | null = auth.currentUser): Promise<T> {
   if (!firebaseUser) throw new IntentApiError('Entre na sua conta para continuar.', 401, 'AUTH_REQUIRED');
 
@@ -142,7 +163,7 @@ async function authenticatedRequest<T>(path: string, init: RequestInit = {}, fir
     let payload: ApiErrorEnvelope = {};
     try { payload = await response.json() as ApiErrorEnvelope; } catch { /* resposta não JSON */ }
     throw new IntentApiError(
-      payload.error?.message || 'Não foi possível comunicar com o Intent.',
+      firstValidationMessage(payload) || payload.error?.message || 'Não foi possível comunicar com o Intent.',
       response.status,
       payload.error?.code || 'API_ERROR',
       payload.error?.requestId,
