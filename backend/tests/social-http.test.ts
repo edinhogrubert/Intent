@@ -184,6 +184,21 @@ describe('autoridade HTTP do backend', () => {
     expect(db.domainEvent.create.mock.calls[0]![0].data).toMatchObject({ actorId: viewer.id, type: 'INTENT_CREATED' });
   });
 
+  it('aceita criar Intent privada e persiste a visibilidade no backend', async () => {
+    db.$transaction.mockImplementation(async (operation) => operation(db));
+    db.intent.create.mockResolvedValue({ id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE' });
+    const response = await write('/v1/intents', 'POST', { ...command, visibility: 'PRIVATE' });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ data: { id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE' } });
+    expect(db.intent.create.mock.calls[0]![0].data).toMatchObject({
+      creatorId: viewer.id,
+      status: 'PUBLISHED',
+      visibility: 'PRIVATE',
+      supportCount: 0,
+      realizedAt: null,
+    });
+  });
+
   it.each([
     ['PATCH', { supportGoal: 1 }], ['PUT', { supportGoal: 1 }],
     ['PATCH', { status: 'REALIZED' }], ['PUT', { status: 'REALIZED' }],

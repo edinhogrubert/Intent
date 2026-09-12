@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, Lock, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Globe, Lock, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { getIntent, IntentApiError, removeIntentSupport, supportIntent, type ApiIntent, type IntentCategory } from '../services/intentApi';
 
@@ -10,6 +10,16 @@ const categoryLabels: Record<IntentCategory, string> = {
   HEALTH_WELLNESS: 'Saúde e bem-estar', CAREER_BUSINESS: 'Carreira e negócios', COMMUNITY_CAUSES: 'Comunidade e causas',
   PERSONAL_LIFE: 'Vida pessoal', OTHER: 'Outros',
 };
+
+function VisibilityBadge({ visibility }: { visibility: ApiIntent['visibility'] }) {
+  if (visibility === 'PRIVATE') {
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#fff3e0] text-[#e65100] text-xs font-bold"><Lock className="w-3 h-3" />Privada</span>;
+  }
+  if (visibility === 'FOLLOWERS') {
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e8f5e9] text-[#2e7d32] text-xs font-bold"><Users className="w-3 h-3" />Seguidores</span>;
+  }
+  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold"><Globe className="w-3 h-3" />Publica</span>;
+}
 
 export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDetailProps) {
   const [intent, setIntent] = useState<ApiIntent | null>(null);
@@ -49,7 +59,10 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
       const progress = Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal));
       return <article className="bg-white border border-[#e4e2de] rounded-2xl p-6 shadow-sm">
         <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center font-black">{intent.creator.displayName.charAt(0).toUpperCase()}</div><div><p className="font-bold">{intent.creator.displayName}</p><p className="text-xs text-[#666]">@{intent.creator.username.replace(/^@+/, '')}</p></div></div>
-        <span className="inline-block mt-5 px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold">{categoryLabels[intent.category] || 'Outros'}</span>
+        <div className="flex flex-wrap gap-2 mt-5">
+          <span className="inline-block px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold">{categoryLabels[intent.category] || 'Outros'}</span>
+          <VisibilityBadge visibility={intent.visibility} />
+        </div>
         <h1 className="text-2xl font-black mt-3">{intent.title}</h1><p className="text-sm text-[#454652] mt-3 whitespace-pre-wrap">{intent.story}</p>
         <div className="mt-6"><div className="flex justify-between text-sm font-bold"><span>{intent.supportCount} de {intent.supportGoal} apoios</span><span>{progress}%</span></div><div className="h-3 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>
 

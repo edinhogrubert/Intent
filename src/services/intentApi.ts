@@ -98,7 +98,7 @@ export interface CreateSupportIntentInput {
   category: IntentCategory;
   supportGoal: number;
   revealContent: string;
-  visibility: 'PUBLIC' | 'FOLLOWERS';
+  visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
 }
 
 export class IntentApiError extends Error {
@@ -204,9 +204,12 @@ export function listProfileFollowing(userId: string, cursor?: string) {
   return listProfileConnections(userId, 'following', cursor);
 }
 
-export async function createSupportIntent(input: CreateSupportIntentInput): Promise<ApiIntent> {
+export async function createSupportIntent(input: CreateSupportIntentInput, idempotencyKey?: string): Promise<ApiIntent> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>('/v1/intents', {
     method: 'POST',
+    headers,
     body: JSON.stringify(input),
   });
   return result.data;
