@@ -113,6 +113,21 @@ describe('regressão HTTP dos feeds e autenticação', () => {
     expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
     expect(db.intent.findMany).not.toHaveBeenCalled();
   });
+
+  it('Minhas Intents permite retornar privadas do próprio usuário sem filtro de feed', async () => {
+    db.intent.findMany.mockResolvedValue([{
+      id: intentId,
+      creatorId: viewer.id,
+      visibility: 'PRIVATE',
+      status: 'PUBLISHED',
+    }]);
+    const response = await get('/v1/intents/mine', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { items: [{ id: intentId, visibility: 'PRIVATE' }], nextCursor: null },
+    });
+    expect(db.intent.findMany.mock.calls[0]![0].where).toEqual({ creatorId: viewer.id });
+  });
 });
 
 describe('acesso HTTP a Intent exclusiva', () => {
@@ -142,6 +157,41 @@ describe('acesso HTTP a Intent exclusiva', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data).toMatchObject({ id: intentId, visibility: 'FOLLOWERS', revealContent: null });
+    for (const field of ['revealCiphertext', 'revealIv', 'revealAuthTag']) expect(body.data).not.toHaveProperty(field);
+  });
+});
+
+describe('acesso HTTP a Intent privada', () => {
+  beforeEach(() => {
+    db.intent.findUnique.mockResolvedValue({
+      id: intentId, creatorId, visibility: 'PRIVATE', status: 'PUBLISHED',
+      creator: { id: creatorId, status: 'ACTIVE' },
+      revealCiphertext: 'not-public', revealIv: 'not-public', revealAuthTag: 'not-public',
+    });
+  });
+
+  it('não entrega detalhe privado a visitante anônimo', async () => {
+    const response = await get(`/v1/intents/${intentId}`);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: 'INTENT_FORBIDDEN' } });
+    expect(db.support.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('não entrega detalhe privado a outro usuário autenticado', async () => {
+    const response = await get(`/v1/intents/${intentId}`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: { code: 'INTENT_FORBIDDEN' } });
+    expect(db.support.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('entrega detalhe privado ao criador sem revelar conteúdo antes da meta', async () => {
+    const creatorViewer = { ...viewer, id: creatorId };
+    db.user.findUnique.mockResolvedValue(creatorViewer);
+    db.user.update.mockResolvedValue(creatorViewer);
+    const response = await get(`/v1/intents/${intentId}`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toMatchObject({ id: intentId, visibility: 'PRIVATE', revealContent: null });
     for (const field of ['revealCiphertext', 'revealIv', 'revealAuthTag']) expect(body.data).not.toHaveProperty(field);
   });
 });
