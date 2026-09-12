@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Globe, Lock, Plus, RefreshCw, Users } from 'lucide-react';
+import { AlertCircle, Calendar, Globe, Lock, Plus, RefreshCw, Users, Vote } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { IntentApiError, listMyIntents, type ApiIntent, type IntentCategory } from '../services/intentApi';
 
@@ -19,6 +19,16 @@ function VisibilityBadge({ visibility }: { visibility: ApiIntent['visibility'] }
     return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e8f5e9] text-[#2e7d32] text-[11px] font-bold"><Users className="w-3 h-3" />Seguidores</span>;
   }
   return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-[11px] font-bold"><Globe className="w-3 h-3" />Publica</span>;
+}
+
+function ConditionLine({ intent }: { intent: ApiIntent }) {
+  if (intent.conditionType === 'DATE') {
+    return <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4"/>{intent.revealAt ? new Date(intent.revealAt).toLocaleString('pt-BR') : 'Data'}</span>;
+  }
+  if (intent.conditionType === 'GUARDIANS') {
+    return <span className="flex items-center gap-1.5"><Vote className="w-4 h-4"/>{intent.guardianApprovals?.length ?? 0} de {intent.guardianApprovalGoal ?? 1} guardioes</span>;
+  }
+  return <span className="flex items-center gap-1.5"><Users className="w-4 h-4"/>{intent.supportCount} de {intent.supportGoal} apoios</span>;
 }
 
 export function MyIntentsDashboard({ currentUser, onCreateNew, onSelectIntent }: MyIntentsDashboardProps) {
@@ -46,12 +56,16 @@ export function MyIntentsDashboard({ currentUser, onCreateNew, onSelectIntent }:
     {!loading && error && <div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5 flex items-start gap-3"><AlertCircle className="w-5 h-5 shrink-0"/><div><p className="font-bold">Não foi possível carregar</p><p className="text-sm mt-1">{error}</p><button onClick={() => void loadIntents()} className="mt-3 underline text-sm font-bold">Tentar novamente</button></div></div>}
     {!loading && !error && visible.length === 0 && <div className="bg-white border-2 border-dashed border-[#c6c5d4] rounded-2xl p-10 text-center"><div className="w-12 h-12 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center mx-auto"><Plus className="w-6 h-6"/></div><h3 className="font-bold mt-4">{filter === 'active' ? 'Nenhuma Intent ativa' : 'Nenhuma Intent realizada ainda'}</h3><p className="text-sm text-[#666] mt-2">{currentUser.name}, crie uma Intent simples e acompanhe os apoios aqui.</p>{filter === 'active' && <button onClick={onCreateNew} className="mt-5 px-5 py-3 bg-[#000666] text-white rounded-xl text-sm font-bold">Criar minha primeira Intent</button>}</div>}
     {!loading && !error && visible.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{visible.map((intent) => {
-      const progress = Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal));
+      const progress = intent.conditionType === 'SUPPORT'
+        ? Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal))
+        : intent.conditionType === 'GUARDIANS'
+          ? Math.min(100, Math.round(((intent.guardianApprovals?.length ?? 0) * 100) / (intent.guardianApprovalGoal ?? 1)))
+          : intent.status === 'REALIZED' ? 100 : 0;
       return <article key={intent.id} onClick={() => onSelectIntent(intent.id)} className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm hover:shadow-md p-5 cursor-pointer">
         <div className="flex justify-between items-center gap-2"><span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${intent.status === 'REALIZED' ? 'bg-[#e8f5e9] text-[#2e7d32]' : 'bg-[#e0e0ff] text-[#000666]'}`}>{intent.status === 'REALIZED' ? 'Realizada' : 'Em andamento'}</span><span className="text-xs text-[#666]">{categoryLabels[intent.category] || 'Outros'}</span></div>
         <div className="mt-3"><VisibilityBadge visibility={intent.visibility} /></div>
         <h3 className="font-bold mt-4 line-clamp-2">{intent.title}</h3><p className="text-sm text-[#666] mt-2 line-clamp-2">{intent.story}</p>
-        <div className="mt-5"><div className="flex justify-between text-xs font-bold"><span>{intent.supportCount} de {intent.supportGoal} apoios</span><span className="text-[#006a62]">{progress}%</span></div><div className="h-2 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>
+        <div className="mt-5"><div className="flex justify-between text-xs font-bold"><ConditionLine intent={intent} /><span className="text-[#006a62]">{progress}%</span></div><div className="h-2 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#f0efec] text-xs text-[#666]"><span className="flex items-center gap-1.5"><Users className="w-4 h-4"/>{intent.supportCount} mobilizados</span><span className="flex items-center gap-1.5"><Lock className="w-4 h-4"/>{intent.status === 'REALIZED' ? 'Revelada' : 'Protegida'}</span></div>
       </article>;
     })}</div>}

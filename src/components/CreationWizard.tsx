@@ -34,6 +34,7 @@ interface CreationWizardProps {
 
 type IconComponent = typeof Trophy;
 type VisibilityOption = 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+type ConditionOption = 'SUPPORT' | 'DATE' | 'GUARDIANS';
 
 interface CategoryOption {
   value: IntentCategory;
@@ -43,56 +44,28 @@ interface CategoryOption {
   example: string;
 }
 
-interface VisibilityDetails {
-  title: string;
-  badge: string;
-  shortDesc: string;
-  feedImpact: string;
-  supportImpact: string;
-  icon: IconComponent;
-  tone: string;
-}
-
 const categories: CategoryOption[] = [
-  { value: 'SPORTS', label: 'Esportes', icon: Trophy, description: 'Palpites, desafios esportivos, metas de treino e competicoes.', example: 'Ex.: acertar o placar do classico ou completar 10 km em menos de 50 min.' },
-  { value: 'ENTERTAINMENT', label: 'Entretenimento & Cultura', icon: Film, description: 'Filmes, series, musica, games, eventos e cultura pop.', example: 'Ex.: teoria sobre uma temporada ou critica guardada para depois da estreia.' },
-  { value: 'TECHNOLOGY', label: 'Tecnologia & Criacao', icon: Cpu, description: 'Projetos de software, IA, hardware e lancamentos digitais.', example: 'Ex.: publicar uma versao do app ou revelar uma previsao tecnica.' },
-  { value: 'EDUCATION', label: 'Educacao & Aprendizado', icon: GraduationCap, description: 'Cursos, leituras, certificacoes e metas de estudo.', example: 'Ex.: terminar um modulo, passar em uma prova ou entregar um trabalho.' },
-  { value: 'HEALTH_WELLNESS', label: 'Saude & Bem-estar', icon: HeartPulse, description: 'Habitos saudaveis, treino, nutricao e equilibrio pessoal.', example: 'Ex.: 30 dias de caminhada ou manter uma rotina matinal.' },
-  { value: 'CAREER_BUSINESS', label: 'Carreira & Negocios', icon: Briefcase, description: 'Metas de trabalho, vendas, carreira, startups e networking.', example: 'Ex.: conseguir os primeiros clientes ou concluir uma transicao de carreira.' },
-  { value: 'COMMUNITY_CAUSES', label: 'Comunidade & Causas', icon: HandHeart, description: 'Campanhas, voluntariado, arrecadacoes e impacto coletivo.', example: 'Ex.: arrecadar doacoes ou organizar um mutirao local.' },
-  { value: 'PERSONAL_LIFE', label: 'Vida Pessoal', icon: Compass, description: 'Planos pessoais, viagens, promessas e desafios de vida.', example: 'Ex.: aprender violao, fazer uma viagem ou guardar uma mensagem futura.' },
-  { value: 'OTHER', label: 'Outros', icon: Sparkles, description: 'Ideias criativas que nao cabem nas outras categorias.', example: 'Ex.: uma aposta divertida ou experimento social com amigos.' },
+  { value: 'SPORTS', label: 'Esportes', icon: Trophy, description: 'Palpites, desafios esportivos, metas de treino e competicoes.', example: 'Ex.: acertar o placar do classico.' },
+  { value: 'ENTERTAINMENT', label: 'Entretenimento & Cultura', icon: Film, description: 'Filmes, series, musica, games, eventos e cultura pop.', example: 'Ex.: teoria sobre uma temporada.' },
+  { value: 'TECHNOLOGY', label: 'Tecnologia & Criacao', icon: Cpu, description: 'Projetos de software, IA, hardware e lancamentos digitais.', example: 'Ex.: publicar uma versao do app.' },
+  { value: 'EDUCATION', label: 'Educacao & Aprendizado', icon: GraduationCap, description: 'Cursos, leituras, certificacoes e metas de estudo.', example: 'Ex.: passar em uma prova.' },
+  { value: 'HEALTH_WELLNESS', label: 'Saude & Bem-estar', icon: HeartPulse, description: 'Habitos saudaveis, treino, nutricao e equilibrio pessoal.', example: 'Ex.: 30 dias de caminhada.' },
+  { value: 'CAREER_BUSINESS', label: 'Carreira & Negocios', icon: Briefcase, description: 'Metas de trabalho, vendas, carreira e startups.', example: 'Ex.: conseguir os primeiros clientes.' },
+  { value: 'COMMUNITY_CAUSES', label: 'Comunidade & Causas', icon: HandHeart, description: 'Campanhas, voluntariado, arrecadacoes e impacto coletivo.', example: 'Ex.: organizar um mutirao local.' },
+  { value: 'PERSONAL_LIFE', label: 'Vida Pessoal', icon: Compass, description: 'Planos pessoais, viagens, promessas e desafios de vida.', example: 'Ex.: guardar uma mensagem futura.' },
+  { value: 'OTHER', label: 'Outros', icon: Sparkles, description: 'Ideias criativas que nao cabem nas outras categorias.', example: 'Ex.: uma aposta divertida.' },
 ];
 
-const visibilityConfig: Record<VisibilityOption, VisibilityDetails> = {
-  PUBLIC: {
-    title: 'Publica',
-    badge: 'Feed Para voce',
-    shortDesc: 'Visivel para toda a rede.',
-    feedImpact: 'Aparece no feed "Para voce".',
-    supportImpact: 'Qualquer pessoa autenticada pode ver e apoiar.',
-    icon: Globe,
-    tone: 'bg-[#e0e0ff] text-[#000666]',
-  },
-  FOLLOWERS: {
-    title: 'Somente seguidores',
-    badge: 'Feed Seguindo',
-    shortDesc: 'Exclusiva para quem segue seu perfil.',
-    feedImpact: 'Aparece no feed "Seguindo" dos seus seguidores.',
-    supportImpact: 'Quem deixar de seguir perde o acesso.',
-    icon: Users,
-    tone: 'bg-[#e8f5e9] text-[#2e7d32]',
-  },
-  PRIVATE: {
-    title: 'Privada',
-    badge: 'Cofre pessoal',
-    shortDesc: 'Aparece somente para voce em Minhas Intents.',
-    feedImpact: 'Nao aparece no feed publico nem no feed Seguindo.',
-    supportImpact: 'Outras pessoas nao podem ver nem apoiar.',
-    icon: Lock,
-    tone: 'bg-[#fff3e0] text-[#e65100]',
-  },
+const visibilityConfig: Record<VisibilityOption, { title: string; badge: string; description: string; icon: IconComponent; tone: string }> = {
+  PUBLIC: { title: 'Publica', badge: 'Feed Para voce', description: 'Toda a rede pode ver.', icon: Globe, tone: 'bg-[#e0e0ff] text-[#000666]' },
+  FOLLOWERS: { title: 'Seguidores', badge: 'Feed Seguindo', description: 'Apenas seus seguidores podem ver.', icon: Users, tone: 'bg-[#e8f5e9] text-[#2e7d32]' },
+  PRIVATE: { title: 'Privada', badge: 'Cofre pessoal', description: 'Criador e guardioes autorizados.', icon: Lock, tone: 'bg-[#fff3e0] text-[#e65100]' },
+};
+
+const conditionConfig: Record<ConditionOption, { title: string; badge: string; description: string; icon: IconComponent }> = {
+  SUPPORT: { title: 'Apoios', badge: 'Meta social', description: 'Revela quando atingir a quantidade de apoios.', icon: Users },
+  DATE: { title: 'Data', badge: 'Trava de tempo', description: 'Revela automaticamente depois da data escolhida.', icon: Calendar },
+  GUARDIANS: { title: 'Guardioes', badge: 'Aprovacao', description: 'Revela quando os guardioes escolhidos aprovarem.', icon: Vote },
 };
 
 function createClientIdempotencyKey() {
@@ -100,14 +73,27 @@ function createClientIdempotencyKey() {
   return `intent-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function localDateTimeValue(date: Date) {
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+
+function splitGuardianIds(value: string) {
+  return value.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
+}
+
 export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWizardProps) {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState('');
   const [story, setStory] = useState('');
   const [category, setCategory] = useState<IntentCategory>('SPORTS');
-  const [supportGoal, setSupportGoal] = useState(1);
-  const [revealContent, setRevealContent] = useState('');
   const [visibility, setVisibility] = useState<VisibilityOption>('PUBLIC');
+  const [conditionType, setConditionType] = useState<ConditionOption>('SUPPORT');
+  const [supportGoal, setSupportGoal] = useState(1);
+  const [revealAt, setRevealAt] = useState(() => localDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000)));
+  const [guardianIdsText, setGuardianIdsText] = useState('');
+  const [guardianApprovalGoal, setGuardianApprovalGoal] = useState(1);
+  const [revealContent, setRevealContent] = useState('');
   const [error, setError] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [publishedSuccess, setPublishedSuccess] = useState<ApiIntent | null>(null);
@@ -115,8 +101,22 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
 
   const selectedCategory = useMemo(() => categories.find((item) => item.value === category) || categories[0], [category]);
   const selectedVisibility = visibilityConfig[visibility];
+  const selectedCondition = conditionConfig[conditionType];
   const SelectedCategoryIcon = selectedCategory.icon;
   const SelectedVisibilityIcon = selectedVisibility.icon;
+  const SelectedConditionIcon = selectedCondition.icon;
+  const guardianIds = splitGuardianIds(guardianIdsText);
+
+  function handleVisibilityChange(next: VisibilityOption) {
+    setVisibility(next);
+    if (next === 'PRIVATE' && conditionType === 'SUPPORT') setConditionType('DATE');
+  }
+
+  function handleConditionChange(next: ConditionOption) {
+    setConditionType(next);
+    if (next === 'SUPPORT' && visibility === 'PRIVATE') setVisibility('PUBLIC');
+    if (next === 'GUARDIANS' && visibility !== 'PRIVATE') setVisibility('PRIVATE');
+  }
 
   function validateCurrentStep() {
     const cleanTitle = title.trim();
@@ -131,9 +131,17 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
     }
 
     if (step === 2) {
-      if (!Number.isInteger(supportGoal) || supportGoal < 1) return 'A meta deve ser um numero inteiro a partir de 1.';
-      if (supportGoal > 1_000_000) return 'A meta nao pode exceder 1.000.000 apoios.';
-      if (!cleanReveal) return 'Conte o que sera revelado quando a meta for alcancada.';
+      if (visibility === 'PRIVATE' && conditionType === 'SUPPORT') return 'Intent privada nao pode depender de apoios.';
+      if (conditionType === 'SUPPORT' && (!Number.isInteger(supportGoal) || supportGoal < 1)) return 'A meta deve ser um numero inteiro a partir de 1.';
+      if (conditionType === 'SUPPORT' && supportGoal > 1_000_000) return 'A meta nao pode exceder 1.000.000 apoios.';
+      if (conditionType === 'DATE' && new Date(revealAt).getTime() <= Date.now()) return 'Escolha uma data futura.';
+      if (conditionType === 'GUARDIANS') {
+        if (guardianIds.length === 0) return 'Informe ao menos um ID de guardiao.';
+        if (new Set(guardianIds).size !== guardianIds.length) return 'Nao repita guardioes.';
+        if (!Number.isInteger(guardianApprovalGoal) || guardianApprovalGoal < 1) return 'A meta de guardioes deve ser ao menos 1.';
+        if (guardianApprovalGoal > guardianIds.length) return 'A meta nao pode ser maior que a quantidade de guardioes.';
+      }
+      if (!cleanReveal) return 'Conte o que sera revelado quando a condicao for cumprida.';
       if (cleanReveal.length > 10000) return 'A revelacao nao pode ter mais de 10.000 caracteres.';
     }
 
@@ -160,9 +168,12 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
         title: title.trim(),
         story: story.trim(),
         category,
-        supportGoal,
-        revealContent: revealContent.trim(),
         visibility,
+        conditionType,
+        ...(conditionType === 'SUPPORT' ? { supportGoal } : {}),
+        ...(conditionType === 'DATE' ? { revealAt: new Date(revealAt).toISOString() } : {}),
+        ...(conditionType === 'GUARDIANS' ? { guardianIds, guardianApprovalGoal } : {}),
+        revealContent: revealContent.trim(),
       }, idempotencyKeyRef.current);
       setPublishedSuccess(created);
       window.setTimeout(() => onComplete(created), 800);
@@ -187,13 +198,11 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
   if (publishedSuccess) {
     return (
       <div className="w-full max-w-2xl mx-auto bg-white rounded-3xl border border-[#e4e2de] shadow-lg p-8 my-10 text-center">
-        <div className="w-16 h-16 bg-[#e8f5e9] text-[#2e7d32] rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle2 className="w-8 h-8" />
-        </div>
+        <div className="w-16 h-16 bg-[#e8f5e9] text-[#2e7d32] rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 className="w-8 h-8" /></div>
         <h2 className="text-2xl font-black text-[#1b1c1a]">Intent criada com sucesso</h2>
         <p className="text-sm text-[#454652] mt-2 max-w-md mx-auto">Sua Intent foi registrada e sera exibida conforme a visibilidade escolhida.</p>
         <div className="mt-6 p-4 rounded-2xl bg-[#f7f6fc] border border-[#e4e2de] text-left max-w-md mx-auto">
-          <p className="text-xs font-bold text-[#000666] uppercase tracking-wider">{selectedCategory.label}</p>
+          <p className="text-xs font-bold text-[#000666] uppercase tracking-wider">{conditionConfig[publishedSuccess.conditionType].title}</p>
           <p className="font-bold text-base mt-1 text-[#1b1c1a]">{publishedSuccess.title}</p>
           <p className="text-xs text-[#666] mt-2">Visibilidade: {visibilityConfig[publishedSuccess.visibility].title}</p>
         </div>
@@ -212,7 +221,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
       <div className="w-full max-w-md mx-auto mb-8">
         <div className="flex justify-between text-xs font-bold text-[#666] mb-2 px-1">
           <span className={step >= 1 ? 'text-[#000666]' : ''}>1. Ideia</span>
-          <span className={step >= 2 ? 'text-[#000666]' : ''}>2. Meta</span>
+          <span className={step >= 2 ? 'text-[#000666]' : ''}>2. Regra</span>
           <span className={step >= 3 ? 'text-[#000666]' : ''}>3. Revisao</span>
         </div>
         <div className="h-2 w-full bg-[#e4e2de] rounded-full overflow-hidden"><div className="h-full bg-[#000666] transition-all" style={{ width: `${(step * 100) / 3}%` }} /></div>
@@ -222,14 +231,8 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
         <section className="space-y-6">
           <div className="text-center"><h1 className="text-2xl sm:text-3xl font-black text-[#1b1c1a]">O que voce quer fazer acontecer?</h1><p className="text-sm text-[#454652] mt-2">Comece simples. A Intent pode ser um palpite, desafio, promessa ou cofre pessoal.</p></div>
           <div className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm p-6 space-y-5">
-            <label className="block">
-              <span className="flex justify-between text-xs font-bold mb-2"><span>Titulo</span><span className="text-[#888]">{title.length}/160</span></span>
-              <input value={title} maxLength={160} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Vou acertar o placar do jogo do meu time" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" />
-            </label>
-            <label className="block">
-              <span className="flex justify-between text-xs font-bold mb-2"><span>Conte a historia</span><span className="text-[#888]">{story.length}/5000</span></span>
-              <textarea value={story} maxLength={5000} onChange={(event) => setStory(event.target.value)} rows={4} placeholder="O que voce pretende fazer e por que isso importa?" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" />
-            </label>
+            <label className="block"><span className="flex justify-between text-xs font-bold mb-2"><span>Titulo</span><span className="text-[#888]">{title.length}/160</span></span><input value={title} maxLength={160} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Vou acertar o placar do jogo do meu time" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></label>
+            <label className="block"><span className="flex justify-between text-xs font-bold mb-2"><span>Conte a historia</span><span className="text-[#888]">{story.length}/5000</span></span><textarea value={story} maxLength={5000} onChange={(event) => setStory(event.target.value)} rows={4} placeholder="O que voce pretende fazer e por que isso importa?" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /></label>
             <div>
               <div className="flex items-center justify-between mb-3"><span className="text-xs font-bold">Categoria</span><span className="text-xs text-[#000666] font-bold flex items-center gap-1"><SelectedCategoryIcon className="w-3.5 h-3.5" /> {selectedCategory.label}</span></div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -247,45 +250,42 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
 
       {step === 2 && (
         <section className="space-y-6">
-          <div className="text-center"><h2 className="text-2xl font-black text-[#1b1c1a]">Quando ela sera revelada?</h2><p className="text-sm text-[#454652] mt-2">No MVP, a condicao ativa e atingir uma meta de apoios.</p></div>
+          <div className="text-center"><h2 className="text-2xl font-black text-[#1b1c1a]">Quem ve e quando revela?</h2><p className="text-sm text-[#454652] mt-2">Toda combinacao precisa poder se realizar.</p></div>
           <div className="grid sm:grid-cols-3 gap-3">
-            <div className="bg-white border-2 border-[#000666] rounded-2xl p-4"><Users className="w-5 h-5 text-[#000666]" /><p className="font-bold text-sm mt-3">Quantidade de apoios</p><p className="text-xs text-[#666] mt-1">Disponivel agora</p></div>
-            <div className="bg-[#f5f3ef] border border-[#e4e2de] rounded-2xl p-4 opacity-65"><Calendar className="w-5 h-5" /><p className="font-bold text-sm mt-3">Data</p><p className="text-xs text-[#666] mt-1">Em breve</p></div>
-            <div className="bg-[#f5f3ef] border border-[#e4e2de] rounded-2xl p-4 opacity-65"><Vote className="w-5 h-5" /><p className="font-bold text-sm mt-3">Guardioes</p><p className="text-xs text-[#666] mt-1">Em breve</p></div>
+            {(Object.keys(visibilityConfig) as VisibilityOption[]).map((key) => {
+              const config = visibilityConfig[key];
+              const Icon = config.icon;
+              const selected = visibility === key;
+              return <button key={key} type="button" onClick={() => handleVisibilityChange(key)} className={`text-left rounded-2xl border p-4 transition-colors ${selected ? 'border-[#000666] bg-white ring-2 ring-[#000666]/10' : 'border-[#e4e2de] bg-[#f5f3ef] hover:bg-white'}`}><div className="flex items-center gap-2 font-bold text-sm"><Icon className="w-4 h-4 text-[#000666]" />{config.title}</div><span className={`inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold ${config.tone}`}>{config.badge}</span><p className="text-xs text-[#666] mt-2">{config.description}</p></button>;
+            })}
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {(Object.keys(conditionConfig) as ConditionOption[]).map((key) => {
+              const config = conditionConfig[key];
+              const Icon = config.icon;
+              const selected = conditionType === key;
+              const disabled = visibility === 'PRIVATE' && key === 'SUPPORT';
+              return <button key={key} type="button" disabled={disabled} onClick={() => handleConditionChange(key)} className={`text-left rounded-2xl border p-4 transition-colors disabled:opacity-45 disabled:cursor-not-allowed ${selected ? 'border-[#000666] bg-white ring-2 ring-[#000666]/10' : 'border-[#e4e2de] bg-[#f5f3ef] hover:bg-white'}`}><div className="flex items-center gap-2 font-bold text-sm"><Icon className="w-4 h-4 text-[#000666]" />{config.title}</div><span className="inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e0e0ff] text-[#000666]">{config.badge}</span><p className="text-xs text-[#666] mt-2">{disabled ? 'Privada nao pode depender de apoios.' : config.description}</p></button>;
+            })}
           </div>
           <div className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm p-6 space-y-5">
-            <div>
-              <span className="block text-xs font-bold mb-2">Quantos apoios sao necessarios?</span>
-              <div className="flex flex-wrap gap-2 mb-3">{[1, 3, 5, 10, 25].map((value) => <button key={value} type="button" onClick={() => setSupportGoal(value)} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold border ${supportGoal === value ? 'bg-[#000666] text-white border-[#000666]' : 'bg-[#fbf9f5] text-[#454652] border-[#e4e2de]'}`}>{value}</button>)}</div>
-              <input type="number" inputMode="numeric" min={1} step={1} value={supportGoal} onChange={(event) => setSupportGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" />
-              <span className="block text-xs text-[#666] mt-2">Pode ser 1, 6, 10 ou qualquer numero inteiro.</span>
-            </div>
-            <label className="block">
-              <span className="flex justify-between text-xs font-bold mb-2"><span className="flex items-center gap-2"><Lock className="w-4 h-4" />O que sera revelado?</span><span className="text-[#888]">{revealContent.length}/10000</span></span>
-              <textarea value={revealContent} maxLength={10000} onChange={(event) => setRevealContent(event.target.value)} rows={4} placeholder="Ex.: Meu palpite foi 2 a 1. Este conteudo fica protegido ate a meta." className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" />
-            </label>
+            {conditionType === 'SUPPORT' && <div><span className="block text-xs font-bold mb-2">Quantos apoios sao necessarios?</span><div className="flex flex-wrap gap-2 mb-3">{[1, 3, 5, 10, 25].map((value) => <button key={value} type="button" onClick={() => setSupportGoal(value)} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold border ${supportGoal === value ? 'bg-[#000666] text-white border-[#000666]' : 'bg-[#fbf9f5] text-[#454652] border-[#e4e2de]'}`}>{value}</button>)}</div><input type="number" inputMode="numeric" min={1} step={1} value={supportGoal} onChange={(event) => setSupportGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></div>}
+            {conditionType === 'DATE' && <label className="block"><span className="block text-xs font-bold mb-2">Data e hora de revelacao</span><input type="datetime-local" value={revealAt} onChange={(event) => setRevealAt(event.target.value)} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /><span className="block text-xs text-[#666] mt-2">Datas no passado nao sao aceitas.</span></label>}
+            {conditionType === 'GUARDIANS' && <div className="space-y-4"><label className="block"><span className="block text-xs font-bold mb-2">IDs dos guardioes</span><textarea value={guardianIdsText} onChange={(event) => setGuardianIdsText(event.target.value)} rows={3} placeholder="Cole os IDs dos usuarios, separados por virgula ou espaco" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /><span className="block text-xs text-[#666] mt-2">{guardianIds.length} guardiao(oes) informado(s).</span></label><label className="block"><span className="block text-xs font-bold mb-2">Quantos precisam aprovar?</span><input type="number" inputMode="numeric" min={1} max={Math.max(guardianIds.length, 1)} value={guardianApprovalGoal} onChange={(event) => setGuardianApprovalGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></label></div>}
+            <label className="block"><span className="flex justify-between text-xs font-bold mb-2"><span className="flex items-center gap-2"><Lock className="w-4 h-4" />O que sera revelado?</span><span className="text-[#888]">{revealContent.length}/10000</span></span><textarea value={revealContent} maxLength={10000} onChange={(event) => setRevealContent(event.target.value)} rows={4} placeholder="Este conteudo fica protegido ate a condicao ser cumprida." className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /></label>
           </div>
         </section>
       )}
 
       {step === 3 && (
         <section className="space-y-6">
-          <div className="text-center"><h2 className="text-2xl font-black text-[#1b1c1a]">Tudo pronto?</h2><p className="text-sm text-[#454652] mt-2">Escolha quem pode ver e confira antes de publicar.</p></div>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {(Object.keys(visibilityConfig) as VisibilityOption[]).map((key) => {
-              const config = visibilityConfig[key];
-              const Icon = config.icon;
-              const selected = visibility === key;
-              return <button key={key} type="button" aria-pressed={selected} onClick={() => setVisibility(key)} className={`text-left rounded-2xl border p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-[#000666] ${selected ? 'border-[#000666] bg-white ring-2 ring-[#000666]/10' : 'border-[#e4e2de] bg-[#f5f3ef] hover:bg-white'}`}><div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 font-bold text-sm"><Icon className="w-4 h-4 text-[#000666]" />{config.title}</span>{selected && <Check className="w-4 h-4 text-[#000666]" />}</div><span className={`inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold ${config.tone}`}>{config.badge}</span><p className="text-xs text-[#666] mt-2">{config.shortDesc}</p></button>;
-            })}
-          </div>
-          <div className="flex gap-2 text-xs text-[#454652] bg-[#f0efff] border border-[#d2d1ff] rounded-xl p-3"><SelectedVisibilityIcon className="w-4 h-4 shrink-0 text-[#000666]" /><span><strong>{selectedVisibility.title}:</strong> {selectedVisibility.feedImpact} {selectedVisibility.supportImpact}</span></div>
+          <div className="text-center"><h2 className="text-2xl font-black text-[#1b1c1a]">Tudo pronto?</h2><p className="text-sm text-[#454652] mt-2">Confira como sua Intent sera criada.</p></div>
           <article className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm p-6">
             <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] flex items-center justify-center font-bold text-[#000666]">{currentUser.name.charAt(0).toUpperCase()}</div><div><p className="font-bold text-sm">{currentUser.name}</p><p className="text-xs text-[#666]">Agora mesmo · {selectedVisibility.title}</p></div></div>
-            <div className="flex flex-wrap gap-2 mt-5"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold"><SelectedCategoryIcon className="w-3 h-3" /> {selectedCategory.label}</span><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${selectedVisibility.tone}`}><SelectedVisibilityIcon className="w-3 h-3" /> {selectedVisibility.badge}</span></div>
+            <div className="flex flex-wrap gap-2 mt-5"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold"><SelectedCategoryIcon className="w-3 h-3" /> {selectedCategory.label}</span><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${selectedVisibility.tone}`}><SelectedVisibilityIcon className="w-3 h-3" /> {selectedVisibility.badge}</span><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold"><SelectedConditionIcon className="w-3 h-3" /> {selectedCondition.title}</span></div>
             <h3 className="text-xl font-black mt-3">{title || 'Titulo da Intent'}</h3><p className="text-sm text-[#454652] mt-2 whitespace-pre-wrap">{story || 'Descricao da Intent'}</p>
-            <div className="mt-5 rounded-xl bg-[#f5f3ef] p-4 flex items-center gap-3"><Lock className="w-5 h-5 text-[#000666]" /><div><p className="text-sm font-bold">0 de {supportGoal} apoios</p><p className="text-xs text-[#666]">A revelacao permanece protegida ate a meta.</p></div></div>
-            <div className="grid sm:grid-cols-3 gap-3 mt-4 text-xs"><button type="button" onClick={() => setStep(1)} className="flex items-center justify-center gap-1 p-2 rounded-lg border border-[#e4e2de] font-bold text-[#000666]"><Edit3 className="w-3 h-3" />Editar ideia</button><button type="button" onClick={() => setStep(2)} className="flex items-center justify-center gap-1 p-2 rounded-lg border border-[#e4e2de] font-bold text-[#000666]"><Edit3 className="w-3 h-3" />Editar meta</button><span className="flex items-center justify-center gap-1 p-2 rounded-lg bg-[#e8f5e9] text-[#2e7d32] font-bold"><ShieldCheck className="w-3 h-3" />Pronto para publicar</span></div>
+            <div className="mt-5 rounded-xl bg-[#f5f3ef] p-4 flex items-center gap-3"><Lock className="w-5 h-5 text-[#000666]" /><div><p className="text-sm font-bold">{conditionType === 'SUPPORT' ? `0 de ${supportGoal} apoios` : conditionType === 'DATE' ? `Revela em ${new Date(revealAt).toLocaleString('pt-BR')}` : `0 de ${guardianApprovalGoal} guardioes`}</p><p className="text-xs text-[#666]">A revelacao permanece protegida ate a condicao.</p></div></div>
+            <div className="grid sm:grid-cols-3 gap-3 mt-4 text-xs"><button type="button" onClick={() => setStep(1)} className="flex items-center justify-center gap-1 p-2 rounded-lg border border-[#e4e2de] font-bold text-[#000666]"><Edit3 className="w-3 h-3" />Editar ideia</button><button type="button" onClick={() => setStep(2)} className="flex items-center justify-center gap-1 p-2 rounded-lg border border-[#e4e2de] font-bold text-[#000666]"><Edit3 className="w-3 h-3" />Editar regra</button><span className="flex items-center justify-center gap-1 p-2 rounded-lg bg-[#e8f5e9] text-[#2e7d32] font-bold"><ShieldCheck className="w-3 h-3" />Pronto</span></div>
           </article>
         </section>
       )}

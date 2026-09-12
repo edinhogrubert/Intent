@@ -11,6 +11,7 @@ import { runIntentMutation } from './intent-mutation.js';
 const publicIntentSelection = {
   id: true,
   type: true,
+  conditionType: true,
   status: true,
   visibility: true,
   category: true,
@@ -18,6 +19,10 @@ const publicIntentSelection = {
   story: true,
   supportGoal: true,
   supportCount: true,
+  revealAt: true,
+  guardianIds: true,
+  guardianApprovals: true,
+  guardianApprovalGoal: true,
   publishedAt: true,
   realizedAt: true,
   createdAt: true,
@@ -39,6 +44,43 @@ function assertPublishedState(intent: { supportCount: number; supportGoal: numbe
   }
 }
 
+function asStringArray(value: Prisma.JsonValue | unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function isRevealConditionSatisfied(intent: {
+  conditionType: string;
+  supportCount: number;
+  supportGoal: number;
+  revealAt: Date | null;
+  guardianIds: Prisma.JsonValue | unknown;
+  guardianApprovals: Prisma.JsonValue | unknown;
+  guardianApprovalGoal: number | null;
+}): boolean {
+  if (intent.conditionType === 'SUPPORT') {
+    return isSupportConditionSatisfied(intent.supportCount, intent.supportGoal);
+  }
+  if (intent.conditionType === 'DATE') {
+    return Boolean(intent.revealAt && intent.revealAt.getTime() <= Date.now());
+  }
+  if (intent.conditionType === 'GUARDIANS') {
+    const guardianIds = new Set(asStringArray(intent.guardianIds));
+    const approvals = asStringArray(intent.guardianApprovals).filter((id) => guardianIds.has(id));
+    return approvals.length >= (intent.guardianApprovalGoal ?? guardianIds.size);
+  }
+  return false;
+}
+
+function publicGuardianIds(intent: { creatorId: string; guardianIds: Prisma.JsonValue | unknown }, viewerId?: string) {
+  if (intent.creatorId === viewerId) return asStringArray(intent.guardianIds);
+  return undefined;
+}
+
+function publicGuardianApprovals(intent: { creatorId: string; guardianApprovals: Prisma.JsonValue | unknown }, viewerId?: string) {
+  if (intent.creatorId === viewerId) return asStringArray(intent.guardianApprovals);
+  return undefined;
+}
+
 // Actor IDs come from the authenticated server context, never from command fields.
 export async function createIntent(creatorId: string, input: unknown, idempotencyKey?: string) {
   const command = createIntentSchema.parse(input);
@@ -55,15 +97,20 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
       data: {
         id: intentId,
         creatorId,
-        type: 'SUPPORT_REVEAL',
+        type: 'CONDITIONAL_REVEAL',
+        conditionType: command.conditionType,
         status: 'PUBLISHED',
         supportCount: 0,
         realizedAt: null,
         title: command.title,
         story: command.story,
         category: command.category,
-        supportGoal: command.supportGoal,
+        supportGoal: command.supportGoal ?? command.guardianApprovalGoal ?? 1,
         visibility: command.visibility,
+        revealAt: command.revealAt ?? null,
+        guardianIds: command.guardianIds ?? [],
+        guardianApprovals: [],
+        guardianApprovalGoal: command.guardianApprovalGoal ?? null,
         revealCiphertext: sealed.ciphertext,
         revealIv: sealed.iv,
         revealAuthTag: sealed.authTag,
@@ -79,8 +126,12 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
         type: 'INTENT_CREATED',
         idempotencyKey: `intent-created:${intentId}:v1`,
         payload: {
-          type: 'SUPPORT_REVEAL',
-          supportGoal: command.supportGoal,
+          type: 'CONDITIONAL_REVEAL',
+          conditionType: command.conditionType,
+          supportGoal: command.supportGoal ?? null,
+          revealAt: command.revealAt?.toISOString() ?? null,
+          guardianCount: command.guardianIds?.length ?? 0,
+          guardianApprovalGoal: command.guardianApprovalGoal ?? null,
           category: command.category,
           visibility: command.visibility,
           revealVersion,
@@ -161,7 +212,7 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
 }
 
 export async function getIntent(intentId: string, viewerId?: string) {
-  const intent = await prisma.intent.findUnique({
+  let intent = await prisma.intent.findUnique({
     where: { id: intentId },
     include: {
       creator: {
@@ -180,7 +231,10 @@ export async function getIntent(intentId: string, viewerId?: string) {
     throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent não está disponível.');
   }
 
-  if (intent.visibility === 'PRIVATE' && intent.creatorId !== viewerId) {
+  const guardianIds = asStringArray(intent.guardianIds);
+  const viewerIsGuardian = Boolean(viewerId && guardianIds.includes(viewerId));
+
+  if (intent.visibility === 'PRIVATE' && intent.creatorId !== viewerId && !viewerIsGuardian) {
     throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode acessar esta Intent.');
   }
 
@@ -213,14 +267,41 @@ export async function getIntent(intentId: string, viewerId?: string) {
     revealCiphertext,
     revealIv,
     revealAuthTag,
+    guardianIds: _guardianIds,
+    guardianApprovals: _guardianApprovals,
     ...publicIntent
   } = intent;
 
-  if (intent.status !== 'REALIZED') {
-    return { ...publicIntent, revealContent: null, viewerHasSupported: Boolean(viewerSupport) };
+  if (intent.status === 'PUBLISHED' && isRevealConditionSatisfied(intent)) {
+    const result = await prisma.intent.updateMany({
+      where: { id: intentId, status: 'PUBLISHED' },
+      data: { status: 'REALIZED', realizedAt: new Date() },
+    });
+    if (result.count === 1) {
+      intent = await prisma.intent.findUniqueOrThrow({
+        where: { id: intentId },
+        include: {
+          creator: {
+            select: { id: true, username: true, displayName: true, avatarUrl: true, status: true },
+          },
+        },
+      });
+    }
   }
 
-  if (!intent.realizedAt || !isSupportConditionSatisfied(intent.supportCount, intent.supportGoal)) {
+  if (intent.status !== 'REALIZED') {
+    return {
+      ...publicIntent,
+      guardianIds: publicGuardianIds(intent, viewerId),
+      guardianApprovals: publicGuardianApprovals(intent, viewerId),
+      viewerIsGuardian,
+      viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
+      revealContent: null,
+      viewerHasSupported: Boolean(viewerSupport),
+    };
+  }
+
+  if (!intent.realizedAt || !isRevealConditionSatisfied(intent)) {
     throw new AppError(409, 'INTENT_STATE_INVALID', 'O estado da Intent é inconsistente.');
   }
 
@@ -234,7 +315,16 @@ export async function getIntent(intentId: string, viewerId?: string) {
     revealAssociatedData(intent.id, intent.revealVersion),
   );
 
-  return { ...publicIntent, revealContent, viewerHasSupported: Boolean(viewerSupport) };
+  const { revealCiphertext: _c, revealIv: _i, revealAuthTag: _a, guardianIds: _g, guardianApprovals: _ga, ...realizedPublicIntent } = intent;
+  return {
+    ...realizedPublicIntent,
+    guardianIds: publicGuardianIds(intent, viewerId),
+    guardianApprovals: publicGuardianApprovals(intent, viewerId),
+    viewerIsGuardian,
+    viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
+    revealContent,
+    viewerHasSupported: Boolean(viewerSupport),
+  };
 }
 
 async function ensureSupportAccess(
@@ -283,6 +373,10 @@ export async function supportIntent(intentId: string, supporterId: string, idemp
       throw new AppError(409, 'INTENT_NOT_OPEN', 'Esta Intent não está aberta para novos apoios.');
     }
 
+    if (existing.conditionType !== 'SUPPORT') {
+      throw new AppError(409, 'INTENT_NOT_SUPPORT_BASED', 'Esta Intent não usa apoios como condição.');
+    }
+
     assertPublishedState(existing);
 
     await ensureSupportAccess(transaction, existing, supporterId);
@@ -316,7 +410,7 @@ export async function supportIntent(intentId: string, supporterId: string, idemp
     });
 
     let realizedNow = false;
-    if (isSupportConditionSatisfied(updated.supportCount, updated.supportGoal)) {
+    if (isRevealConditionSatisfied(updated)) {
       const result = await transaction.intent.updateMany({
         where: { id: intentId, status: 'PUBLISHED' },
         data: { status: 'REALIZED', realizedAt: new Date() },
@@ -351,6 +445,90 @@ export async function supportIntent(intentId: string, supporterId: string, idemp
       supportCount: updated.supportCount,
       supportGoal: updated.supportGoal,
       supported: true,
+      realized: realizedNow || updated.status === 'REALIZED',
+      realizedNow,
+    };
+  });
+}
+
+export async function approveGuardianIntent(intentId: string, guardianId: string, idempotencyKey?: string) {
+  intentId = intentId.toLowerCase();
+  return runIntentMutation(guardianId, `GUARDIAN_APPROVE:${intentId}`, idempotencyKey, { intentId }, async (transaction) => {
+    const intent = await transaction.intent.findUnique({
+      where: { id: intentId },
+      include: { creator: { select: { status: true } } },
+    });
+
+    if (!intent || intent.creator.status !== 'ACTIVE') {
+      throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
+    }
+    if (intent.conditionType !== 'GUARDIANS') {
+      throw new AppError(409, 'INTENT_NOT_GUARDIAN_BASED', 'Esta Intent não usa guardiões como condição.');
+    }
+    if (intent.status !== 'PUBLISHED') {
+      throw new AppError(409, 'INTENT_NOT_OPEN', 'Esta Intent não está aberta para aprovação.');
+    }
+
+    const guardianIds = asStringArray(intent.guardianIds);
+    if (!guardianIds.includes(guardianId)) {
+      throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não é guardião desta Intent.');
+    }
+
+    const approvals = new Set(asStringArray(intent.guardianApprovals));
+    const hadApproved = approvals.has(guardianId);
+    approvals.add(guardianId);
+    const nextApprovals = [...approvals];
+
+    const updated = await transaction.intent.update({
+      where: { id: intentId },
+      data: { guardianApprovals: nextApprovals },
+    });
+
+    if (!hadApproved) {
+      await transaction.domainEvent.create({
+        data: {
+          intentId,
+          actorId: guardianId,
+          type: 'GUARDIAN_APPROVED',
+          idempotencyKey: `guardian-approved:${intentId}:${guardianId}`,
+          payload: {
+            approvals: nextApprovals.length,
+            guardianApprovalGoal: updated.guardianApprovalGoal,
+          },
+        },
+      });
+    }
+
+    let realizedNow = false;
+    if (isRevealConditionSatisfied(updated)) {
+      const result = await transaction.intent.updateMany({
+        where: { id: intentId, status: 'PUBLISHED' },
+        data: { status: 'REALIZED', realizedAt: new Date() },
+      });
+      realizedNow = result.count === 1;
+      if (realizedNow) {
+        await transaction.domainEvent.create({
+          data: {
+            intentId,
+            actorId: guardianId,
+            type: 'INTENT_REALIZED',
+            idempotencyKey: `intent-realized:${intentId}:v${updated.revealVersion}`,
+            payload: {
+              conditionType: updated.conditionType,
+              guardianApprovalGoal: updated.guardianApprovalGoal,
+              approvals: nextApprovals.length,
+              revealVersion: updated.revealVersion,
+            },
+          },
+        });
+      }
+    }
+
+    return {
+      intentId,
+      approved: true,
+      approvals: nextApprovals.length,
+      guardianApprovalGoal: updated.guardianApprovalGoal,
       realized: realizedNow || updated.status === 'REALIZED',
       realizedNow,
     };

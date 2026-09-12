@@ -4,6 +4,7 @@ import { createIntentSchema } from '../domain/intent-schemas.js';
 import { AppError } from '../errors.js';
 import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middleware/auth.js';
 import {
+  approveGuardianIntent,
   createIntent,
   getIntent,
   listUserIntents,
@@ -87,6 +88,16 @@ intentsRouter.delete('/:id/supports', requireAuthenticatedUser, async (request, 
     const intentId = identifierSchema.parse(request.params.id);
     const result = await removeSupport(intentId, request.appUser!.id, request.get('Idempotency-Key'));
     response.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.post('/:id/guardian-approvals', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const result = await approveGuardianIntent(intentId, request.appUser!.id, request.get('Idempotency-Key'));
+    response.status(201).json({ data: result });
   } catch (error) {
     next(error);
   }

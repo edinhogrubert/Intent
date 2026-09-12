@@ -236,17 +236,26 @@ describe('autoridade HTTP do backend', () => {
 
   it('aceita criar Intent privada e persiste a visibilidade no backend', async () => {
     db.$transaction.mockImplementation(async (operation) => operation(db));
-    db.intent.create.mockResolvedValue({ id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE' });
-    const response = await write('/v1/intents', 'POST', { ...command, visibility: 'PRIVATE' });
+    db.intent.create.mockResolvedValue({ id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE', conditionType: 'DATE' });
+    const revealAt = new Date(Date.now() + 60_000).toISOString();
+    const response = await write('/v1/intents', 'POST', { ...command, visibility: 'PRIVATE', conditionType: 'DATE', revealAt });
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ data: { id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE' } });
+    expect(await response.json()).toEqual({ data: { id: intentId, status: 'PUBLISHED', visibility: 'PRIVATE', conditionType: 'DATE' } });
     expect(db.intent.create.mock.calls[0]![0].data).toMatchObject({
       creatorId: viewer.id,
       status: 'PUBLISHED',
       visibility: 'PRIVATE',
+      conditionType: 'DATE',
       supportCount: 0,
       realizedAt: null,
     });
+  });
+
+  it('rejeita Intent privada baseada em apoios para evitar regra impossível', async () => {
+    const response = await write('/v1/intents', 'POST', { ...command, visibility: 'PRIVATE', conditionType: 'SUPPORT' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 
   it.each([

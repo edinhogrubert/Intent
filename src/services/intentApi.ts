@@ -34,7 +34,8 @@ export type IntentCategory =
 
 export interface ApiIntent {
   id: string;
-  type: 'SUPPORT_REVEAL';
+  type: 'SUPPORT_REVEAL' | 'CONDITIONAL_REVEAL';
+  conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
   status: 'PUBLISHED' | 'REALIZED';
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
   category: IntentCategory;
@@ -42,12 +43,18 @@ export interface ApiIntent {
   story: string;
   supportGoal: number;
   supportCount: number;
+  revealAt: string | null;
+  guardianIds?: string[];
+  guardianApprovals?: string[];
+  guardianApprovalGoal: number | null;
   publishedAt: string;
   realizedAt: string | null;
   createdAt: string;
   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
   revealContent?: string | null;
   viewerHasSupported?: boolean;
+  viewerIsGuardian?: boolean;
+  viewerHasApprovedAsGuardian?: boolean;
 }
 
 export interface ApiSocialProfile {
@@ -96,9 +103,22 @@ export interface CreateSupportIntentInput {
   title: string;
   story: string;
   category: IntentCategory;
-  supportGoal: number;
+  conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
+  supportGoal?: number;
+  revealAt?: string;
+  guardianIds?: string[];
+  guardianApprovalGoal?: number;
   revealContent: string;
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+}
+
+export interface GuardianApprovalResult {
+  intentId: string;
+  approved: boolean;
+  approvals: number;
+  guardianApprovalGoal: number | null;
+  realized: boolean;
+  realizedNow: boolean;
 }
 
 export class IntentApiError extends Error {
@@ -251,6 +271,14 @@ export async function removeIntentSupport(intentId: string): Promise<SupportInte
   const result = await authenticatedRequest<ApiEnvelope<SupportIntentResult>>(
     `/v1/intents/${encodeURIComponent(intentId)}/supports`,
     { method: 'DELETE' },
+  );
+  return result.data;
+}
+
+export async function approveGuardianIntent(intentId: string): Promise<GuardianApprovalResult> {
+  const result = await authenticatedRequest<ApiEnvelope<GuardianApprovalResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/guardian-approvals`,
+    { method: 'POST' },
   );
   return result.data;
 }
