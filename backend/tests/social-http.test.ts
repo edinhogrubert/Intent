@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // Real app, routes, authentication middleware and feed services; no external I/O.
 const { db, verifyIdToken } = vi.hoisted(() => ({
   db: {
-    user: { findUnique: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     intent: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
     domainEvent: { create: vi.fn() },
@@ -47,6 +47,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   verifyIdToken.mockResolvedValue({ uid: viewer.firebaseUid, name: 'Visitante' });
   db.user.findUnique.mockResolvedValue(viewer);
+  db.user.findMany.mockResolvedValue([]);
   db.user.update.mockResolvedValue(viewer);
   db.intent.findMany.mockResolvedValue([]);
   db.follow.findUnique.mockResolvedValue(null);
@@ -193,6 +194,33 @@ describe('acesso HTTP a Intent privada', () => {
     const body = await response.json();
     expect(body.data).toMatchObject({ id: intentId, visibility: 'PRIVATE', revealContent: null });
     for (const field of ['revealCiphertext', 'revealIv', 'revealAuthTag']) expect(body.data).not.toHaveProperty(field);
+  });
+});
+
+describe('busca HTTP de guardiões', () => {
+  it('exige autenticação para buscar usuários', async () => {
+    const response = await get('/v1/users/search?q=edi');
+    expect(response.status).toBe(401);
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('busca contas ativas por username ou nome e exclui o próprio usuário', async () => {
+    db.user.findMany.mockResolvedValue([{ id: creatorId, username: 'edinho_grubert_1', displayName: 'Edinho Grubert', avatarUrl: null }]);
+    const response = await get('/v1/users/search?q=@edinho', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { items: [{ id: creatorId, username: 'edinho_grubert_1', displayName: 'Edinho Grubert', avatarUrl: null }] } });
+    expect(db.user.findMany.mock.calls[0]![0]).toMatchObject({
+      where: {
+        id: { not: viewer.id },
+        status: 'ACTIVE',
+      },
+      take: 10,
+      select: { id: true, username: true, displayName: true, avatarUrl: true },
+    });
+    expect(db.user.findMany.mock.calls[0]![0].where.OR).toEqual([
+      { username: { contains: 'edinho', mode: 'insensitive' } },
+      { displayName: { contains: '@edinho', mode: 'insensitive' } },
+    ]);
   });
 });
 

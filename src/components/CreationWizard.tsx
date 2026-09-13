@@ -24,7 +24,14 @@ import {
   X,
 } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { createSupportIntent, IntentApiError, type ApiIntent, type IntentCategory } from '../services/intentApi';
+import {
+  createSupportIntent,
+  IntentApiError,
+  searchUsers,
+  type ApiIntent,
+  type ApiUserSearchResult,
+  type IntentCategory,
+} from '../services/intentApi';
 
 interface CreationWizardProps {
   currentUser: UserAccount;
@@ -78,8 +85,9 @@ function localDateTimeValue(date: Date) {
   return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
 }
 
-function splitGuardianIds(value: string) {
-  return value.split(/[\s,;]+/).map((item) => item.trim()).filter(Boolean);
+function parseRevealDate(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? new Date(time) : null;
 }
 
 export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWizardProps) {
@@ -91,7 +99,10 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
   const [conditionType, setConditionType] = useState<ConditionOption>('SUPPORT');
   const [supportGoal, setSupportGoal] = useState(1);
   const [revealAt, setRevealAt] = useState(() => localDateTimeValue(new Date(Date.now() + 24 * 60 * 60 * 1000)));
-  const [guardianIdsText, setGuardianIdsText] = useState('');
+  const [guardianSearch, setGuardianSearch] = useState('');
+  const [guardianSearchResults, setGuardianSearchResults] = useState<ApiUserSearchResult[]>([]);
+  const [guardianSearchLoading, setGuardianSearchLoading] = useState(false);
+  const [selectedGuardians, setSelectedGuardians] = useState<ApiUserSearchResult[]>([]);
   const [guardianApprovalGoal, setGuardianApprovalGoal] = useState(1);
   const [revealContent, setRevealContent] = useState('');
   const [error, setError] = useState('');
@@ -105,7 +116,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
   const SelectedCategoryIcon = selectedCategory.icon;
   const SelectedVisibilityIcon = selectedVisibility.icon;
   const SelectedConditionIcon = selectedCondition.icon;
-  const guardianIds = splitGuardianIds(guardianIdsText);
+  const guardianIds = selectedGuardians.map((guardian) => guardian.id);
 
   function handleVisibilityChange(next: VisibilityOption) {
     setVisibility(next);
@@ -116,6 +127,35 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
     setConditionType(next);
     if (next === 'SUPPORT' && visibility === 'PRIVATE') setVisibility('PUBLIC');
     if (next === 'GUARDIANS' && visibility !== 'PRIVATE') setVisibility('PRIVATE');
+  }
+
+  async function handleGuardianSearch() {
+    const query = guardianSearch.trim();
+    if (query.length < 2) {
+      setError('Digite pelo menos 2 caracteres para buscar guardioes.');
+      return;
+    }
+    setError('');
+    setGuardianSearchLoading(true);
+    try {
+      const results = await searchUsers(query);
+      const selectedIds = new Set(selectedGuardians.map((guardian) => guardian.id));
+      setGuardianSearchResults(results.filter((user) => !selectedIds.has(user.id)));
+    } catch (caught) {
+      setError(caught instanceof IntentApiError ? caught.message : 'Nao foi possivel buscar guardioes.');
+    } finally {
+      setGuardianSearchLoading(false);
+    }
+  }
+
+  function addGuardian(user: ApiUserSearchResult) {
+    setSelectedGuardians((current) => current.some((guardian) => guardian.id === user.id) ? current : [...current, user]);
+    setGuardianSearchResults((current) => current.filter((result) => result.id !== user.id));
+    setGuardianSearch('');
+  }
+
+  function removeGuardian(userId: string) {
+    setSelectedGuardians((current) => current.filter((guardian) => guardian.id !== userId));
   }
 
   function validateCurrentStep() {
@@ -134,7 +174,9 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
       if (visibility === 'PRIVATE' && conditionType === 'SUPPORT') return 'Intent privada nao pode depender de apoios.';
       if (conditionType === 'SUPPORT' && (!Number.isInteger(supportGoal) || supportGoal < 1)) return 'A meta deve ser um numero inteiro a partir de 1.';
       if (conditionType === 'SUPPORT' && supportGoal > 1_000_000) return 'A meta nao pode exceder 1.000.000 apoios.';
-      if (conditionType === 'DATE' && new Date(revealAt).getTime() <= Date.now()) return 'Escolha uma data futura.';
+      const parsedRevealAt = parseRevealDate(revealAt);
+      if (conditionType === 'DATE' && !parsedRevealAt) return 'Informe uma data e hora validas.';
+      if (conditionType === 'DATE' && parsedRevealAt!.getTime() <= Date.now() + 60_000) return 'Escolha uma data pelo menos 1 minuto no futuro.';
       if (conditionType === 'GUARDIANS') {
         if (guardianIds.length === 0) return 'Informe ao menos um ID de guardiao.';
         if (new Set(guardianIds).size !== guardianIds.length) return 'Nao repita guardioes.';
@@ -171,7 +213,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
         visibility,
         conditionType,
         ...(conditionType === 'SUPPORT' ? { supportGoal } : {}),
-        ...(conditionType === 'DATE' ? { revealAt: new Date(revealAt).toISOString() } : {}),
+        ...(conditionType === 'DATE' ? { revealAt: parseRevealDate(revealAt)!.toISOString() } : {}),
         ...(conditionType === 'GUARDIANS' ? { guardianIds, guardianApprovalGoal } : {}),
         revealContent: revealContent.trim(),
       }, idempotencyKeyRef.current);
@@ -270,8 +312,26 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
           </div>
           <div className="bg-white rounded-2xl border border-[#e4e2de] shadow-sm p-6 space-y-5">
             {conditionType === 'SUPPORT' && <div><span className="block text-xs font-bold mb-2">Quantos apoios sao necessarios?</span><div className="flex flex-wrap gap-2 mb-3">{[1, 3, 5, 10, 25].map((value) => <button key={value} type="button" onClick={() => setSupportGoal(value)} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold border ${supportGoal === value ? 'bg-[#000666] text-white border-[#000666]' : 'bg-[#fbf9f5] text-[#454652] border-[#e4e2de]'}`}>{value}</button>)}</div><input type="number" inputMode="numeric" min={1} step={1} value={supportGoal} onChange={(event) => setSupportGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></div>}
-            {conditionType === 'DATE' && <label className="block"><span className="block text-xs font-bold mb-2">Data e hora de revelacao</span><input type="datetime-local" value={revealAt} onChange={(event) => setRevealAt(event.target.value)} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /><span className="block text-xs text-[#666] mt-2">Datas no passado nao sao aceitas.</span></label>}
-            {conditionType === 'GUARDIANS' && <div className="space-y-4"><label className="block"><span className="block text-xs font-bold mb-2">IDs dos guardioes</span><textarea value={guardianIdsText} onChange={(event) => setGuardianIdsText(event.target.value)} rows={3} placeholder="Cole os IDs dos usuarios, separados por virgula ou espaco" className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /><span className="block text-xs text-[#666] mt-2">{guardianIds.length} guardiao(oes) informado(s).</span></label><label className="block"><span className="block text-xs font-bold mb-2">Quantos precisam aprovar?</span><input type="number" inputMode="numeric" min={1} max={Math.max(guardianIds.length, 1)} value={guardianApprovalGoal} onChange={(event) => setGuardianApprovalGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></label></div>}
+            {conditionType === 'DATE' && <label className="block"><span className="block text-xs font-bold mb-2">Data e hora de revelacao</span><input type="datetime-local" min={localDateTimeValue(new Date(Date.now() + 60_000))} value={revealAt} onChange={(event) => setRevealAt(event.target.value)} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /><span className="block text-xs text-[#666] mt-2">Use uma data pelo menos 1 minuto no futuro.</span></label>}
+            {conditionType === 'GUARDIANS' && <div className="space-y-4">
+              <div>
+                <span className="block text-xs font-bold mb-2">Buscar guardioes</span>
+                <div className="flex gap-2">
+                  <input value={guardianSearch} onChange={(event) => setGuardianSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void handleGuardianSearch(); } }} placeholder="@usuario ou nome" className="min-w-0 flex-1 bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" />
+                  <button type="button" onClick={() => void handleGuardianSearch()} disabled={guardianSearchLoading} className="px-4 py-3 rounded-xl bg-[#000666] text-white text-xs font-bold disabled:opacity-60">{guardianSearchLoading ? 'Buscando...' : 'Buscar'}</button>
+                </div>
+                <span className="block text-xs text-[#666] mt-2">Busque pelo @username simples ou pelo nome exibido.</span>
+                {guardianSearchResults.length > 0 && <div className="mt-3 rounded-xl border border-[#e4e2de] overflow-hidden bg-white">
+                  {guardianSearchResults.map((user) => <button key={user.id} type="button" onClick={() => addGuardian(user)} className="w-full flex items-center gap-3 p-3 text-left hover:bg-[#f5f3ef] border-b border-[#f0efec] last:border-b-0"><div className="w-8 h-8 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center text-xs font-black">{user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : user.displayName.charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-sm font-bold truncate">{user.displayName}</p><p className="text-xs text-[#666] truncate">@{user.username.replace(/^@+/, '')}</p></div></button>)}
+                </div>}
+              </div>
+              <div>
+                <span className="block text-xs font-bold mb-2">Guardioes selecionados</span>
+                {selectedGuardians.length === 0 ? <p className="text-sm text-[#666] bg-[#f5f3ef] border border-dashed border-[#c6c5d4] rounded-xl p-4">Nenhum guardiao selecionado.</p> : <div className="space-y-2">{selectedGuardians.map((guardian) => <div key={guardian.id} className="flex items-center justify-between gap-3 bg-[#f5f3ef] border border-[#e4e2de] rounded-xl p-3"><div className="min-w-0"><p className="text-sm font-bold truncate">{guardian.displayName}</p><p className="text-xs text-[#666] truncate">@{guardian.username.replace(/^@+/, '')}</p></div><button type="button" onClick={() => removeGuardian(guardian.id)} className="text-xs font-bold text-[#8c1d18]">Remover</button></div>)}</div>}
+                <span className="block text-xs text-[#666] mt-2">{guardianIds.length} guardiao(oes) selecionado(s).</span>
+              </div>
+              <label className="block"><span className="block text-xs font-bold mb-2">Quantos precisam aprovar?</span><input type="number" inputMode="numeric" min={1} max={Math.max(guardianIds.length, 1)} value={guardianApprovalGoal} onChange={(event) => setGuardianApprovalGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></label>
+            </div>}
             <label className="block"><span className="flex justify-between text-xs font-bold mb-2"><span className="flex items-center gap-2"><Lock className="w-4 h-4" />O que sera revelado?</span><span className="text-[#888]">{revealContent.length}/10000</span></span><textarea value={revealContent} maxLength={10000} onChange={(event) => setRevealContent(event.target.value)} rows={4} placeholder="Este conteudo fica protegido ate a condicao ser cumprida." className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /></label>
           </div>
         </section>

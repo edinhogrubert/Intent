@@ -12,6 +12,10 @@ const connectionQuerySchema = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
+const userSearchQuerySchema = z.object({
+  q: z.string().trim().min(2).max(40),
+  limit: z.coerce.number().int().min(1).max(10).default(10),
+});
 
 usersRouter.use(requireAuthenticatedUser);
 
@@ -21,6 +25,34 @@ usersRouter.post('/me/sync', (request, response) => {
 
 usersRouter.get('/me', (request, response) => {
   response.json({ data: request.appUser });
+});
+
+usersRouter.get('/search', async (request, response, next) => {
+  try {
+    const query = userSearchQuerySchema.parse(request.query);
+    const normalized = query.q.replace(/^@+/, '').toLowerCase();
+    const users = await prisma.user.findMany({
+      where: {
+        id: { not: request.appUser!.id },
+        status: 'ACTIVE',
+        OR: [
+          { username: { contains: normalized, mode: 'insensitive' } },
+          { displayName: { contains: query.q, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: [{ username: 'asc' }, { id: 'asc' }],
+      take: query.limit,
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+    });
+    response.json({ data: { items: users } });
+  } catch (error) {
+    next(error);
+  }
 });
 
 usersRouter.get('/me/social', async (request, response, next) => {

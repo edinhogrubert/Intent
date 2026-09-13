@@ -99,6 +99,13 @@ export interface ApiSocialConnection {
   isFollowing: boolean;
 }
 
+export interface ApiUserSearchResult {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export interface SupportIntentResult {
   intentId: string;
   supportCount: number;
@@ -243,6 +250,14 @@ export function listProfileFollowers(userId: string, cursor?: string) {
 
 export function listProfileFollowing(userId: string, cursor?: string) {
   return listProfileConnections(userId, 'following', cursor);
+}
+
+export async function searchUsers(query: string): Promise<ApiUserSearchResult[]> {
+  const search = new URLSearchParams({ q: query, limit: '10' });
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiUserSearchResult[] }>>(
+    `/v1/users/search?${search.toString()}`,
+  );
+  return result.data.items;
 }
 
 export async function createSupportIntent(input: CreateSupportIntentInput, idempotencyKey?: string): Promise<ApiIntent> {
