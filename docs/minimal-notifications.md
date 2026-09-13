@@ -54,11 +54,20 @@ a lista e sem usar mocks ou `localStorage`. O sino mostra o total não lido e us
 abrir o modal e reduzido depois de cada leitura confirmada. Se a consulta falhar,
 o badge é ocultado sem interromper a aplicação.
 
+### Filtros do modal
+
+O modal permite exibir todas as notificações, somente as não lidas ou somente as
+lidas. O filtro inicial é **Todas** e opera apenas sobre as notificações já
+carregadas no cliente. Ao marcar uma notificação como lida no filtro **Não
+lidas**, ela deixa imediatamente a lista visível. Cada filtro possui seu próprio
+estado vazio.
+
 ## Fora do escopo
 
-WebSocket, polling, push, e-mail, atualização em tempo real, preferências avançadas,
-agrupamento, reações e comentários permanecem fora deste bloco. Não há mudança
-em Firebase, portas, Docker ou deploy da Oracle.
+WebSocket, polling, push, e-mail, atualização em tempo real, paginação, endpoint
+adicional para filtros, preferências avançadas, agrupamento, reações e comentários
+permanecem fora deste bloco. Não há mudança em Firebase, portas, Docker ou deploy
+da Oracle.
 
 ## Validação
 
