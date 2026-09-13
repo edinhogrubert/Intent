@@ -87,7 +87,6 @@ export const guardianApprovalSchema = z.object({
 }).strict();
 
 export const updateProfileSchema = z.object({
-  username: z.string().trim().regex(/^[a-z0-9_]{3,30}$/).optional(),
   displayName: z.string().trim().min(2).max(120).optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   avatarUrl: z.string().url().max(2048).nullable().optional(),

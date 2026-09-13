@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, RefreshCw, Target, UserMinus, UserPlus, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Pencil, RefreshCw, Target, UserMinus, UserPlus, Users } from 'lucide-react';
 import type { UserAccount } from '../types';
 import { followProfile, getSocialProfile, IntentApiError, unfollowProfile, type ApiSocialProfile } from '../services/intentApi';
 import { MvpConnectionsList } from './MvpConnectionsList';
+import { EditProfileModal } from './EditProfileModal';
 
 interface MvpSocialProfileProps {
   userId: string;
@@ -10,18 +11,20 @@ interface MvpSocialProfileProps {
   onBack: () => void;
   onSelectIntent: (id: string) => void;
   onSelectProfile: (id: string) => void;
+  onCurrentUserUpdated: (user: UserAccount) => void;
 }
 
 function memberSince(value: string) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(value));
 }
 
-export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, onSelectProfile }: MvpSocialProfileProps) {
+export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, onSelectProfile, onCurrentUserUpdated }: MvpSocialProfileProps) {
   const [profile, setProfile] = useState<ApiSocialProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [relationshipLoading, setRelationshipLoading] = useState(false);
   const [error, setError] = useState('');
   const [connectionsMode, setConnectionsMode] = useState<'followers' | 'following' | null>(null);
+  const [editing, setEditing] = useState(false);
   const loadGeneration = useRef(0);
 
   async function loadProfile() {
@@ -58,6 +61,16 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, 
     }
   }
 
+  function handleProfileSaved(updated: UserAccount) {
+    setProfile((current) => current ? {
+      ...current,
+      displayName: updated.name,
+      bio: updated.bio || null,
+      avatarUrl: updated.avatarUrl || null,
+    } : current);
+    onCurrentUserUpdated(updated);
+  }
+
   if (loading) return <div className="max-w-3xl mx-auto px-4 py-12 text-center text-sm text-[#666]"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3"/>Carregando perfil real...</div>;
 
   if (!profile) return <div className="max-w-xl mx-auto px-4 py-10"><div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5"><AlertCircle className="w-5 h-5 mb-2"/><p className="font-bold">Perfil indisponível</p><p className="text-sm mt-1">{error}</p><button onClick={onBack} className="mt-4 text-sm font-bold underline">Voltar</button></div></div>;
@@ -83,7 +96,9 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, 
           <div className="w-20 h-20 rounded-full border-4 border-white bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center text-2xl font-black">
             {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover"/> : profile.displayName.charAt(0).toUpperCase()}
           </div>
-          {!profile.isMe && <button onClick={() => void toggleFollow()} disabled={relationshipLoading} className={`mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-60 ${profile.isFollowing ? 'border border-[#c6c5d4] text-[#8c1d18] bg-white' : 'bg-[#000666] text-white'}`}>{profile.isFollowing ? <UserMinus className="w-4 h-4"/> : <UserPlus className="w-4 h-4"/>}{relationshipLoading ? 'Atualizando...' : profile.isFollowing ? 'Deixar de seguir' : 'Seguir'}</button>}
+          {profile.isMe
+            ? <button type="button" onClick={() => setEditing(true)} className="mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 border border-[#c6c5d4] text-[#000666] bg-white"><Pencil className="w-4 h-4"/>Editar perfil</button>
+            : <button onClick={() => void toggleFollow()} disabled={relationshipLoading} className={`mb-1 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-60 ${profile.isFollowing ? 'border border-[#c6c5d4] text-[#8c1d18] bg-white' : 'bg-[#000666] text-white'}`}>{profile.isFollowing ? <UserMinus className="w-4 h-4"/> : <UserPlus className="w-4 h-4"/>}{relationshipLoading ? 'Atualizando...' : profile.isFollowing ? 'Deixar de seguir' : 'Seguir'}</button>}
         </div>
 
         <h1 className="text-2xl font-black mt-4">{profile.displayName}</h1>
@@ -108,5 +123,10 @@ export function MvpSocialProfile({ userId, currentUser, onBack, onSelectIntent, 
       {profile.recentIntents.length === 0 && <div className="bg-white border-2 border-dashed border-[#c6c5d4] rounded-2xl p-7 text-center text-sm text-[#666]">Este perfil ainda não publicou Intents públicas.</div>}
       <div className="space-y-3">{profile.recentIntents.map((intent) => <button key={intent.id} onClick={() => onSelectIntent(intent.id)} className="w-full bg-white border border-[#e4e2de] rounded-2xl p-4 text-left flex items-center justify-between gap-4 hover:border-[#000666]"><div className="min-w-0"><p className="font-bold truncate">{intent.title}</p><p className="text-xs text-[#666] mt-1 flex items-center gap-1.5">{intent.status === 'REALIZED' ? <CheckCircle2 className="w-3.5 h-3.5 text-[#28642f]"/> : <Users className="w-3.5 h-3.5"/>}{intent.supportCount} de {intent.supportGoal} apoios · {intent.status === 'REALIZED' ? 'Realizada' : 'Em andamento'}</p></div><ArrowRight className="w-5 h-5 text-[#000666] shrink-0"/></button>)}</div>
     </section>
+    {editing && <EditProfileModal
+      user={currentUser}
+      onClose={() => setEditing(false)}
+      onSaved={handleProfileSaved}
+    />}
   </div>;
 }

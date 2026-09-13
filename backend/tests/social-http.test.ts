@@ -22,7 +22,20 @@ vi.mock('../src/config.js', () => ({ config: {
 
 import { createApp } from '../src/app.js';
 
-const viewer = { id: '10000000-0000-4000-8000-000000000002', firebaseUid: 'test-viewer', username: 'visitante', status: 'ACTIVE' };
+const viewer = {
+  id: '10000000-0000-4000-8000-000000000002',
+  firebaseUid: 'test-viewer',
+  email: 'private@example.com',
+  username: 'visitante',
+  displayName: 'Visitante',
+  bio: 'Perfil de teste',
+  avatarUrl: null,
+  status: 'ACTIVE',
+  createdAt: new Date('2026-01-02T03:04:05.000Z'),
+  updatedAt: new Date('2026-02-03T04:05:06.000Z'),
+  passwordHash: 'never-return-this',
+  tokens: ['never-return-this'],
+};
 const creatorId = '10000000-0000-4000-8000-000000000001';
 const intentId = '20000000-0000-4000-8000-000000000001';
 let server: Server;
@@ -242,6 +255,110 @@ describe('busca HTTP de guardiões', () => {
       { username: { contains: 'edinho', mode: 'insensitive' } },
       { displayName: { contains: '@edinho', mode: 'insensitive' } },
     ]);
+  });
+});
+
+describe('edição HTTP do próprio perfil', () => {
+  const publicFields = ['id', 'username', 'displayName', 'bio', 'avatarUrl', 'createdAt', 'updatedAt'];
+
+  function patchProfile(body: unknown, authenticated = true) {
+    return fetch(`${baseUrl}/v1/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer synthetic-test-token' } : {}) },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('exige autenticação', async () => {
+    const response = await patchProfile({ displayName: 'Novo nome' }, false);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: { code: 'AUTH_REQUIRED' } });
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejeita payload vazio', async () => {
+    const response = await patchProfile({});
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['username', 'email', 'status', 'passwordHash', 'firebaseUid', 'metrics', 'id', 'userId'])(
+    'rejeita tentativa de alterar o campo protegido %s',
+    async (field) => {
+      const response = await patchProfile({ [field]: 'valor' });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+      expect(db.user.update).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('rejeita por inteiro payload misto com displayName e username', async () => {
+    const response = await patchProfile({ displayName: 'Nome permitido', username: 'campo_proibido' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('altera apenas o próprio perfil, usa select explícito e retorna a allowlist exata', async () => {
+    const updated = {
+      ...viewer,
+      displayName: 'Nome atualizado',
+      bio: null,
+      avatarUrl: 'https://example.com/avatar.png',
+      updatedAt: new Date('2026-03-04T05:06:07.000Z'),
+    };
+    db.user.update.mockResolvedValueOnce(viewer).mockResolvedValueOnce(updated);
+
+    const response = await patchProfile({
+      displayName: updated.displayName,
+      bio: null,
+      avatarUrl: updated.avatarUrl,
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(Object.keys(body.data)).toEqual(publicFields);
+    expect(body.data).toEqual({
+      id: viewer.id,
+      username: viewer.username,
+      displayName: updated.displayName,
+      bio: null,
+      avatarUrl: updated.avatarUrl,
+      createdAt: viewer.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    });
+    for (const field of ['passwordHash', 'firebaseUid', 'email', 'tokens', 'credentials', 'status']) {
+      expect(body.data).not.toHaveProperty(field);
+    }
+    expect(db.user.update.mock.calls[1]![0]).toEqual({
+      where: { id: viewer.id },
+      data: { displayName: updated.displayName, bio: null, avatarUrl: updated.avatarUrl },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  });
+
+  it.each([
+    ['GET', '/v1/users/me'],
+    ['POST', '/v1/users/me/sync'],
+  ] as const)('%s %s usa a mesma projeção pública', async (method, path) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { Authorization: 'Bearer synthetic-test-token' },
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(Object.keys(body.data)).toEqual(publicFields);
+    for (const field of ['passwordHash', 'firebaseUid', 'email', 'tokens', 'credentials', 'status']) {
+      expect(body.data).not.toHaveProperty(field);
+    }
   });
 });
 

@@ -20,15 +20,18 @@ interface ApiErrorEnvelope {
 
 interface ApiUser {
   id: string;
-  firebaseUid: string;
-  email: string | null;
   username: string;
   displayName: string;
   bio: string | null;
   avatarUrl: string | null;
-  status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface UpdateUserProfileInput {
+  displayName?: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
 }
 
 export type IntentCategory =
@@ -179,31 +182,40 @@ async function authenticatedRequest<T>(path: string, init: RequestInit = {}, fir
   return response.json() as Promise<T>;
 }
 
-function mapApiUser(user: ApiUser): UserAccount {
+function mapApiUser(user: ApiUser, firebaseUser: FirebaseUser | null = auth.currentUser): UserAccount {
   const cached = getCurrentSessionUser();
-  const status: UserAccount['status'] = user.status === 'SUSPENDED' ? 'suspended' : user.status === 'INACTIVE' ? 'inactive' : 'active';
   return createDefaultUserFields({
     ...(cached?.id === user.id ? cached : {}),
     id: user.id,
     name: user.displayName,
     username: user.username.replace(/^@+/, ''),
-    email: user.email || '',
+    email: firebaseUser?.email || (cached?.id === user.id ? cached.email : ''),
     avatarUrl: user.avatarUrl || undefined,
     bio: user.bio || undefined,
     createdAt: user.createdAt,
-    status,
+    status: 'active',
   });
 }
 
 export async function syncAuthenticatedUser(firebaseUser: FirebaseUser | null = auth.currentUser): Promise<UserAccount> {
   const result = await authenticatedRequest<ApiEnvelope<ApiUser>>('/v1/users/me/sync', { method: 'POST' }, firebaseUser);
-  const account = mapApiUser(result.data);
+  const account = mapApiUser(result.data, firebaseUser);
   setCurrentSessionUser(account);
   return account;
 }
 
 export async function getAuthenticatedProfile(): Promise<UserAccount> {
   const result = await authenticatedRequest<ApiEnvelope<ApiUser>>('/v1/users/me');
+  const account = mapApiUser(result.data);
+  setCurrentSessionUser(account);
+  return account;
+}
+
+export async function updateUserProfile(input: UpdateUserProfileInput): Promise<UserAccount> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiUser>>('/v1/users/me', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
   const account = mapApiUser(result.data);
   setCurrentSessionUser(account);
   return account;
