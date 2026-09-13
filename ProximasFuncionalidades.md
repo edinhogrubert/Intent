@@ -408,7 +408,40 @@ Requisitos de produto e segurança:
 
 Essa evolução complementa a **Jornada do Seguidor**, permitindo experiências voltadas a seguidores antigos, seguidores futuros ou somente ao período posterior ao início do vínculo.
 
-## 4.8 Plataforma e operação
+## 4.8 Papéis avançados: guardiões, beneficiários e destinatários
+
+A ideia original da Intent privada não se limita a “quem aprova também vê”. Em uma fase futura, o criador poderá separar claramente os papéis envolvidos em uma revelação protegida.
+
+Papéis planejados:
+
+- **Criador:** pessoa que cria a Intent, define a regra e insere o conteúdo protegido.
+- **Guardião ou aprovador:** pessoa que confirma que a condição humana foi cumprida.
+- **Beneficiário ou destinatário:** pessoa que poderá acessar o conteúdo depois da revelação.
+- **Observador autorizado:** pessoa que acompanha o estado, mas não aprova nem recebe o conteúdo final.
+
+Exemplos que devem ser suportados:
+
+- pai deixa um testamento digital protegido;
+- um arquivo criado por três pessoas só abre após todos ou parte aprovarem;
+- um conteúdo só abre em certa data e fica disponível apenas para destinatários escolhidos;
+- guardiões aprovam a abertura, mas o conteúdo final é visto por outra pessoa;
+- uma Intent privada fica disponível para um, alguns ou todos os aprovadores, conforme regra definida.
+
+Regras futuras necessárias:
+
+- separar **quem aprova** de **quem pode ver**;
+- permitir quórum `N de M`;
+- permitir condição por data, por aprovação ou por combinação de data + aprovação;
+- registrar versão da regra aprovada;
+- impedir que o criador altere destinatários ou guardiões de forma insegura depois da publicação;
+- exibir antes da criação um resumo claro de quem aprova, quem recebe e quando abre;
+- registrar eventos de aprovação, revelação e acesso;
+- manter autorização sempre no backend;
+- impedir acesso por link direto quando a pessoa não for autorizada.
+
+Essa evolução é parte central do coração do Intent: conteúdo protegido, regras humanas verificáveis e revelação controlada por acontecimentos.
+
+## 4.9 Plataforma e operação
 
 - domínio e HTTPS;
 - publicação controlada;
