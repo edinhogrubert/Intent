@@ -162,6 +162,31 @@ export async function listUserIntents(creatorId: string, cursor?: string, limit 
   };
 }
 
+export async function listGuardianRequests(guardianId: string, cursor?: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const items = await prisma.intent.findMany({
+    where: {
+      conditionType: 'GUARDIANS',
+      status: { in: ['PUBLISHED', 'REALIZED'] },
+      creatorId: { not: guardianId },
+      creator: { status: 'ACTIVE' },
+      guardianIds: { array_contains: [guardianId] },
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: safeLimit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: publicIntentSelection,
+  });
+
+  const hasMore = items.length > safeLimit;
+  const page = hasMore ? items.slice(0, safeLimit) : items;
+
+  return {
+    items: page,
+    nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
+  };
+}
+
 export async function listPublicFeed(cursor?: string, limit = 20) {
   const safeLimit = Math.min(Math.max(limit, 1), 50);
   const items = await prisma.intent.findMany({

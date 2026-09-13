@@ -129,6 +129,27 @@ describe('regressão HTTP dos feeds e autenticação', () => {
     });
     expect(db.intent.findMany.mock.calls[0]![0].where).toEqual({ creatorId: viewer.id });
   });
+
+  it('lista Intents em que o usuário autenticado é guardião', async () => {
+    db.intent.findMany.mockResolvedValue([{
+      id: intentId,
+      conditionType: 'GUARDIANS',
+      visibility: 'PRIVATE',
+      status: 'PUBLISHED',
+      viewerIsGuardian: true,
+    }]);
+    const response = await get('/v1/intents/guardian-requests', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { items: [{ id: intentId, conditionType: 'GUARDIANS', visibility: 'PRIVATE' }], nextCursor: null },
+    });
+    expect(db.intent.findMany.mock.calls[0]![0].where).toMatchObject({
+      conditionType: 'GUARDIANS',
+      creatorId: { not: viewer.id },
+      creator: { status: 'ACTIVE' },
+      guardianIds: { array_contains: [viewer.id] },
+    });
+  });
 });
 
 describe('acesso HTTP a Intent exclusiva', () => {

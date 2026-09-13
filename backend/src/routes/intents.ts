@@ -7,6 +7,7 @@ import {
   approveGuardianIntent,
   createIntent,
   getIntent,
+  listGuardianRequests,
   listUserIntents,
   listFollowingFeed,
   listPublicFeed,
@@ -43,6 +44,21 @@ intentsRouter.get('/mine', requireAuthenticatedUser, async (request, response, n
     const cursor = typeof request.query.cursor === 'string' ? request.query.cursor : undefined;
     const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
     const intents = await listUserIntents(
+      request.appUser!.id,
+      cursor,
+      Number.isFinite(limit) ? limit : 20,
+    );
+    response.json({ data: intents });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.get('/guardian-requests', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const cursor = typeof request.query.cursor === 'string' ? request.query.cursor : undefined;
+    const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
+    const intents = await listGuardianRequests(
       request.appUser!.id,
       cursor,
       Number.isFinite(limit) ? limit : 20,

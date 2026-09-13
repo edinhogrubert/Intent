@@ -276,6 +276,11 @@ export async function listMyIntents(): Promise<{ items: ApiIntent[]; nextCursor:
   return result.data;
 }
 
+export async function listGuardianRequests(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/guardian-requests');
+  return result.data;
+}
+
 export type FeedScope = 'public' | 'following';
 
 export async function listPublicIntents(
