@@ -408,7 +408,74 @@ Requisitos de produto e segurança:
 
 Essa evolução complementa a **Jornada do Seguidor**, permitindo experiências voltadas a seguidores antigos, seguidores futuros ou somente ao período posterior ao início do vínculo.
 
-## 4.8 Plataforma e operação
+## 4.8 Papéis avançados: guardiões, beneficiários e destinatários
+
+A ideia original da Intent privada não se limita a “quem aprova também vê”. Em uma fase futura, o criador poderá separar claramente os papéis envolvidos em uma revelação protegida.
+
+Papéis planejados:
+
+- **Criador:** pessoa que cria a Intent, define a regra e insere o conteúdo protegido.
+- **Guardião ou aprovador:** pessoa que confirma que a condição humana foi cumprida.
+- **Beneficiário ou destinatário:** pessoa que poderá acessar o conteúdo depois da revelação.
+- **Observador autorizado:** pessoa que acompanha o estado, mas não aprova nem recebe o conteúdo final.
+
+Exemplos que devem ser suportados:
+
+- pai deixa um testamento digital protegido;
+- um arquivo criado por três pessoas só abre após todos ou parte aprovarem;
+- um conteúdo só abre em certa data e fica disponível apenas para destinatários escolhidos;
+- guardiões aprovam a abertura, mas o conteúdo final é visto por outra pessoa;
+- uma Intent privada fica disponível para um, alguns ou todos os aprovadores, conforme regra definida.
+
+Regras futuras necessárias:
+
+- separar **quem aprova** de **quem pode ver**;
+- permitir quórum `N de M`;
+- permitir condição por data, por aprovação ou por combinação de data + aprovação;
+- registrar versão da regra aprovada;
+- impedir que o criador altere destinatários ou guardiões de forma insegura depois da publicação;
+- exibir antes da criação um resumo claro de quem aprova, quem recebe e quando abre;
+- registrar eventos de aprovação, revelação e acesso;
+- manter autorização sempre no backend;
+- impedir acesso por link direto quando a pessoa não for autorizada.
+
+Essa evolução é parte central do coração do Intent: conteúdo protegido, regras humanas verificáveis e revelação controlada por acontecimentos.
+
+## 4.9 Intent por localização
+
+Uma Intent poderá depender da presença do usuário em determinado endereço ou região geográfica. Em vez de exigir um ponto exato, o criador definirá um endereço, coordenada ou local de referência e um **raio de validação** configurável.
+
+Exemplos de uso:
+
+- jogo presencial em que a próxima pista só abre ao chegar em um ponto;
+- caça ao tesouro, trilhas, gincanas, escape game urbano ou dinâmica escolar;
+- desafio familiar, como liberar um presente se o filho visitar a avó em determinado dia e endereço;
+- turismo guiado, onde cada local visitado revela uma história, pergunta ou próxima missão;
+- eventos, feiras e congressos, liberando conteúdo somente para quem esteve no local;
+- ações de comércio local, com recompensa para quem comparece fisicamente à loja;
+- integração com atividades esportivas, como abrir a próxima etapa ao chegar em um parque, quadra ou ponto de corrida;
+- experiências de memória afetiva, em que uma mensagem só abre em uma praça, casa antiga, praia ou local especial;
+- tarefas de equipe, onde cada pessoa precisa validar presença em pontos diferentes;
+- ensino prático, como aulas de campo com conteúdo liberado em locais específicos.
+
+Regras futuras necessárias:
+
+- permitir raio configurável, por exemplo 30 m, 100 m, 500 m ou valor definido pelo criador;
+- mostrar antes da publicação qual área aproximada será considerada válida;
+- permitir combinação com data, guardiões, destinatários e quórum;
+- registrar evento de presença com data, hora, precisão aproximada e versão da regra;
+- evitar armazenar localização contínua; validar apenas quando o usuário tentar cumprir a condição;
+- explicar claramente ao usuário por que a localização está sendo solicitada;
+- permitir recusa de permissão sem travar o aplicativo inteiro;
+- validar no backend se a tentativa está dentro do raio configurado;
+- considerar margem de erro do GPS, especialmente em prédios, áreas urbanas densas e zonas rurais;
+- bloquear manipulação óbvia quando possível, sem prometer segurança absoluta contra spoofing de GPS;
+- definir política para múltiplas tentativas e tentativas fora do raio;
+- preservar privacidade: não exibir localização exata de participantes sem necessidade.
+
+Essa condição amplia o Intent para acontecimentos físicos: estar em um lugar passa a ser parte da regra de revelação, não apenas um dado decorativo.
+
+## 4.10 Plataforma e operação
 
 - domínio e HTTPS;
 - publicação controlada;

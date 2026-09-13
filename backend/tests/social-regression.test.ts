@@ -25,8 +25,10 @@ const viewerId = '10000000-0000-4000-8000-000000000002';
 const intentId = '20000000-0000-4000-8000-000000000001';
 const creator = { id: creatorId, username: 'criador', displayName: 'Criador', avatarUrl: null, status: 'ACTIVE' };
 const intent = {
-  id: intentId, creatorId, creator, visibility: 'PUBLIC', status: 'PUBLISHED',
+  id: intentId, creatorId, creator, type: 'CONDITIONAL_REVEAL', conditionType: 'SUPPORT',
+  visibility: 'PUBLIC', status: 'PUBLISHED',
   supportCount: 0, supportGoal: 3, revealVersion: 1,
+  revealAt: null, guardianIds: [], guardianApprovals: [], guardianApprovalGoal: null,
   revealCiphertext: 'not-public', revealIv: 'not-public', revealAuthTag: 'not-public',
 };
 

@@ -47,6 +47,7 @@ model Intent {
   id                 String        @id @default(uuid()) @db.Uuid
   creatorId          String        @map("creator_id") @db.Uuid
   type               String        @default("SUPPORT_REVEAL") @db.VarChar(40)
+  conditionType      String        @default("SUPPORT") @map("condition_type") @db.VarChar(30)
   status             String        @default("PUBLISHED") @db.VarChar(20)
   visibility         String        @default("PUBLIC") @db.VarChar(20)
   category           String        @default("OTHER") @db.VarChar(40)
@@ -54,6 +55,10 @@ model Intent {
   story              String        @db.Text
   supportGoal        Int           @map("support_goal")
   supportCount       Int           @default(0) @map("support_count")
+  revealAt           DateTime?     @map("reveal_at") @db.Timestamptz(3)
+  guardianIds        Json          @default("[]") @map("guardian_ids")
+  guardianApprovals  Json          @default("[]") @map("guardian_approvals")
+  guardianApprovalGoal Int?        @map("guardian_approval_goal")
   revealCiphertext   String        @map("reveal_ciphertext") @db.Text
   revealIv           String        @map("reveal_iv") @db.VarChar(64)
   revealAuthTag      String        @map("reveal_auth_tag") @db.VarChar(64)
@@ -67,6 +72,7 @@ model Intent {
   events             DomainEvent[]
 
   @@index([status, visibility, createdAt(sort: Desc)])
+  @@index([conditionType, revealAt])
   @@index([creatorId, createdAt(sort: Desc)])
   @@map("intents")
 }

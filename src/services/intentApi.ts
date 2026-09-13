@@ -6,7 +6,17 @@ import type { UserAccount } from '../types';
 const API_PREFIX = '/api';
 
 interface ApiEnvelope<T> { data: T }
-interface ApiErrorEnvelope { error?: { code?: string; message?: string; requestId?: string } }
+interface ApiErrorEnvelope {
+  error?: {
+    code?: string;
+    message?: string;
+    requestId?: string;
+    fields?: {
+      formErrors?: string[];
+      fieldErrors?: Record<string, string[] | undefined>;
+    };
+  }
+}
 
 interface ApiUser {
   id: string;
@@ -34,7 +44,8 @@ export type IntentCategory =
 
 export interface ApiIntent {
   id: string;
-  type: 'SUPPORT_REVEAL';
+  type: 'SUPPORT_REVEAL' | 'CONDITIONAL_REVEAL';
+  conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
   status: 'PUBLISHED' | 'REALIZED';
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
   category: IntentCategory;
@@ -42,12 +53,18 @@ export interface ApiIntent {
   story: string;
   supportGoal: number;
   supportCount: number;
+  revealAt: string | null;
+  guardianIds?: string[];
+  guardianApprovals?: string[];
+  guardianApprovalGoal: number | null;
   publishedAt: string;
   realizedAt: string | null;
   createdAt: string;
   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
   revealContent?: string | null;
   viewerHasSupported?: boolean;
+  viewerIsGuardian?: boolean;
+  viewerHasApprovedAsGuardian?: boolean;
 }
 
 export interface ApiSocialProfile {
@@ -82,6 +99,13 @@ export interface ApiSocialConnection {
   isFollowing: boolean;
 }
 
+export interface ApiUserSearchResult {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
 export interface SupportIntentResult {
   intentId: string;
   supportCount: number;
@@ -96,9 +120,22 @@ export interface CreateSupportIntentInput {
   title: string;
   story: string;
   category: IntentCategory;
-  supportGoal: number;
+  conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
+  supportGoal?: number;
+  revealAt?: string;
+  guardianIds?: string[];
+  guardianApprovalGoal?: number;
   revealContent: string;
-  visibility: 'PUBLIC' | 'FOLLOWERS';
+  visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+}
+
+export interface GuardianApprovalResult {
+  intentId: string;
+  approved: boolean;
+  approvals: number;
+  guardianApprovalGoal: number | null;
+  realized: boolean;
+  realizedNow: boolean;
 }
 
 export class IntentApiError extends Error {
@@ -106,6 +143,17 @@ export class IntentApiError extends Error {
     super(message);
     this.name = 'IntentApiError';
   }
+}
+
+function firstValidationMessage(payload: ApiErrorEnvelope) {
+  const fieldErrors = payload.error?.fields?.fieldErrors;
+  if (fieldErrors) {
+    for (const messages of Object.values(fieldErrors)) {
+      const message = messages?.find(Boolean);
+      if (message) return message;
+    }
+  }
+  return payload.error?.fields?.formErrors?.find(Boolean);
 }
 
 async function authenticatedRequest<T>(path: string, init: RequestInit = {}, firebaseUser: FirebaseUser | null = auth.currentUser): Promise<T> {
@@ -122,7 +170,7 @@ async function authenticatedRequest<T>(path: string, init: RequestInit = {}, fir
     let payload: ApiErrorEnvelope = {};
     try { payload = await response.json() as ApiErrorEnvelope; } catch { /* resposta não JSON */ }
     throw new IntentApiError(
-      payload.error?.message || 'Não foi possível comunicar com o Intent.',
+      firstValidationMessage(payload) || payload.error?.message || 'Não foi possível comunicar com o Intent.',
       response.status,
       payload.error?.code || 'API_ERROR',
       payload.error?.requestId,
@@ -204,9 +252,20 @@ export function listProfileFollowing(userId: string, cursor?: string) {
   return listProfileConnections(userId, 'following', cursor);
 }
 
-export async function createSupportIntent(input: CreateSupportIntentInput): Promise<ApiIntent> {
+export async function searchUsers(query: string): Promise<ApiUserSearchResult[]> {
+  const search = new URLSearchParams({ q: query, limit: '10' });
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiUserSearchResult[] }>>(
+    `/v1/users/search?${search.toString()}`,
+  );
+  return result.data.items;
+}
+
+export async function createSupportIntent(input: CreateSupportIntentInput, idempotencyKey?: string): Promise<ApiIntent> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>('/v1/intents', {
     method: 'POST',
+    headers,
     body: JSON.stringify(input),
   });
   return result.data;
@@ -214,6 +273,11 @@ export async function createSupportIntent(input: CreateSupportIntentInput): Prom
 
 export async function listMyIntents(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
   const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/mine');
+  return result.data;
+}
+
+export async function listGuardianRequests(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/guardian-requests');
   return result.data;
 }
 
@@ -248,6 +312,14 @@ export async function removeIntentSupport(intentId: string): Promise<SupportInte
   const result = await authenticatedRequest<ApiEnvelope<SupportIntentResult>>(
     `/v1/intents/${encodeURIComponent(intentId)}/supports`,
     { method: 'DELETE' },
+  );
+  return result.data;
+}
+
+export async function approveGuardianIntent(intentId: string): Promise<GuardianApprovalResult> {
+  const result = await authenticatedRequest<ApiEnvelope<GuardianApprovalResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/guardian-approvals`,
+    { method: 'POST' },
   );
   return result.data;
 }

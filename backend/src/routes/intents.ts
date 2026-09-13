@@ -4,8 +4,10 @@ import { createIntentSchema } from '../domain/intent-schemas.js';
 import { AppError } from '../errors.js';
 import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middleware/auth.js';
 import {
+  approveGuardianIntent,
   createIntent,
   getIntent,
+  listGuardianRequests,
   listUserIntents,
   listFollowingFeed,
   listPublicFeed,
@@ -52,6 +54,21 @@ intentsRouter.get('/mine', requireAuthenticatedUser, async (request, response, n
   }
 });
 
+intentsRouter.get('/guardian-requests', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const cursor = typeof request.query.cursor === 'string' ? request.query.cursor : undefined;
+    const limit = typeof request.query.limit === 'string' ? Number(request.query.limit) : 20;
+    const intents = await listGuardianRequests(
+      request.appUser!.id,
+      cursor,
+      Number.isFinite(limit) ? limit : 20,
+    );
+    response.json({ data: intents });
+  } catch (error) {
+    next(error);
+  }
+});
+
 intentsRouter.get('/:id', optionalAuthenticatedUser, async (request, response, next) => {
   try {
     const intentId = identifierSchema.parse(request.params.id);
@@ -87,6 +104,16 @@ intentsRouter.delete('/:id/supports', requireAuthenticatedUser, async (request, 
     const intentId = identifierSchema.parse(request.params.id);
     const result = await removeSupport(intentId, request.appUser!.id, request.get('Idempotency-Key'));
     response.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.post('/:id/guardian-approvals', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const result = await approveGuardianIntent(intentId, request.appUser!.id, request.get('Idempotency-Key'));
+    response.status(201).json({ data: result });
   } catch (error) {
     next(error);
   }
