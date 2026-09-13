@@ -125,7 +125,13 @@ export interface ApiUserSearchResult {
   id: string;
   username: string;
   displayName: string;
+  bio?: string | null;
   avatarUrl: string | null;
+}
+
+export interface ApiSearchResults {
+  intents: ApiIntent[];
+  users: Array<ApiUserSearchResult & { bio: string | null }>;
 }
 
 export interface SupportIntentResult {
@@ -302,6 +308,14 @@ export async function searchUsers(query: string): Promise<ApiUserSearchResult[]>
     `/v1/users/search?${search.toString()}`,
   );
   return result.data.items;
+}
+
+export async function searchIntentsAndUsers(query: string): Promise<ApiSearchResults> {
+  const search = new URLSearchParams({ q: query, limit: '10' });
+  const result = await authenticatedRequest<ApiEnvelope<ApiSearchResults>>(
+    `/v1/search?${search.toString()}`,
+  );
+  return result.data;
 }
 
 export async function createSupportIntent(input: CreateSupportIntentInput, idempotencyKey?: string): Promise<ApiIntent> {

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, Calendar, Lock, Plus, RefreshCw, Users, Vote } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { AlertCircle, ArrowRight, Calendar, Lock, Plus, RefreshCw, Search, Users, Vote, X } from 'lucide-react';
 import type { UserAccount } from '../types';
 import {
   IntentApiError,
   listPublicIntents,
+  searchIntentsAndUsers,
   type ApiIntent,
+  type ApiSearchResults,
   type FeedScope,
   type IntentCategory,
 } from '../services/intentApi';
@@ -44,6 +46,10 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ApiSearchResults | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const loadGeneration = useRef(0);
 
   async function loadFeed(cursor?: string) {
@@ -73,12 +79,59 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     void loadFeed();
   }, [scope]);
 
+  async function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchError('Digite pelo menos 2 caracteres para buscar.');
+      return;
+    }
+    setSearching(true);
+    setSearchError('');
+    setSearchResults(null);
+    try {
+      setSearchResults(await searchIntentsAndUsers(query));
+    } catch (caught) {
+      setSearchError(caught instanceof IntentApiError ? caught.message : 'Não foi possível realizar a busca.');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchError('');
+  }
+
   const isFollowingFeed = scope === 'following';
 
   return <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
     <section className="bg-white border border-[#e4e2de] rounded-2xl p-5 mb-6 shadow-sm">
       <p className="text-xs font-bold text-[#000666]">Olá, {currentUser.name.split(' ')[0]}</p>
       <div className="flex items-center justify-between gap-4 mt-2"><div><h1 className="text-xl sm:text-2xl font-black text-[#1b1c1a]">O que você quer fazer acontecer?</h1><p className="text-sm text-[#666] mt-1">Crie uma Intent ou acompanhe o que já está acontecendo.</p><span className="inline-flex items-center mt-3 px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-[11px] font-bold">Versao {APP_VERSION_LABEL} · {APP_VERSION_CONTEXT}</span></div><button onClick={onCreate} className="shrink-0 w-11 h-11 rounded-full bg-[#000666] text-white flex items-center justify-center" aria-label="Criar Intent"><Plus className="w-5 h-5"/></button></div>
+    </section>
+
+    <section className="mb-6">
+      <form onSubmit={(event) => void submitSearch(event)} className="flex gap-2" role="search">
+        <label htmlFor="home-search" className="sr-only">Buscar Intents e pessoas</label>
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#777]"/>
+          <input id="home-search" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Buscar Intents e pessoas" maxLength={80} className="w-full rounded-xl border border-[#c6c5d4] bg-white pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#000666]"/>
+          {(searchQuery || searchResults) && <button type="button" onClick={clearSearch} aria-label="Limpar busca" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#666]"><X className="w-4 h-4"/></button>}
+        </div>
+        <button type="submit" disabled={searching} className="px-5 py-3 rounded-xl bg-[#000666] text-white text-sm font-bold disabled:opacity-60">{searching ? 'Buscando...' : 'Buscar'}</button>
+      </form>
+
+      {searchError && <div role="alert" className="mt-3 rounded-xl bg-[#ffdad6] text-[#8c1d18] p-3 text-sm flex gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>{searchError}</div>}
+      {searching && <div className="mt-4 rounded-2xl bg-white border border-[#e4e2de] p-7 text-center text-sm text-[#666]"><RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2"/>Buscando Intents e pessoas...</div>}
+      {!searching && searchResults && <div className="mt-4 rounded-2xl bg-white border border-[#e4e2de] p-5 space-y-6">
+        {searchResults.intents.length === 0 && searchResults.users.length === 0 && <div className="py-5 text-center"><Search className="w-7 h-7 text-[#777] mx-auto mb-2"/><p className="font-bold">Nenhum resultado encontrado.</p></div>}
+
+        {searchResults.intents.length > 0 && <div><h2 className="font-black mb-3">Intents</h2><div className="space-y-2">{searchResults.intents.map((intent) => <button type="button" key={intent.id} onClick={() => onSelectIntent(intent.id)} className="w-full rounded-xl border border-[#e4e2de] p-3 text-left hover:border-[#000666] flex items-center justify-between gap-3"><div className="min-w-0"><p className="font-bold truncate">{intent.title}</p><p className="text-xs text-[#666] mt-1 truncate">{intent.creator.displayName} · @{intent.creator.username.replace(/^@+/, '')}</p></div><ArrowRight className="w-4 h-4 text-[#000666] shrink-0"/></button>)}</div></div>}
+
+        {searchResults.users.length > 0 && <div><h2 className="font-black mb-3">Pessoas</h2><div className="space-y-2">{searchResults.users.map((user) => <button type="button" key={user.id} onClick={() => onSelectProfile(user.id)} className="w-full rounded-xl border border-[#e4e2de] p-3 text-left hover:border-[#000666] flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black shrink-0">{user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover"/> : user.displayName.charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="font-bold truncate">{user.displayName}</p><p className="text-xs text-[#666] truncate">@{user.username.replace(/^@+/, '')}{user.bio ? ` · ${user.bio}` : ''}</p></div></button>)}</div></div>}
+      </div>}
     </section>
 
     <div className="flex items-end justify-between gap-4 mb-4"><div><h2 className="text-lg font-black">Acontecendo agora</h2><p className="text-xs text-[#666]">{isFollowingFeed ? 'Intents das pessoas que você segue' : 'Intents públicas reais'}</p></div><button onClick={() => void loadFeed()} className="p-2 rounded-full bg-white border border-[#e4e2de]" aria-label="Atualizar feed"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}/></button></div>
