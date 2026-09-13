@@ -80,6 +80,12 @@ export async function listNotifications(userId: string, limit = 50) {
   return notifications.map(toPublicNotification);
 }
 
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  return prisma.notification.count({
+    where: { userId, readAt: null },
+  });
+}
+
 export async function markNotificationRead(userId: string, notificationId: string) {
   return prisma.$transaction(async (transaction) => {
     await transaction.notification.updateMany({
