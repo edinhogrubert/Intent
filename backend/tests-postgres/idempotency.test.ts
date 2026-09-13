@@ -15,6 +15,7 @@ import { createApp } from '../src/app.js';
 import { approveGuardianIntent, createIntent, getIntent, supportIntent, removeSupport } from '../src/services/intent-service.js';
 import { followUser, unfollowUser } from '../src/services/social-service.js';
 import { listNotifications, markNotificationRead } from '../src/services/notification-service.js';
+import { searchIntentsAndUsers } from '../src/services/search-service.js';
 
 let owner: string, alice: string, bob: string, ownerToken: string;
 let server: Server;
@@ -275,5 +276,33 @@ describe('idempotência persistida em PostgreSQL', () => {
     expect(await prisma.notification.count({
       where: { userId: owner, actorId: alice, intentId: target.id, type: 'GUARDIAN_APPROVAL_RECEIVED' },
     })).toBe(1);
+  });
+
+  it('busca aplica visibilidade real para criador, seguidor e usuário sem vínculo', async () => {
+    const marker = `search-${key()}`;
+    const publicIntent = await createIntent(owner, { ...command, title: `${marker} public`, visibility: 'PUBLIC' });
+    const followersIntent = await createIntent(owner, { ...command, title: `${marker} followers`, visibility: 'FOLLOWERS' });
+    const privateIntent = await createIntent(owner, {
+      ...command,
+      title: `${marker} private`,
+      visibility: 'PRIVATE',
+      conditionType: 'DATE',
+      supportGoal: undefined,
+      revealAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    await followUser(alice, owner);
+
+    const ownerResults = await searchIntentsAndUsers(owner, marker);
+    const followerResults = await searchIntentsAndUsers(alice, marker);
+    const strangerResults = await searchIntentsAndUsers(bob, marker);
+    expect(ownerResults.intents.map((item) => item.id).sort()).toEqual(
+      [publicIntent.id, followersIntent.id, privateIntent.id].sort(),
+    );
+    expect(followerResults.intents.map((item) => item.id).sort()).toEqual(
+      [publicIntent.id, followersIntent.id].sort(),
+    );
+    expect(strangerResults.intents.map((item) => item.id)).toEqual([publicIntent.id]);
+    expect(JSON.stringify(ownerResults)).not.toContain('revealCiphertext');
+    expect(JSON.stringify(ownerResults)).not.toContain(command.revealContent);
   });
 });

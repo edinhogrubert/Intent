@@ -170,6 +170,23 @@ describe('regressão HTTP dos feeds e autenticação', () => {
   });
 });
 
+describe('busca HTTP autenticada', () => {
+  it('exige autenticação', async () => {
+    const response = await get('/v1/search?q=teste');
+    expect(response.status).toBe(401);
+    expect(db.intent.findMany).not.toHaveBeenCalled();
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('retorna as duas coleções para o usuário autenticado', async () => {
+    const response = await get('/v1/search?q=teste', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { intents: [], users: [] } });
+    expect(db.intent.findMany).toHaveBeenCalledOnce();
+    expect(db.user.findMany).toHaveBeenCalledOnce();
+  });
+});
+
 describe('acesso HTTP a Intent exclusiva', () => {
   beforeEach(() => {
     db.intent.findUnique.mockResolvedValue({
