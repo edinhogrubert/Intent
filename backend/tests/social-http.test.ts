@@ -11,7 +11,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     domainEvent: { create: vi.fn() },
     follow: { findUnique: vi.fn() },
     support: { findUnique: vi.fn() },
-    notification: { findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
+    notification: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -67,6 +67,7 @@ beforeEach(() => {
   db.follow.findUnique.mockResolvedValue(null);
   db.support.findUnique.mockResolvedValue(null);
   db.notification.findMany.mockResolvedValue([]);
+  db.notification.count.mockResolvedValue(0);
   db.notification.updateMany.mockResolvedValue({ count: 0 });
   db.notification.findFirst.mockResolvedValue(null);
   db.$transaction.mockImplementation(async (operation) => operation(db));
@@ -403,6 +404,30 @@ describe('notificações HTTP autenticadas', () => {
     },
     intent: { id: intentId, title: 'Intent do usuário', revealCiphertext: 'secret' },
   };
+
+  it('exige autenticação para contar notificações não lidas', async () => {
+    const response = await get('/v1/notifications/unread-count');
+    expect(response.status).toBe(401);
+    expect(db.notification.count).not.toHaveBeenCalled();
+  });
+
+  it('conta somente notificações não lidas do usuário autenticado e retorna o formato exato', async () => {
+    db.notification.count.mockResolvedValue(12);
+    const response = await get('/v1/notifications/unread-count', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { unreadCount: 12 } });
+    expect(db.notification.count).toHaveBeenCalledOnce();
+    expect(db.notification.count).toHaveBeenCalledWith({
+      where: { userId: viewer.id, readAt: null },
+    });
+  });
+
+  it('rejeita userId externo sem consultar notificações de outro usuário', async () => {
+    const response = await get(`/v1/notifications/unread-count?userId=${creatorId}`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.notification.count).not.toHaveBeenCalled();
+  });
 
   it('exige autenticação para listar', async () => {
     const response = await get('/v1/notifications');

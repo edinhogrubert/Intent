@@ -37,16 +37,26 @@ Exige autenticação e marca `readAt` somente quando a notificação pertence ao
 usuário atual e ainda não foi lida. Notificações ausentes ou de outro usuário
 retornam `404 NOTIFICATION_NOT_FOUND`.
 
+### `GET /v1/notifications/unread-count`
+
+Exige autenticação e retorna exatamente
+`{ "data": { "unreadCount": number } }`. O contador considera somente registros
+do usuário atual com `readAt` igual a `null`. A rota rejeita parâmetros extras,
+inclusive tentativas de informar outro `userId`, e não retorna a lista.
+
 ## Interface
 
 O sino no cabeçalho abre um modal que consulta a API. O modal apresenta texto em
 português, data e hora, estado vazio e diferença visual entre itens lidos e não
 lidos. Marcar como lida atualiza apenas o item retornado pela API, sem recarregar
-a lista e sem usar mocks ou `localStorage`.
+a lista e sem usar mocks ou `localStorage`. O sino mostra o total não lido e usa
+`9+` acima de nove itens. O contador é carregado após autenticação, atualizado ao
+abrir o modal e reduzido depois de cada leitura confirmada. Se a consulta falhar,
+o badge é ocultado sem interromper a aplicação.
 
 ## Fora do escopo
 
-WebSocket, push, e-mail, atualização em tempo real, preferências avançadas,
+WebSocket, polling, push, e-mail, atualização em tempo real, preferências avançadas,
 agrupamento, reações e comentários permanecem fora deste bloco. Não há mudança
 em Firebase, portas, Docker ou deploy da Oracle.
 

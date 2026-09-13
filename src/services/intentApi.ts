@@ -273,6 +273,13 @@ export async function listNotifications(): Promise<ApiNotification[]> {
   return result.data.items;
 }
 
+export async function getUnreadNotificationCount(): Promise<number> {
+  const result = await authenticatedRequest<ApiEnvelope<{ unreadCount: number }>>(
+    '/v1/notifications/unread-count',
+  );
+  return result.data.unreadCount;
+}
+
 export async function markNotificationRead(id: string): Promise<ApiNotification> {
   const result = await authenticatedRequest<ApiEnvelope<ApiNotification>>(
     `/v1/notifications/${encodeURIComponent(id)}/read`,

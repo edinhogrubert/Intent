@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { listNotifications, markNotificationRead } from '../services/notification-service.js';
+import { countUnreadNotifications, listNotifications, markNotificationRead } from '../services/notification-service.js';
 
 export const notificationsRouter = Router();
 const identifierSchema = z.string().uuid();
@@ -9,8 +9,19 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(50),
 }).strict();
 const emptyBodySchema = z.object({}).strict();
+const emptyQuerySchema = z.object({}).strict();
 
 notificationsRouter.use(requireAuthenticatedUser);
+
+notificationsRouter.get('/unread-count', async (request, response, next) => {
+  try {
+    emptyQuerySchema.parse(request.query);
+    const unreadCount = await countUnreadNotifications(request.appUser!.id);
+    response.json({ data: { unreadCount } });
+  } catch (error) {
+    next(error);
+  }
+});
 
 notificationsRouter.get('/', async (request, response, next) => {
   try {

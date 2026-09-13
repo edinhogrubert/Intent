@@ -9,6 +9,7 @@ import {
 
 interface NotificationsModalProps {
   onClose: () => void;
+  onRead: () => void;
 }
 
 function notificationText(notification: ApiNotification): string {
@@ -25,7 +26,7 @@ function notificationDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function NotificationsModal({ onClose }: NotificationsModalProps) {
+export function NotificationsModal({ onClose, onRead }: NotificationsModalProps) {
   const [items, setItems] = useState<ApiNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export function NotificationsModal({ onClose }: NotificationsModalProps) {
     try {
       const updated = await markNotificationRead(notification.id);
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      onRead();
     } catch (caught) {
       setError(caught instanceof IntentApiError
         ? caught.message
