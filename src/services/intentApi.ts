@@ -102,6 +102,25 @@ export interface ApiSocialConnection {
   isFollowing: boolean;
 }
 
+export type NotificationType =
+  | 'FOLLOW_RECEIVED'
+  | 'SUPPORT_RECEIVED'
+  | 'GUARDIAN_APPROVAL_RECEIVED';
+
+export interface ApiNotification {
+  id: string;
+  type: NotificationType;
+  readAt: string | null;
+  createdAt: string;
+  actor: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  intent: { id: string; title: string } | null;
+}
+
 export interface ApiUserSearchResult {
   id: string;
   username: string;
@@ -239,6 +258,19 @@ export async function unfollowProfile(userId: string): Promise<ApiSocialProfile>
   const result = await authenticatedRequest<ApiEnvelope<ApiSocialProfile>>(
     `/v1/users/${encodeURIComponent(userId)}/follow`,
     { method: 'DELETE' },
+  );
+  return result.data;
+}
+
+export async function listNotifications(): Promise<ApiNotification[]> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiNotification[] }>>('/v1/notifications');
+  return result.data.items;
+}
+
+export async function markNotificationRead(id: string): Promise<ApiNotification> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiNotification>>(
+    `/v1/notifications/${encodeURIComponent(id)}/read`,
+    { method: 'PATCH' },
   );
   return result.data;
 }

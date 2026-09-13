@@ -11,6 +11,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     domainEvent: { create: vi.fn() },
     follow: { findUnique: vi.fn() },
     support: { findUnique: vi.fn() },
+    notification: { findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -65,6 +66,10 @@ beforeEach(() => {
   db.intent.findMany.mockResolvedValue([]);
   db.follow.findUnique.mockResolvedValue(null);
   db.support.findUnique.mockResolvedValue(null);
+  db.notification.findMany.mockResolvedValue([]);
+  db.notification.updateMany.mockResolvedValue({ count: 0 });
+  db.notification.findFirst.mockResolvedValue(null);
+  db.$transaction.mockImplementation(async (operation) => operation(db));
 });
 
 function get(path: string, authorization?: string) {
@@ -359,6 +364,107 @@ describe('edição HTTP do próprio perfil', () => {
     for (const field of ['passwordHash', 'firebaseUid', 'email', 'tokens', 'credentials', 'status']) {
       expect(body.data).not.toHaveProperty(field);
     }
+  });
+});
+
+describe('notificações HTTP autenticadas', () => {
+  const notificationId = '30000000-0000-4000-8000-000000000001';
+  const notification = {
+    id: notificationId,
+    type: 'SUPPORT_RECEIVED',
+    readAt: null,
+    createdAt: new Date('2026-09-13T12:00:00.000Z'),
+    actor: {
+      id: creatorId,
+      username: 'criador',
+      displayName: 'Criador',
+      avatarUrl: null,
+      email: 'secret@example.com',
+      firebaseUid: 'secret-firebase-uid',
+      passwordHash: 'secret-password-hash',
+      tokens: ['secret-token'],
+    },
+    intent: { id: intentId, title: 'Intent do usuário', revealCiphertext: 'secret' },
+  };
+
+  it('exige autenticação para listar', async () => {
+    const response = await get('/v1/notifications');
+    expect(response.status).toBe(401);
+    expect(db.notification.findMany).not.toHaveBeenCalled();
+  });
+
+  it('lista somente pelo usuário autenticado, com select e sem dados sensíveis', async () => {
+    db.notification.findMany.mockResolvedValue([notification]);
+    const response = await get('/v1/notifications', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.items).toEqual([{
+      id: notificationId,
+      type: 'SUPPORT_RECEIVED',
+      readAt: null,
+      createdAt: notification.createdAt.toISOString(),
+      actor: { id: creatorId, username: 'criador', displayName: 'Criador', avatarUrl: null },
+      intent: { id: intentId, title: 'Intent do usuário' },
+    }]);
+    expect(db.notification.findMany.mock.calls[0]![0]).toMatchObject({
+      where: { userId: viewer.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 50,
+      select: {
+        id: true,
+        type: true,
+        readAt: true,
+        createdAt: true,
+        actor: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+        intent: { select: { id: true, title: true } },
+      },
+    });
+    for (const field of ['email', 'firebaseUid', 'passwordHash', 'tokens', 'status']) {
+      expect(body.data.items[0].actor).not.toHaveProperty(field);
+    }
+    expect(body.data.items[0].intent).not.toHaveProperty('revealCiphertext');
+  });
+
+  it('marca como lida somente uma notificação própria', async () => {
+    const readNotification = { ...notification, readAt: new Date('2026-09-13T12:05:00.000Z') };
+    db.notification.updateMany.mockResolvedValue({ count: 1 });
+    db.notification.findFirst.mockResolvedValue(readNotification);
+    const response = await fetch(`${baseUrl}/v1/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer synthetic-test-token' },
+    });
+    expect(response.status).toBe(200);
+    expect(db.notification.updateMany).toHaveBeenCalledWith({
+      where: { id: notificationId, userId: viewer.id, readAt: null },
+      data: { readAt: expect.any(Date) },
+    });
+    expect(db.notification.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: notificationId, userId: viewer.id },
+    }));
+    expect((await response.json()).data.readAt).toBe(readNotification.readAt.toISOString());
+  });
+
+  it('não marca nem retorna notificação de outro usuário', async () => {
+    const response = await fetch(`${baseUrl}/v1/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer synthetic-test-token' },
+    });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: { code: 'NOTIFICATION_NOT_FOUND' } });
+    expect(db.notification.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: notificationId, userId: viewer.id, readAt: null },
+    }));
+  });
+
+  it('não aceita escolher outro usuário no corpo da marcação', async () => {
+    const response = await fetch(`${baseUrl}/v1/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer synthetic-test-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: creatorId }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.notification.updateMany).not.toHaveBeenCalled();
   });
 });
 

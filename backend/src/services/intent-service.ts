@@ -7,6 +7,7 @@ import { openReveal, revealAssociatedData, sealReveal } from '../domain/reveal-c
 import { isSupportConditionSatisfied } from '../domain/support-condition.js';
 import { createIntentSchema } from '../domain/intent-schemas.js';
 import { runIntentMutation } from './intent-mutation.js';
+import { createNotification } from './notification-service.js';
 
 const publicIntentSelection = {
   id: true,
@@ -434,6 +435,14 @@ export async function supportIntent(intentId: string, supporterId: string, idemp
       },
     });
 
+    await createNotification(transaction, {
+      userId: existing.creatorId,
+      actorId: supporterId,
+      type: 'SUPPORT_RECEIVED',
+      intentId,
+      deduplicationKey: `support:${support.id}`,
+    });
+
     let realizedNow = false;
     if (isRevealConditionSatisfied(updated)) {
       const result = await transaction.intent.updateMany({
@@ -521,6 +530,13 @@ export async function approveGuardianIntent(intentId: string, guardianId: string
             guardianApprovalGoal: updated.guardianApprovalGoal,
           },
         },
+      });
+      await createNotification(transaction, {
+        userId: intent.creatorId,
+        actorId: guardianId,
+        type: 'GUARDIAN_APPROVAL_RECEIVED',
+        intentId,
+        deduplicationKey: `guardian-approval:${intentId}:${guardianId}`,
       });
     }
 

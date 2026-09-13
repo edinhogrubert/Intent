@@ -10,6 +10,7 @@ import { AppError } from './errors.js';
 import { logger } from './lib/logger.js';
 import { healthRouter } from './routes/health.js';
 import { intentsRouter } from './routes/intents.js';
+import { notificationsRouter } from './routes/notifications.js';
 import { usersRouter } from './routes/users.js';
 
 export function createApp() {
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/health', healthRouter);
   app.use('/v1/users', usersRouter);
   app.use('/v1/intents', intentsRouter);
+  app.use('/v1/notifications', notificationsRouter);
 
   app.use((_request, response) => {
     response.status(404).json({

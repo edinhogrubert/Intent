@@ -25,6 +25,8 @@ model User {
   followers      Follow[]      @relation("Following")
   idempotencyRequests IdempotencyRequest[]
   authoredEvents DomainEvent[] @relation("EventActor")
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+  notificationActions Notification[] @relation("NotificationActor")
 
   @@map("users")
 }
@@ -70,6 +72,7 @@ model Intent {
   creator            User          @relation(fields: [creatorId], references: [id], onDelete: Restrict)
   supports           Support[]
   events             DomainEvent[]
+  notifications      Notification[]
 
   @@index([status, visibility, createdAt(sort: Desc)])
   @@index([conditionType, revealAt])
@@ -119,4 +122,27 @@ model IdempotencyRequest {
 
   @@unique([actorId, operation, key])
   @@map("idempotency_requests")
+}
+
+enum NotificationType {
+  FOLLOW_RECEIVED
+  SUPPORT_RECEIVED
+  GUARDIAN_APPROVAL_RECEIVED
+}
+
+model Notification {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  type             NotificationType
+  actorId          String           @map("actor_id") @db.Uuid
+  intentId         String?          @map("intent_id") @db.Uuid
+  deduplicationKey String           @unique @map("deduplication_key") @db.VarChar(180)
+  readAt           DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user             User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Restrict)
+  actor            User             @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Restrict)
+  intent           Intent?          @relation(fields: [intentId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
 }
