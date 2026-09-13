@@ -100,3 +100,11 @@ Usar adição explícita dos cinco caminhos e commit com a mensagem:
 Mostrar `git diff --stat`, resultados da validação e hash do commit antes de
 qualquer decisão de merge. Publicação da branch e revisão podem ocorrer em etapa
 posterior; não enviar `main`, não mover `mvp-1.0.0` e não fazer merge automático.
+
+## Release mvp-1.0.5
+
+- Commit: c86c26408c2f4c104a3f41c62f24a75242f2b390
+- Tag: mvp-1.0.5
+- Conteúdo: edição simples de perfil
+- Status: main, VM e GitHub alinhados
+- Validação: perfil editável testado via localhost:3100
