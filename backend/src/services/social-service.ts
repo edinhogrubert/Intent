@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from '../errors.js';
 import { prisma } from '../lib/prisma.js';
+import { createNotification } from './notification-service.js';
 
 const profileIntentSelection = {
   id: true,
@@ -139,10 +140,21 @@ export async function followUser(followerId: string, followingId: string) {
     throw new AppError(404, 'USER_NOT_FOUND', 'Perfil não encontrado.');
   }
 
-  await prisma.follow.upsert({
-    where: { followerId_followingId: { followerId, followingId } },
-    create: { followerId, followingId },
-    update: {},
+  await prisma.$transaction(async (transaction) => {
+    const created = await transaction.follow.createManyAndReturn({
+      data: [{ followerId, followingId }],
+      skipDuplicates: true,
+      select: { id: true },
+    });
+    const relation = created[0];
+    if (relation) {
+      await createNotification(transaction, {
+        userId: followingId,
+        actorId: followerId,
+        type: 'FOLLOW_RECEIVED',
+        deduplicationKey: `follow:${relation.id}`,
+      });
+    }
   });
 
   return getSocialProfile(followingId, followerId);

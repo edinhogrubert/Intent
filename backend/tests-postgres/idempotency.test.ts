@@ -12,8 +12,9 @@ vi.mock('../src/lib/firebase.js', () => ({ firebaseAuth: {
 } }));
 import { prisma } from '../src/lib/prisma.js';
 import { createApp } from '../src/app.js';
-import { createIntent, getIntent, supportIntent, removeSupport } from '../src/services/intent-service.js';
+import { approveGuardianIntent, createIntent, getIntent, supportIntent, removeSupport } from '../src/services/intent-service.js';
 import { followUser, unfollowUser } from '../src/services/social-service.js';
+import { listNotifications, markNotificationRead } from '../src/services/notification-service.js';
 
 let owner: string, alice: string, bob: string, ownerToken: string;
 let server: Server;
@@ -239,5 +240,40 @@ describe('idempotência persistida em PostgreSQL', () => {
     expect((await getIntent(target.id, owner)).revealContent).toBe(command.revealContent);
     await unfollowUser(alice, owner);
     await expect(getIntent(target.id, alice)).rejects.toMatchObject({ code: 'INTENT_FORBIDDEN' });
+  });
+
+  it('persiste uma notificação por relação de seguidor e permite marcá-la como lida', async () => {
+    await followUser(alice, bob);
+    await followUser(alice, bob);
+    const notifications = await listNotifications(bob);
+    const received = notifications.filter((item) => item.type === 'FOLLOW_RECEIVED' && item.actor.id === alice);
+    expect(received).toHaveLength(1);
+    const updated = await markNotificationRead(bob, received[0]!.id);
+    expect(updated.readAt).toBeInstanceOf(Date);
+    await expect(markNotificationRead(owner, received[0]!.id)).rejects.toMatchObject({ code: 'NOTIFICATION_NOT_FOUND' });
+  });
+
+  it('não duplica notificação de apoio em replay idempotente', async () => {
+    const target = await create(), token = key();
+    await supportIntent(target.id, alice, token);
+    await supportIntent(target.id, alice, token);
+    expect(await prisma.notification.count({
+      where: { userId: owner, actorId: alice, intentId: target.id, type: 'SUPPORT_RECEIVED' },
+    })).toBe(1);
+  });
+
+  it('persiste uma notificação por aprovação do guardião', async () => {
+    const target = await createIntent(owner, {
+      ...command,
+      conditionType: 'GUARDIANS',
+      supportGoal: undefined,
+      guardianIds: [alice, bob],
+      guardianApprovalGoal: 2,
+    });
+    await approveGuardianIntent(target.id, alice, key());
+    await approveGuardianIntent(target.id, alice, key());
+    expect(await prisma.notification.count({
+      where: { userId: owner, actorId: alice, intentId: target.id, type: 'GUARDIAN_APPROVAL_RECEIVED' },
+    })).toBe(1);
   });
 });

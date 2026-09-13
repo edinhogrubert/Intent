@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Home, LogOut, PlusCircle, Target, UserRound } from 'lucide-react';
+import { Bell, Home, LogOut, PlusCircle, Target, UserRound } from 'lucide-react';
 import type { UserAccount } from './types';
 import { AuthGate } from './components/AuthGate';
 import { CreationWizard } from './components/CreationWizard';
@@ -7,6 +7,7 @@ import { MyIntentsDashboard } from './components/MyIntentsDashboard';
 import { MvpHomeFeed } from './components/MvpHomeFeed';
 import { MvpIntentDetail } from './components/MvpIntentDetail';
 import { MvpSocialProfile } from './components/MvpSocialProfile';
+import { NotificationsModal } from './components/NotificationsModal';
 import { auth, onAuthStateChanged, signOut } from './utils/firebase';
 import { logoutUser, setCurrentSessionUser } from './utils/storage';
 import { syncAuthenticatedUser } from './services/intentApi';
@@ -22,6 +23,7 @@ export default function App() {
   const [selectedIntentId, setSelectedIntentId] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const manualAuthentication = useRef(false);
 
   async function synchronizeSession() {
@@ -80,7 +82,7 @@ export default function App() {
   ];
 
   return <div className="min-h-screen bg-[#f7f6fc] text-[#1b1c1a]">
-    <header className="sticky top-0 z-30 bg-white border-b border-[#e4e2de]"><div className="max-w-5xl mx-auto h-16 px-4 flex items-center justify-between"><button onClick={() => setView('home')} className="text-xl font-black tracking-tight text-[#000666]">INTENT</button><nav className="hidden sm:flex items-center gap-1">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { if (id === 'profile') setSelectedProfileId(currentUser.id); setView(id); }} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${view === id ? 'bg-[#e0e0ff] text-[#000666]' : 'text-[#666] hover:bg-[#f5f3ef]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav><div className="flex items-center gap-3"><button onClick={() => selectProfile(currentUser.id)} className="hidden md:block text-right"><p className="text-xs font-bold">{currentUser.name}</p><p className="text-[11px] text-[#666]">@{currentUser.username.replace(/^@+/, '')}</p></button><button onClick={() => void handleLogout()} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Sair"><LogOut className="w-5 h-5"/></button></div></div></header>
+    <header className="sticky top-0 z-30 bg-white border-b border-[#e4e2de]"><div className="max-w-5xl mx-auto h-16 px-4 flex items-center justify-between"><button onClick={() => setView('home')} className="text-xl font-black tracking-tight text-[#000666]">INTENT</button><nav className="hidden sm:flex items-center gap-1">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { if (id === 'profile') setSelectedProfileId(currentUser.id); setView(id); }} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${view === id ? 'bg-[#e0e0ff] text-[#000666]' : 'text-[#666] hover:bg-[#f5f3ef]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav><div className="flex items-center gap-2"><button type="button" onClick={() => setNotificationsOpen(true)} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Abrir notificações"><Bell className="w-5 h-5"/></button><button onClick={() => selectProfile(currentUser.id)} className="hidden md:block text-right"><p className="text-xs font-bold">{currentUser.name}</p><p className="text-[11px] text-[#666]">@{currentUser.username.replace(/^@+/, '')}</p></button><button onClick={() => void handleLogout()} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Sair"><LogOut className="w-5 h-5"/></button></div></div></header>
 
     <main className="pb-24 sm:pb-8">
       {view === 'home' && <MvpHomeFeed currentUser={currentUser} onCreate={() => setView('create')} onSelectIntent={selectIntent} onSelectProfile={selectProfile}/>} 
@@ -99,5 +101,6 @@ export default function App() {
 
     <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#e4e2de] px-2 py-2 flex justify-around">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { if (id === 'profile') setSelectedProfileId(currentUser.id); setView(id); }} className={`min-w-16 py-1 flex flex-col items-center gap-1 text-[10px] font-bold ${view === id ? 'text-[#000666]' : 'text-[#777]'}`}><Icon className="w-5 h-5"/>{label}</button>)}</nav>
     {toast && <div role="status" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#1b1c1a] text-white px-5 py-3 rounded-xl shadow-lg text-sm font-bold">{toast}</div>}
+    {notificationsOpen && <NotificationsModal onClose={() => setNotificationsOpen(false)}/>}
   </div>;
 }

@@ -9,15 +9,16 @@ const { db, key } = vi.hoisted(() => ({
     $transaction: vi.fn(),
     user: { findUnique: vi.fn() },
     intent: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
-    follow: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
+    follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     support: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
     domainEvent: { create: vi.fn() },
+    notification: { createMany: vi.fn() },
   },
 }));
 vi.mock('../src/lib/prisma.js', () => ({ prisma: db }));
 vi.mock('../src/config.js', () => ({ config: { revealEncryptionKey: key } }));
 
-import { createIntent, getIntent, listFollowingFeed, listPublicFeed, removeSupport, supportIntent } from '../src/services/intent-service.js';
+import { approveGuardianIntent, createIntent, getIntent, listFollowingFeed, listPublicFeed, removeSupport, supportIntent } from '../src/services/intent-service.js';
 import { followUser, unfollowUser } from '../src/services/social-service.js';
 
 const creatorId = '10000000-0000-4000-8000-000000000001';
@@ -40,6 +41,8 @@ beforeEach(() => {
   db.follow.findUnique.mockResolvedValue(null);
   db.support.findUnique.mockResolvedValue(null);
   db.domainEvent.create.mockResolvedValue({});
+  db.follow.createManyAndReturn.mockResolvedValue([{ id: 'relation' }]);
+  db.notification.createMany.mockResolvedValue({ count: 1 });
 });
 
 describe('criação e acesso às Intents', () => {
@@ -102,9 +105,12 @@ describe('seguir e deixar de seguir', () => {
   it('seguir, repetir, deixar de seguir e voltar a seguir atualizam acesso e perfil', async () => {
     // Minimal relation store: deliberately no visibility logic in the test double.
     const relations = new Set<string>();
-    db.follow.upsert.mockImplementation(async ({ create }) => {
-      relations.add(`${create.followerId}:${create.followingId}`);
-      return { id: 'relation' };
+    db.follow.createManyAndReturn.mockImplementation(async ({ data }) => {
+      const relation = data[0];
+      const key = `${relation.followerId}:${relation.followingId}`;
+      const created = relations.has(key) ? [] : [{ id: `relation-${relations.size}` }];
+      relations.add(key);
+      return created;
     });
     db.follow.deleteMany.mockImplementation(async ({ where }) => ({ count: Number(relations.delete(`${where.followerId}:${where.followingId}`)) }));
     db.follow.findUnique.mockImplementation(async ({ where }) => {
@@ -127,15 +133,32 @@ describe('seguir e deixar de seguir', () => {
     await expect(getIntent(intentId, viewerId)).resolves.toMatchObject({ id: intentId });
   });
 
+  it('cria uma notificação ao seguir e não repete enquanto a relação já existe', async () => {
+    db.follow.createManyAndReturn.mockResolvedValueOnce([{ id: 'follow-notification' }]).mockResolvedValueOnce([]);
+    await followUser(viewerId, creatorId);
+    await followUser(viewerId, creatorId);
+    expect(db.notification.createMany).toHaveBeenCalledTimes(1);
+    expect(db.notification.createMany).toHaveBeenCalledWith({
+      data: [{
+        userId: creatorId,
+        actorId: viewerId,
+        type: 'FOLLOW_RECEIVED',
+        intentId: null,
+        deduplicationKey: 'follow:follow-notification',
+      }],
+      skipDuplicates: true,
+    });
+  });
+
   it('não permite seguir a própria conta', async () => {
     await expect(followUser(creatorId, creatorId)).rejects.toMatchObject({ code: 'SELF_FOLLOW_NOT_ALLOWED' });
-    expect(db.follow.upsert).not.toHaveBeenCalled();
+    expect(db.follow.createManyAndReturn).not.toHaveBeenCalled();
   });
 
   it.each([null, { ...creator, status: 'INACTIVE' }])('não permite seguir perfil ausente ou inativo (%s)', async (target) => {
     db.user.findUnique.mockResolvedValue(target);
     await expect(followUser(viewerId, creatorId)).rejects.toMatchObject({ code: 'USER_NOT_FOUND' });
-    expect(db.follow.upsert).not.toHaveBeenCalled();
+    expect(db.follow.createManyAndReturn).not.toHaveBeenCalled();
   });
 });
 
@@ -203,6 +226,23 @@ describe('apoio alternável', () => {
   it('não permite apoio do criador', async () => {
     await expect(supportIntent(intentId, creatorId)).rejects.toMatchObject({ code: 'CREATOR_CANNOT_SUPPORT' });
     expect(db.support.create).not.toHaveBeenCalled();
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('cria notificação persistida para o criador ao apoiar', async () => {
+    db.support.create.mockResolvedValue({ id: 'support-notification' });
+    db.intent.update.mockResolvedValue({ ...intent, supportCount: 1 });
+    await supportIntent(intentId, viewerId);
+    expect(db.notification.createMany).toHaveBeenCalledWith({
+      data: [{
+        userId: creatorId,
+        actorId: viewerId,
+        type: 'SUPPORT_RECEIVED',
+        intentId,
+        deduplicationKey: 'support:support-notification',
+      }],
+      skipDuplicates: true,
+    });
   });
 
   it('bloqueia apoio de não seguidor em Intent exclusiva', async () => {
@@ -231,6 +271,36 @@ describe('apoio alternável', () => {
     db.intent.findUnique.mockResolvedValue({ ...intent, status: 'REALIZED', supportCount: 3 });
     await expect(removeSupport(intentId, viewerId)).rejects.toMatchObject({ code: 'SUPPORT_LOCKED_AFTER_REVEAL' });
     expect(db.support.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('aprovação por guardião', () => {
+  it('cria uma notificação para o criador e não duplica no retry lógico', async () => {
+    db.intent.findUnique
+      .mockResolvedValueOnce({ ...intent, conditionType: 'GUARDIANS', guardianIds: [viewerId] })
+      .mockResolvedValueOnce({ ...intent, conditionType: 'GUARDIANS', guardianIds: [viewerId], guardianApprovals: [viewerId] });
+    db.intent.update.mockImplementation(async ({ data }) => ({
+      ...intent,
+      conditionType: 'GUARDIANS',
+      guardianIds: [viewerId],
+      guardianApprovals: data.guardianApprovals,
+      guardianApprovalGoal: 2,
+    }));
+
+    await approveGuardianIntent(intentId, viewerId);
+    await approveGuardianIntent(intentId, viewerId);
+
+    expect(db.notification.createMany).toHaveBeenCalledTimes(1);
+    expect(db.notification.createMany).toHaveBeenCalledWith({
+      data: [{
+        userId: creatorId,
+        actorId: viewerId,
+        type: 'GUARDIAN_APPROVAL_RECEIVED',
+        intentId,
+        deduplicationKey: `guardian-approval:${intentId}:${viewerId}`,
+      }],
+      skipDuplicates: true,
+    });
   });
 });
 
@@ -271,6 +341,7 @@ describe('fundação de autoridade', () => {
     await expect(supportIntent(intentId, viewerId)).rejects.toMatchObject({ code: 'SUPPORT_ALREADY_EXISTS' });
     expect(db.intent.update).toHaveBeenCalledTimes(1);
     expect(db.domainEvent.create).toHaveBeenCalledTimes(1);
+    expect(db.notification.createMany).toHaveBeenCalledTimes(1);
     expect(db.domainEvent.create.mock.calls[0]![0].data.idempotencyKey).toBe('support-received:support-1');
   });
 
