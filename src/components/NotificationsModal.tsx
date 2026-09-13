@@ -12,6 +12,20 @@ interface NotificationsModalProps {
   onRead: () => void;
 }
 
+type NotificationFilter = 'all' | 'unread' | 'read';
+
+const notificationFilters: Array<{ value: NotificationFilter; label: string }> = [
+  { value: 'all', label: 'Todas' },
+  { value: 'unread', label: 'Não lidas' },
+  { value: 'read', label: 'Lidas' },
+];
+
+const emptyMessages: Record<NotificationFilter, string> = {
+  all: 'Nenhuma notificação.',
+  unread: 'Nenhuma notificação não lida.',
+  read: 'Nenhuma notificação lida.',
+};
+
 function notificationText(notification: ApiNotification): string {
   const actor = notification.actor.displayName;
   if (notification.type === 'FOLLOW_RECEIVED') return `${actor} começou a seguir você.`;
@@ -28,9 +42,16 @@ function notificationDate(value: string): string {
 
 export function NotificationsModal({ onClose, onRead }: NotificationsModalProps) {
   const [items, setItems] = useState<ApiNotification[]>([]);
+  const [filter, setFilter] = useState<NotificationFilter>('all');
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const visibleItems = items.filter((notification) => {
+    if (filter === 'unread') return notification.readAt === null;
+    if (filter === 'read') return notification.readAt !== null;
+    return true;
+  });
 
   useEffect(() => {
     let active = true;
@@ -72,12 +93,22 @@ export function NotificationsModal({ onClose, onRead }: NotificationsModalProps)
         <button type="button" onClick={onClose} aria-label="Fechar" className="p-2 rounded-full text-[#666] hover:bg-[#f5f3ef]"><X className="w-5 h-5"/></button>
       </header>
 
+      <div className="px-5 py-3 border-b border-[#e4e2de] flex gap-2" aria-label="Filtrar notificações">
+        {notificationFilters.map((option) => <button
+          key={option.value}
+          type="button"
+          aria-pressed={filter === option.value}
+          onClick={() => setFilter(option.value)}
+          className={`px-3 py-1.5 rounded-full text-sm font-bold transition-colors ${filter === option.value ? 'bg-[#000666] text-white' : 'bg-[#f5f3ef] text-[#555] hover:bg-[#e9e7e2]'}`}
+        >{option.label}</button>)}
+      </div>
+
       <div className="overflow-y-auto">
         {loading && <div className="p-10 text-center text-sm text-[#666]"><LoaderCircle className="w-6 h-6 animate-spin mx-auto mb-3"/>Carregando notificações...</div>}
         {!loading && error && items.length === 0 && <div role="alert" className="m-5 rounded-xl bg-[#ffdad6] p-4 text-sm text-[#8c1d18] flex gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>{error}</div>}
-        {!loading && !error && items.length === 0 && <div className="p-10 text-center"><Bell className="w-8 h-8 text-[#8b8994] mx-auto mb-3"/><p className="font-bold">Nenhuma notificação</p><p className="text-sm text-[#666] mt-1">As novas atividades aparecerão aqui.</p></div>}
+        {!loading && !error && visibleItems.length === 0 && <div className="p-10 text-center"><Bell className="w-8 h-8 text-[#8b8994] mx-auto mb-3"/><p className="font-bold">{emptyMessages[filter]}</p><p className="text-sm text-[#666] mt-1">As novas atividades aparecerão aqui.</p></div>}
         {error && items.length > 0 && <div role="alert" className="m-4 rounded-xl bg-[#ffdad6] p-3 text-sm text-[#8c1d18]">{error}</div>}
-        <div className="divide-y divide-[#e4e2de]">{items.map((notification) => <article key={notification.id} className={`p-4 flex gap-3 ${notification.readAt ? 'bg-white' : 'bg-[#f0efff]'}`}>
+        <div className="divide-y divide-[#e4e2de]">{visibleItems.map((notification) => <article key={notification.id} className={`p-4 flex gap-3 ${notification.readAt ? 'bg-white' : 'bg-[#f0efff]'}`}>
           <div className="w-10 h-10 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black shrink-0">
             {notification.actor.avatarUrl ? <img src={notification.actor.avatarUrl} alt="" className="w-full h-full object-cover"/> : notification.actor.displayName.charAt(0).toUpperCase()}
           </div>
