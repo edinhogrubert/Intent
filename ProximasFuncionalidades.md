@@ -441,7 +441,41 @@ Regras futuras necessárias:
 
 Essa evolução é parte central do coração do Intent: conteúdo protegido, regras humanas verificáveis e revelação controlada por acontecimentos.
 
-## 4.9 Plataforma e operação
+## 4.9 Intent por localização
+
+Uma Intent poderá depender da presença do usuário em determinado endereço ou região geográfica. Em vez de exigir um ponto exato, o criador definirá um endereço, coordenada ou local de referência e um **raio de validação** configurável.
+
+Exemplos de uso:
+
+- jogo presencial em que a próxima pista só abre ao chegar em um ponto;
+- caça ao tesouro, trilhas, gincanas, escape game urbano ou dinâmica escolar;
+- desafio familiar, como liberar um presente se o filho visitar a avó em determinado dia e endereço;
+- turismo guiado, onde cada local visitado revela uma história, pergunta ou próxima missão;
+- eventos, feiras e congressos, liberando conteúdo somente para quem esteve no local;
+- ações de comércio local, com recompensa para quem comparece fisicamente à loja;
+- integração com atividades esportivas, como abrir a próxima etapa ao chegar em um parque, quadra ou ponto de corrida;
+- experiências de memória afetiva, em que uma mensagem só abre em uma praça, casa antiga, praia ou local especial;
+- tarefas de equipe, onde cada pessoa precisa validar presença em pontos diferentes;
+- ensino prático, como aulas de campo com conteúdo liberado em locais específicos.
+
+Regras futuras necessárias:
+
+- permitir raio configurável, por exemplo 30 m, 100 m, 500 m ou valor definido pelo criador;
+- mostrar antes da publicação qual área aproximada será considerada válida;
+- permitir combinação com data, guardiões, destinatários e quórum;
+- registrar evento de presença com data, hora, precisão aproximada e versão da regra;
+- evitar armazenar localização contínua; validar apenas quando o usuário tentar cumprir a condição;
+- explicar claramente ao usuário por que a localização está sendo solicitada;
+- permitir recusa de permissão sem travar o aplicativo inteiro;
+- validar no backend se a tentativa está dentro do raio configurado;
+- considerar margem de erro do GPS, especialmente em prédios, áreas urbanas densas e zonas rurais;
+- bloquear manipulação óbvia quando possível, sem prometer segurança absoluta contra spoofing de GPS;
+- definir política para múltiplas tentativas e tentativas fora do raio;
+- preservar privacidade: não exibir localização exata de participantes sem necessidade.
+
+Essa condição amplia o Intent para acontecimentos físicos: estar em um lugar passa a ser parte da regra de revelação, não apenas um dado decorativo.
+
+## 4.10 Plataforma e operação
 
 - domínio e HTTPS;
 - publicação controlada;
