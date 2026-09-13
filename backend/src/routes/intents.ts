@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createIntentSchema } from '../domain/intent-schemas.js';
+import { createCommentSchema } from '../domain/comment-schemas.js';
 import { AppError } from '../errors.js';
 import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middleware/auth.js';
 import {
@@ -14,6 +15,7 @@ import {
   removeSupport,
   supportIntent,
 } from '../services/intent-service.js';
+import { createIntentComment, listIntentComments } from '../services/comment-service.js';
 
 export const intentsRouter = Router();
 
@@ -64,6 +66,27 @@ intentsRouter.get('/guardian-requests', requireAuthenticatedUser, async (request
       Number.isFinite(limit) ? limit : 20,
     );
     response.json({ data: intents });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.get('/:id/comments', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const comments = await listIntentComments(intentId, request.appUser!.id);
+    response.json({ data: { items: comments } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.post('/:id/comments', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const command = createCommentSchema.parse(request.body);
+    const comment = await createIntentComment(intentId, request.appUser!.id, command);
+    response.status(201).json({ data: comment });
   } catch (error) {
     next(error);
   }

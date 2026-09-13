@@ -12,6 +12,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     follow: { findUnique: vi.fn() },
     support: { findUnique: vi.fn() },
     notification: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
+    intentComment: { findMany: vi.fn(), create: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -70,6 +71,7 @@ beforeEach(() => {
   db.notification.count.mockResolvedValue(0);
   db.notification.updateMany.mockResolvedValue({ count: 0 });
   db.notification.findFirst.mockResolvedValue(null);
+  db.intentComment.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation(async (operation) => operation(db));
 });
 
@@ -507,6 +509,183 @@ describe('notificações HTTP autenticadas', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
     expect(db.notification.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('comentários HTTP em Intents', () => {
+  const commentId = '40000000-0000-4000-8000-000000000001';
+  const createdAt = new Date('2026-09-13T15:00:00.000Z');
+  const comment = {
+    id: commentId,
+    body: 'Comentário público',
+    createdAt,
+    updatedAt: createdAt,
+    author: {
+      id: viewer.id,
+      username: viewer.username,
+      displayName: viewer.displayName,
+      avatarUrl: null,
+      email: 'never-return@example.com',
+      firebaseUid: 'never-return-firebase',
+      passwordHash: 'never-return-password',
+      tokens: ['never-return-token'],
+      status: 'ACTIVE',
+    },
+  };
+
+  function intentAccess(overrides: Record<string, unknown> = {}) {
+    return {
+      id: intentId,
+      creatorId,
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED',
+      guardianIds: [],
+      creator: { status: 'ACTIVE' },
+      revealCiphertext: 'never-return-ciphertext',
+      revealIv: 'never-return-iv',
+      revealAuthTag: 'never-return-tag',
+      revealContent: 'never-return-content',
+      ...overrides,
+    };
+  }
+
+  function postComment(body: unknown, authenticated = true) {
+    return fetch(`${baseUrl}/v1/intents/${intentId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer synthetic-test-token' } : {}) },
+      body: JSON.stringify(body),
+    });
+  }
+
+  beforeEach(() => {
+    db.intent.findUnique.mockResolvedValue(intentAccess());
+    db.intentComment.findMany.mockResolvedValue([comment]);
+    db.intentComment.create.mockResolvedValue(comment);
+  });
+
+  it('GET exige autenticação', async () => {
+    const response = await get(`/v1/intents/${intentId}/comments`);
+    expect(response.status).toBe(401);
+    expect(db.intentComment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('POST exige autenticação', async () => {
+    const response = await postComment({ body: 'Olá' }, false);
+    expect(response.status).toBe(401);
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('usuário inativo não lista nem cria comentários', async () => {
+    db.user.findUnique.mockResolvedValue({ ...viewer, status: 'INACTIVE' });
+    expect((await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token')).status).toBe(403);
+    expect((await postComment({ body: 'Não autorizado' })).status).toBe(403);
+    expect(db.intent.findUnique).not.toHaveBeenCalled();
+    expect(db.intentComment.findMany).not.toHaveBeenCalled();
+    expect(db.intentComment.create).not.toHaveBeenCalled();
+  });
+
+  it('usuário com acesso lista em ordem cronológica, com limite e projeção segura', async () => {
+    const response = await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ data: { items: [{
+      id: commentId,
+      body: comment.body,
+      createdAt: createdAt.toISOString(),
+      updatedAt: createdAt.toISOString(),
+      author: { id: viewer.id, username: viewer.username, displayName: viewer.displayName, avatarUrl: null },
+    }] } });
+    expect(db.intentComment.findMany).toHaveBeenCalledWith({
+      where: { intentId, author: { status: 'ACTIVE' } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: 50,
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        updatedAt: true,
+        author: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+      },
+    });
+    for (const field of ['email', 'firebaseUid', 'passwordHash', 'tokens', 'status']) {
+      expect(body.data.items[0].author).not.toHaveProperty(field);
+    }
+    for (const secret of ['revealCiphertext', 'revealIv', 'revealAuthTag', 'revealContent']) {
+      expect(JSON.stringify(body)).not.toContain(secret);
+      expect(db.intent.findUnique.mock.calls[0]![0].select).not.toHaveProperty(secret);
+    }
+  });
+
+  it('usuário sem acesso não lista nem consulta comentários', async () => {
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'PRIVATE' }));
+    const response = await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(403);
+    expect(db.intentComment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('usuário com acesso cria comentário como o usuário autenticado e aplica trim', async () => {
+    const response = await postComment({ body: '  Comentário público  ' });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ data: {
+      id: commentId,
+      body: comment.body,
+      createdAt: createdAt.toISOString(),
+      updatedAt: createdAt.toISOString(),
+      author: { id: viewer.id, username: viewer.username, displayName: viewer.displayName, avatarUrl: null },
+    } });
+    expect(db.intentComment.create.mock.calls[0]![0]).toMatchObject({
+      data: { intentId, authorId: viewer.id, body: 'Comentário público' },
+    });
+  });
+
+  it('usuário sem acesso não cria comentário', async () => {
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'PRIVATE' }));
+    const response = await postComment({ body: 'Bloqueado' });
+    expect(response.status).toBe(403);
+    expect(db.intentComment.create).not.toHaveBeenCalled();
+  });
+
+  it('PRIVATE permite comentários do próprio criador', async () => {
+    const creatorViewer = { ...viewer, id: creatorId };
+    db.user.findUnique.mockResolvedValue(creatorViewer);
+    db.user.update.mockResolvedValue(creatorViewer);
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'PRIVATE' }));
+    expect((await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token')).status).toBe(200);
+  });
+
+  it('PRIVATE com guardião autorizado permite listar e criar', async () => {
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'PRIVATE', guardianIds: [viewer.id], conditionType: 'GUARDIANS' }));
+    expect((await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token')).status).toBe(200);
+    expect((await postComment({ body: 'Acesso de guardião' })).status).toBe(201);
+  });
+
+  it('FOLLOWERS bloqueia quem não segue', async () => {
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'FOLLOWERS' }));
+    expect((await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token')).status).toBe(403);
+    expect((await postComment({ body: 'Sem vínculo' })).status).toBe(403);
+    expect(db.intentComment.findMany).not.toHaveBeenCalled();
+    expect(db.intentComment.create).not.toHaveBeenCalled();
+  });
+
+  it('FOLLOWERS permite quem segue o criador', async () => {
+    db.intent.findUnique.mockResolvedValue(intentAccess({ visibility: 'FOLLOWERS' }));
+    db.follow.findUnique.mockResolvedValue({ id: 'follow-relation' });
+    expect((await get(`/v1/intents/${intentId}/comments`, 'Bearer synthetic-test-token')).status).toBe(200);
+    expect((await postComment({ body: 'Sou seguidor' })).status).toBe(201);
+  });
+
+  it.each([
+    [{ body: '' }, 'vazio'],
+    [{ body: '   ' }, 'sem caractere útil'],
+    [{ body: 'x'.repeat(501) }, 'acima de 500'],
+    [{ body: 'válido', authorId: creatorId }, 'com authorId'],
+    [{ body: 'válido', intentId }, 'com intentId'],
+    [{ body: 'válido', extra: true }, 'com campo extra'],
+  ])('rejeita body %s (%s)', async (payload, _description) => {
+    const response = await postComment(payload);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 });
 

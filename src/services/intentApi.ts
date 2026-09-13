@@ -121,6 +121,19 @@ export interface ApiNotification {
   intent: { id: string; title: string } | null;
 }
 
+export interface ApiIntentComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+}
+
 export interface ApiUserSearchResult {
   id: string;
   username: string;
@@ -362,6 +375,21 @@ export async function listPublicIntents(
 
 export async function getIntent(intentId: string): Promise<ApiIntent> {
   const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>(`/v1/intents/${encodeURIComponent(intentId)}`);
+  return result.data;
+}
+
+export async function listIntentComments(intentId: string): Promise<ApiIntentComment[]> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntentComment[] }>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/comments`,
+  );
+  return result.data.items;
+}
+
+export async function createIntentComment(intentId: string, body: string): Promise<ApiIntentComment> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiIntentComment>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/comments`,
+    { method: 'POST', body: JSON.stringify({ body }) },
+  );
   return result.data;
 }
 
