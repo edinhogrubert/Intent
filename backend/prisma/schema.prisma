@@ -27,6 +27,7 @@ model User {
   authoredEvents DomainEvent[] @relation("EventActor")
   receivedNotifications Notification[] @relation("NotificationRecipient")
   notificationActions Notification[] @relation("NotificationActor")
+  authoredComments IntentComment[]
 
   @@map("users")
 }
@@ -73,6 +74,7 @@ model Intent {
   supports           Support[]
   events             DomainEvent[]
   notifications      Notification[]
+  comments           IntentComment[]
 
   @@index([status, visibility, createdAt(sort: Desc)])
   @@index([conditionType, revealAt])
@@ -145,4 +147,19 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+model IntentComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  intentId  String   @map("intent_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  intent    Intent   @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([intentId, createdAt])
+  @@index([authorId, createdAt])
+  @@map("intent_comments")
 }

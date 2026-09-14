@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, Lock, Users, Vote } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, LoaderCircle, Lock, MessageCircle, Users, Vote } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { approveGuardianIntent, getIntent, IntentApiError, removeIntentSupport, supportIntent, type ApiIntent, type IntentCategory } from '../services/intentApi';
+import { approveGuardianIntent, createIntentComment, getIntent, IntentApiError, listIntentComments, removeIntentSupport, supportIntent, type ApiIntent, type ApiIntentComment, type IntentCategory } from '../services/intentApi';
 
 interface MvpIntentDetailProps { intentId: string; currentUser: UserAccount; onBack: () => void }
 
@@ -40,6 +40,11 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [supporting, setSupporting] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [comments, setComments] = useState<ApiIntentComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentBody, setCommentBody] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   async function load() {
     setLoading(true); setError('');
@@ -48,7 +53,27 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void load(); }, [intentId]);
+  async function loadComments() {
+    setComments([]); setCommentsLoading(true); setCommentError('');
+    try { setComments(await listIntentComments(intentId)); }
+    catch (caught) { setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar os comentários.'); }
+    finally { setCommentsLoading(false); }
+  }
+
+  useEffect(() => { void load(); void loadComments(); }, [intentId]);
+
+  async function handleComment() {
+    const body = commentBody.trim();
+    if (!body || commentSubmitting) return;
+    setCommentSubmitting(true); setCommentError('');
+    try {
+      const comment = await createIntentComment(intentId, body);
+      setComments((current) => [...current, comment]);
+      setCommentBody('');
+    } catch (caught) {
+      setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível publicar o comentário.');
+    } finally { setCommentSubmitting(false); }
+  }
 
   async function handleSupport() {
     setSupporting(true); setError(''); setNotice('');
@@ -101,6 +126,27 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
           {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'DATE' && <p className="text-sm text-[#666] text-center">Esta Intent será aberta automaticamente na data definida.</p>}
           {!isMine && intent.status === 'REALIZED' && <p className="text-sm text-[#2e7d32] font-bold text-center">{intent.viewerHasSupported ? 'Seu apoio está confirmado e registrado nesta realização.' : 'Esta Intent já foi realizada.'}</p>}
         </div>
+
+        <section className="mt-6 pt-6 border-t border-[#e4e2de]" aria-labelledby="comments-title">
+          <h2 id="comments-title" className="font-black flex items-center gap-2"><MessageCircle className="w-5 h-5 text-[#000666]"/>Comentários</h2>
+
+          {commentsLoading && <div className="py-8 text-center text-sm text-[#666]"><LoaderCircle className="w-5 h-5 animate-spin mx-auto mb-2"/>Carregando comentários...</div>}
+          {!commentsLoading && comments.length === 0 && !commentError && <p className="py-8 text-center text-sm text-[#666]">Nenhum comentário ainda.</p>}
+          {commentError && <div role="alert" className="mt-4 p-3 bg-[#ffdad6] text-[#8c1d18] rounded-xl text-sm flex gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>{commentError}</div>}
+
+          {!commentsLoading && comments.length > 0 && <div className="mt-4 divide-y divide-[#e4e2de]">{comments.map((comment) => <article key={comment.id} className="py-4 flex gap-3">
+            <div className="w-9 h-9 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black shrink-0">
+              {comment.author.avatarUrl ? <img src={comment.author.avatarUrl} alt="" className="w-full h-full object-cover"/> : comment.author.displayName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-baseline gap-x-2"><p className="text-sm font-bold">{comment.author.displayName}</p><p className="text-xs text-[#666]">@{comment.author.username.replace(/^@+/, '')}</p></div><p className="mt-1 text-sm text-[#454652] whitespace-pre-wrap break-words">{comment.body}</p><time className="mt-1 block text-xs text-[#777]" dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('pt-BR')}</time></div>
+          </article>)}</div>}
+
+          <form className="mt-5" onSubmit={(event) => { event.preventDefault(); void handleComment(); }}>
+            <label htmlFor="intent-comment" className="text-sm font-bold">Novo comentário</label>
+            <textarea id="intent-comment" value={commentBody} maxLength={500} onChange={(event) => setCommentBody(event.target.value)} rows={3} placeholder="Escreva um comentário..." className="mt-2 w-full resize-none rounded-xl border border-[#c6c5d4] bg-[#fbf9f5] px-4 py-3 text-sm outline-none focus:border-[#000666]"/>
+            <div className="mt-2 flex items-center justify-between gap-4"><span className="text-xs text-[#666]">{commentBody.length}/500</span><button type="submit" disabled={commentSubmitting || commentBody.trim().length === 0} className="px-5 py-2.5 rounded-xl bg-[#000666] text-white text-sm font-bold disabled:opacity-50">{commentSubmitting ? 'Publicando...' : 'Comentar'}</button></div>
+          </form>
+        </section>
       </article>;
     })()}
   </div>;

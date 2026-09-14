@@ -49,6 +49,67 @@ function asStringArray(value: Prisma.JsonValue | unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
+type IntentAccessClient = Pick<Prisma.TransactionClient, 'intent' | 'follow'>;
+
+interface IntentViewAccessRecord {
+  creatorId: string;
+  visibility: string;
+  status: string;
+  guardianIds: Prisma.JsonValue | unknown;
+  creator: { status: string };
+}
+
+async function assertIntentViewAccess<T extends IntentViewAccessRecord>(
+  intent: T | null,
+  viewerId: string | undefined,
+  client: IntentAccessClient,
+): Promise<T> {
+  if (!intent || (intent.creator.status !== 'ACTIVE' && intent.creatorId !== viewerId)) {
+    throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
+  }
+
+  if (!['PUBLIC', 'FOLLOWERS', 'PRIVATE'].includes(intent.visibility)
+    || !['PUBLISHED', 'REALIZED', 'CANCELLED'].includes(intent.status)) {
+    throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent não está disponível.');
+  }
+
+  const viewerIsGuardian = Boolean(viewerId && asStringArray(intent.guardianIds).includes(viewerId));
+  if (intent.visibility === 'PRIVATE' && intent.creatorId !== viewerId && !viewerIsGuardian) {
+    throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode acessar esta Intent.');
+  }
+
+  if (intent.visibility === 'FOLLOWERS' && intent.creatorId !== viewerId) {
+    const followsCreator = viewerId
+      ? await client.follow.findUnique({
+          where: { followerId_followingId: { followerId: viewerId, followingId: intent.creatorId } },
+          select: { id: true },
+        })
+      : null;
+    if (!followsCreator) {
+      throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent é visível somente para seguidores.');
+    }
+  }
+  return intent;
+}
+
+export async function requireIntentViewAccess(
+  intentId: string,
+  viewerId: string,
+  client: IntentAccessClient = prisma,
+): Promise<void> {
+  const intent = await client.intent.findUnique({
+    where: { id: intentId },
+    select: {
+      creatorId: true,
+      visibility: true,
+      status: true,
+      guardianIds: true,
+      creator: { select: { status: true } },
+    },
+  });
+  await assertIntentViewAccess(intent, viewerId, client);
+}
+
 function isRevealConditionSatisfied(intent: {
   conditionType: string;
   supportCount: number;
@@ -247,40 +308,9 @@ export async function getIntent(intentId: string, viewerId?: string) {
     },
   });
 
-  if (!intent || (intent.creator.status !== 'ACTIVE' && intent.creatorId !== viewerId)) {
-    throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
-  }
+  intent = await assertIntentViewAccess(intent, viewerId, prisma);
 
-  // Unknown persisted values must never fall through to public access.
-  if (!['PUBLIC', 'FOLLOWERS', 'PRIVATE'].includes(intent.visibility)
-    || !['PUBLISHED', 'REALIZED', 'CANCELLED'].includes(intent.status)) {
-    throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent não está disponível.');
-  }
-
-  const guardianIds = asStringArray(intent.guardianIds);
-  const viewerIsGuardian = Boolean(viewerId && guardianIds.includes(viewerId));
-
-  if (intent.visibility === 'PRIVATE' && intent.creatorId !== viewerId && !viewerIsGuardian) {
-    throw new AppError(403, 'INTENT_FORBIDDEN', 'Você não pode acessar esta Intent.');
-  }
-
-  if (intent.visibility === 'FOLLOWERS' && intent.creatorId !== viewerId) {
-    const followsCreator = viewerId
-      ? await prisma.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: viewerId,
-              followingId: intent.creatorId,
-            },
-          },
-          select: { id: true },
-        })
-      : null;
-
-    if (!followsCreator) {
-      throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent é visível somente para seguidores.');
-    }
-  }
+  const viewerIsGuardian = Boolean(viewerId && asStringArray(intent.guardianIds).includes(viewerId));
 
   const viewerSupport = viewerId
     ? await prisma.support.findUnique({
