@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { createCommentSchema } from '../domain/comment-schemas.js';
 import { prisma } from '../lib/prisma.js';
 import { requireIntentViewAccess } from './intent-service.js';
+import { createNotification } from './notification-service.js';
 
 export const commentSelect = {
   id: true,
@@ -54,6 +55,19 @@ export async function createIntentComment(intentId: string, authorId: string, in
       data: { intentId, authorId, body: command.body },
       select: commentSelect,
     });
+    const intent = await transaction.intent.findUnique({
+      where: { id: intentId },
+      select: { creatorId: true },
+    });
+    if (intent && intent.creatorId !== authorId) {
+      await createNotification(transaction, {
+        userId: intent.creatorId,
+        actorId: authorId,
+        type: 'INTENT_COMMENT_RECEIVED',
+        intentId,
+        deduplicationKey: `comment:${comment.id}`,
+      });
+    }
     return toPublicComment(comment);
   });
 }

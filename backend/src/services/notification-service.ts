@@ -103,3 +103,11 @@ export async function markNotificationRead(userId: string, notificationId: strin
     return toPublicNotification(notification);
   });
 }
+
+export async function markAllNotificationsRead(userId: string) {
+  await prisma.notification.updateMany({
+    where: { userId, readAt: null },
+    data: { readAt: new Date() },
+  });
+  return { success: true };
+}

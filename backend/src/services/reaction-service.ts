@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { requireIntentViewAccess } from './intent-service.js';
+import { createNotification } from './notification-service.js';
 import type { ReactionType } from '../domain/reaction-schemas.js';
 
 export interface ReactionCounts {
@@ -77,6 +78,20 @@ export async function setIntentReaction(
       type,
     },
   });
+
+  const intent = await prisma.intent.findUnique({
+    where: { id: intentId },
+    select: { creatorId: true },
+  });
+  if (intent && intent.creatorId !== userId) {
+    await createNotification(prisma, {
+      userId: intent.creatorId,
+      actorId: userId,
+      type: 'INTENT_REACTION_RECEIVED',
+      intentId,
+      deduplicationKey: `reaction:${intentId}:${userId}`,
+    });
+  }
 
   const summary = await getIntentReactionSummary(intentId, userId);
   return {

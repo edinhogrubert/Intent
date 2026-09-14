@@ -122,7 +122,12 @@ export interface ApiSocialConnection {
 export type NotificationType =
   | 'FOLLOW_RECEIVED'
   | 'SUPPORT_RECEIVED'
-  | 'GUARDIAN_APPROVAL_RECEIVED';
+  | 'GUARDIAN_APPROVAL_RECEIVED'
+  | 'INTENT_REACTION_RECEIVED'
+  | 'INTENT_COMMENT_RECEIVED'
+  | 'INTENT_REALIZED'
+  | 'USER_FOLLOWED'
+  | 'GUARDIAN_ACTION';
 
 export interface ApiNotification {
   id: string;
@@ -313,9 +318,16 @@ export async function getUnreadNotificationCount(): Promise<number> {
 export async function markNotificationRead(id: string): Promise<ApiNotification> {
   const result = await authenticatedRequest<ApiEnvelope<ApiNotification>>(
     `/v1/notifications/${encodeURIComponent(id)}/read`,
-    { method: 'PATCH' },
+    { method: 'POST' },
   );
   return result.data;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await authenticatedRequest<ApiEnvelope<{ success: boolean }>>(
+    '/v1/notifications/read-all',
+    { method: 'POST' },
+  );
 }
 
 async function listProfileConnections(
