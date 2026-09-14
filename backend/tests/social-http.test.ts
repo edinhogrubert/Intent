@@ -13,6 +13,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     support: { findUnique: vi.fn() },
     notification: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
     intentComment: { findMany: vi.fn(), create: vi.fn() },
+    intentReaction: { groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -72,6 +73,8 @@ beforeEach(() => {
   db.notification.updateMany.mockResolvedValue({ count: 0 });
   db.notification.findFirst.mockResolvedValue(null);
   db.intentComment.findMany.mockResolvedValue([]);
+  db.intentReaction.groupBy.mockResolvedValue([]);
+  db.intentReaction.findUnique.mockResolvedValue(null);
   db.$transaction.mockImplementation(async (operation) => operation(db));
 });
 

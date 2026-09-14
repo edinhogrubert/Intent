@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { createIntentSchema } from '../domain/intent-schemas.js';
 import { createCommentSchema } from '../domain/comment-schemas.js';
+import { setReactionSchema } from '../domain/reaction-schemas.js';
 import { AppError } from '../errors.js';
 import { optionalAuthenticatedUser, requireAuthenticatedUser } from '../middleware/auth.js';
 import {
@@ -16,6 +17,7 @@ import {
   supportIntent,
 } from '../services/intent-service.js';
 import { createIntentComment, listIntentComments } from '../services/comment-service.js';
+import { removeIntentReaction, setIntentReaction } from '../services/reaction-service.js';
 
 export const intentsRouter = Router();
 
@@ -25,7 +27,6 @@ const feedQuerySchema = z.object({
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
-
 intentsRouter.get('/feed', optionalAuthenticatedUser, async (request, response, next) => {
   try {
     const query = feedQuerySchema.parse(request.query);
@@ -137,6 +138,27 @@ intentsRouter.post('/:id/guardian-approvals', requireAuthenticatedUser, async (r
     const intentId = identifierSchema.parse(request.params.id);
     const result = await approveGuardianIntent(intentId, request.appUser!.id, request.get('Idempotency-Key'));
     response.status(201).json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.post('/:id/reactions', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const command = setReactionSchema.parse(request.body);
+    const result = await setIntentReaction(intentId, request.appUser!.id, command.type);
+    response.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.delete('/:id/reactions', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const result = await removeIntentReaction(intentId, request.appUser!.id);
+    response.json({ data: result });
   } catch (error) {
     next(error);
   }

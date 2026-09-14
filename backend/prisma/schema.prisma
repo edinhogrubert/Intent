@@ -2,7 +2,6 @@ generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -28,6 +27,7 @@ model User {
   receivedNotifications Notification[] @relation("NotificationRecipient")
   notificationActions Notification[] @relation("NotificationActor")
   authoredComments IntentComment[]
+  reactions      IntentReaction[]
 
   @@map("users")
 }
@@ -75,6 +75,7 @@ model Intent {
   events             DomainEvent[]
   notifications      Notification[]
   comments           IntentComment[]
+  reactions          IntentReaction[]
 
   @@index([status, visibility, createdAt(sort: Desc)])
   @@index([conditionType, revealAt])
@@ -162,4 +163,26 @@ model IntentComment {
   @@index([intentId, createdAt])
   @@index([authorId, createdAt])
   @@map("intent_comments")
+}
+
+enum IntentReactionType {
+  LIKE
+  LOVE
+  CELEBRATE
+}
+
+model IntentReaction {
+  id        String             @id @default(uuid()) @db.Uuid
+  intentId  String             @map("intent_id") @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  type      IntentReactionType
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  intent    Intent             @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([intentId, userId])
+  @@index([intentId, type])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("intent_reactions")
 }

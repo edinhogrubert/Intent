@@ -11,6 +11,7 @@ const { db, key } = vi.hoisted(() => ({
     intent: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     support: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
+    intentReaction: { groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
     domainEvent: { create: vi.fn() },
     notification: { createMany: vi.fn() },
   },
@@ -43,6 +44,8 @@ beforeEach(() => {
   db.domainEvent.create.mockResolvedValue({});
   db.follow.createManyAndReturn.mockResolvedValue([{ id: 'relation' }]);
   db.notification.createMany.mockResolvedValue({ count: 1 });
+  db.intentReaction.groupBy.mockResolvedValue([]);
+  db.intentReaction.findUnique.mockResolvedValue(null);
 });
 
 describe('criação e acesso às Intents', () => {

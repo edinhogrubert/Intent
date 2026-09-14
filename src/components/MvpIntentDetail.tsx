@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, LoaderCircle, Lock, MessageCircle, Users, Vote } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, Heart, LoaderCircle, Lock, MessageCircle, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { approveGuardianIntent, createIntentComment, getIntent, IntentApiError, listIntentComments, removeIntentSupport, supportIntent, type ApiIntent, type ApiIntentComment, type IntentCategory } from '../services/intentApi';
+import {
+  approveGuardianIntent,
+  createIntentComment,
+  getIntent,
+  IntentApiError,
+  listIntentComments,
+  removeIntentReaction,
+  removeIntentSupport,
+  setIntentReaction,
+  supportIntent,
+  type ApiIntent,
+  type ApiIntentComment,
+  type IntentCategory,
+  type ReactionType,
+} from '../services/intentApi';
 
 interface MvpIntentDetailProps { intentId: string; currentUser: UserAccount; onBack: () => void }
 
@@ -45,6 +59,8 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [commentBody, setCommentBody] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [reactionPending, setReactionPending] = useState(false);
+  const [reactionError, setReactionError] = useState('');
 
   async function load() {
     setLoading(true); setError('');
@@ -99,6 +115,27 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     } finally { setSupporting(false); }
   }
 
+  async function handleReaction(type: ReactionType) {
+    if (reactionPending || !intent) return;
+    setReactionPending(true);
+    setReactionError('');
+    try {
+      const isCurrent = intent.viewerReaction === type;
+      const result = isCurrent
+        ? await removeIntentReaction(intent.id)
+        : await setIntentReaction(intent.id, type);
+      setIntent((prev) => prev ? {
+        ...prev,
+        viewerReaction: result.viewerReaction,
+        reactionCounts: result.reactionCounts,
+      } : prev);
+    } catch (caught) {
+      setReactionError(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar a reação.');
+    } finally {
+      setReactionPending(false);
+    }
+  }
+
   return <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
     <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#000666] mb-5"><ArrowLeft className="w-4 h-4"/>Voltar</button>
     {loading && <div className="bg-white border border-[#e4e2de] rounded-2xl p-10 text-center text-sm text-[#666]">Carregando Intent...</div>}
@@ -125,6 +162,73 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
           {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'GUARDIANS' && intent.viewerIsGuardian && <button onClick={() => void handleGuardianApproval()} disabled={supporting || intent.viewerHasApprovedAsGuardian} className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 bg-[#000666] text-white"><Vote className="w-4 h-4"/>{intent.viewerHasApprovedAsGuardian ? 'Aprovação registrada' : supporting ? 'Aprovando...' : 'Aprovar revelação'}</button>}
           {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'DATE' && <p className="text-sm text-[#666] text-center">Esta Intent será aberta automaticamente na data definida.</p>}
           {!isMine && intent.status === 'REALIZED' && <p className="text-sm text-[#2e7d32] font-bold text-center">{intent.viewerHasSupported ? 'Seu apoio está confirmado e registrado nesta realização.' : 'Esta Intent já foi realizada.'}</p>}
+        </div>
+
+        <div className="mt-6 pt-5 border-t border-[#e4e2de]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#666]">Reações sociais</h3>
+            <span className="text-xs text-[#888]">Interação social leve (não é apoio)</span>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => void handleReaction('LIKE')}
+              disabled={reactionPending}
+              aria-pressed={intent.viewerReaction === 'LIKE'}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
+                intent.viewerReaction === 'LIKE'
+                  ? 'bg-[#e0e0ff] border-[#000666] text-[#000666]'
+                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
+              }`}
+            >
+              <ThumbsUp className="w-3.5 h-3.5" />
+              <span>Curtir</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
+                {intent.reactionCounts?.LIKE ?? 0}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleReaction('LOVE')}
+              disabled={reactionPending}
+              aria-pressed={intent.viewerReaction === 'LOVE'}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
+                intent.viewerReaction === 'LOVE'
+                  ? 'bg-[#ffebee] border-[#c62828] text-[#c62828]'
+                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5" />
+              <span>Amar</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
+                {intent.reactionCounts?.LOVE ?? 0}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleReaction('CELEBRATE')}
+              disabled={reactionPending}
+              aria-pressed={intent.viewerReaction === 'CELEBRATE'}
+              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
+                intent.viewerReaction === 'CELEBRATE'
+                  ? 'bg-[#fff8e1] border-[#f57f17] text-[#f57f17]'
+                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Celebrar</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
+                {intent.reactionCounts?.CELEBRATE ?? 0}
+              </span>
+            </button>
+          </div>
+          {reactionError && (
+            <div role="alert" className="mt-2 text-xs text-[#8c1d18]">
+              {reactionError}
+            </div>
+          )}
         </div>
 
         <section className="mt-6 pt-6 border-t border-[#e4e2de]" aria-labelledby="comments-title">
