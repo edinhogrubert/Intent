@@ -123,6 +123,7 @@ export default function App() {
     {notificationsOpen && <NotificationsModal
       onClose={() => setNotificationsOpen(false)}
       onRead={() => setUnreadCount((count) => count === null ? null : Math.max(0, count - 1))}
+      onAllRead={() => setUnreadCount(0)}
     />}
   </div>;
 }
