@@ -11,7 +11,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     domainEvent: { create: vi.fn() },
     follow: { findUnique: vi.fn() },
     support: { findUnique: vi.fn() },
-    notification: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
+    notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
     intentComment: { findMany: vi.fn(), create: vi.fn() },
     intentReaction: { groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
   },
@@ -70,6 +70,7 @@ beforeEach(() => {
   db.support.findUnique.mockResolvedValue(null);
   db.notification.findMany.mockResolvedValue([]);
   db.notification.count.mockResolvedValue(0);
+  db.notification.createMany.mockResolvedValue({ count: 1 });
   db.notification.updateMany.mockResolvedValue({ count: 0 });
   db.notification.findFirst.mockResolvedValue(null);
   db.intentComment.findMany.mockResolvedValue([]);

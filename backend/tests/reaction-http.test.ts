@@ -11,7 +11,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     domainEvent: { create: vi.fn() },
     follow: { findUnique: vi.fn() },
     support: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
-    notification: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
+    notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
     intentComment: { findMany: vi.fn(), create: vi.fn() },
   },
   verifyIdToken: vi.fn(),
@@ -76,6 +76,7 @@ beforeEach(() => {
   db.intentReaction.findUnique.mockResolvedValue(null);
   db.intentReaction.upsert.mockResolvedValue({ id: 'reaction-1', intentId, userId: viewer.id, type: 'LIKE' });
   db.intentReaction.deleteMany.mockResolvedValue({ count: 1 });
+  db.notification.createMany.mockResolvedValue({ count: 1 });
 });
 
 function postJson(path: string, body: unknown, authorization?: string) {
