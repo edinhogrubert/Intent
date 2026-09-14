@@ -8,6 +8,7 @@ import { isSupportConditionSatisfied } from '../domain/support-condition.js';
 import { createIntentSchema } from '../domain/intent-schemas.js';
 import { runIntentMutation } from './intent-mutation.js';
 import { createNotification } from './notification-service.js';
+import { getIntentReactionSummary } from './reaction-service.js';
 
 const publicIntentSelection = {
   id: true,
@@ -345,6 +346,8 @@ export async function getIntent(intentId: string, viewerId?: string) {
     }
   }
 
+  const { reactionCounts, viewerReaction } = await getIntentReactionSummary(intentId, viewerId);
+
   if (intent.status !== 'REALIZED') {
     return {
       ...publicIntent,
@@ -354,6 +357,8 @@ export async function getIntent(intentId: string, viewerId?: string) {
       viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
       revealContent: null,
       viewerHasSupported: Boolean(viewerSupport),
+      reactionCounts,
+      viewerReaction,
     };
   }
 
@@ -380,6 +385,8 @@ export async function getIntent(intentId: string, viewerId?: string) {
     viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
     revealContent,
     viewerHasSupported: Boolean(viewerSupport),
+    reactionCounts,
+    viewerReaction,
   };
 }
 

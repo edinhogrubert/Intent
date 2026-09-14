@@ -68,6 +68,23 @@ export interface ApiIntent {
   viewerHasSupported?: boolean;
   viewerIsGuardian?: boolean;
   viewerHasApprovedAsGuardian?: boolean;
+  reactionCounts?: ReactionCounts;
+  viewerReaction?: ReactionType | null;
+}
+
+export type ReactionType = 'LIKE' | 'LOVE' | 'CELEBRATE';
+
+export interface ReactionCounts {
+  LIKE: number;
+  LOVE: number;
+  CELEBRATE: number;
+  total: number;
+}
+
+export interface IntentReactionResult {
+  intentId: string;
+  viewerReaction: ReactionType | null;
+  reactionCounts: ReactionCounts;
 }
 
 export interface ApiSocialProfile {
@@ -413,6 +430,22 @@ export async function approveGuardianIntent(intentId: string): Promise<GuardianA
   const result = await authenticatedRequest<ApiEnvelope<GuardianApprovalResult>>(
     `/v1/intents/${encodeURIComponent(intentId)}/guardian-approvals`,
     { method: 'POST' },
+  );
+  return result.data;
+}
+
+export async function setIntentReaction(intentId: string, type: ReactionType): Promise<IntentReactionResult> {
+  const result = await authenticatedRequest<ApiEnvelope<IntentReactionResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/reactions`,
+    { method: 'POST', body: JSON.stringify({ type }) },
+  );
+  return result.data;
+}
+
+export async function removeIntentReaction(intentId: string): Promise<IntentReactionResult> {
+  const result = await authenticatedRequest<ApiEnvelope<IntentReactionResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/reactions`,
+    { method: 'DELETE' },
   );
   return result.data;
 }
