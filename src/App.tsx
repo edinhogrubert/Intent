@@ -7,12 +7,13 @@ import { MyIntentsDashboard } from './components/MyIntentsDashboard';
 import { MvpHomeFeed } from './components/MvpHomeFeed';
 import { MvpIntentDetail } from './components/MvpIntentDetail';
 import { MvpSocialProfile } from './components/MvpSocialProfile';
+import { PublicUserProfile } from './components/PublicUserProfile';
 import { NotificationsModal } from './components/NotificationsModal';
 import { auth, onAuthStateChanged, signOut } from './utils/firebase';
 import { logoutUser, setCurrentSessionUser } from './utils/storage';
 import { getUnreadNotificationCount, syncAuthenticatedUser } from './services/intentApi';
 
-type View = 'home' | 'create' | 'mine' | 'detail' | 'profile';
+type View = 'home' | 'create' | 'mine' | 'detail' | 'profile' | 'public-profile';
 type SessionStatus = 'checking' | 'unauthenticated' | 'authenticated' | 'error';
 
 export default function App() {
@@ -82,6 +83,7 @@ export default function App() {
 
   function selectIntent(id: string) { setSelectedIntentId(id); setView('detail'); }
   function selectProfile(id: string) { setSelectedProfileId(id); setView('profile'); }
+  function selectPublicProfile(id: string) { setSelectedProfileId(id); setView('public-profile'); }
 
   if (sessionStatus === 'checking') return <div className="min-h-screen bg-[#f5f6fb] flex items-center justify-center"><div className="w-9 h-9 border-4 border-[#000666] border-t-transparent rounded-full animate-spin"/></div>;
 
@@ -104,7 +106,8 @@ export default function App() {
     <header className="sticky top-0 z-30 bg-white border-b border-[#e4e2de]"><div className="max-w-5xl mx-auto h-16 px-4 flex items-center justify-between"><button onClick={() => setView('home')} className="text-xl font-black tracking-tight text-[#000666]">INTENT</button><nav className="hidden sm:flex items-center gap-1">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { if (id === 'profile') setSelectedProfileId(currentUser.id); setView(id); }} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${view === id ? 'bg-[#e0e0ff] text-[#000666]' : 'text-[#666] hover:bg-[#f5f3ef]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav><div className="flex items-center gap-2"><button type="button" onClick={() => void openNotifications()} className="relative p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label={unreadCount && unreadCount > 0 ? `Abrir notificações: ${unreadCount} não lidas` : 'Abrir notificações'}><Bell className="w-5 h-5"/>{unreadCount !== null && unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#ba1a1a] text-white text-[10px] font-black flex items-center justify-center border-2 border-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button><button onClick={() => selectProfile(currentUser.id)} className="hidden md:block text-right"><p className="text-xs font-bold">{currentUser.name}</p><p className="text-[11px] text-[#666]">@{currentUser.username.replace(/^@+/, '')}</p></button><button onClick={() => void handleLogout()} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Sair"><LogOut className="w-5 h-5"/></button></div></div></header>
 
     <main className="pb-24 sm:pb-8">
-      {view === 'home' && <MvpHomeFeed currentUser={currentUser} onCreate={() => setView('create')} onSelectIntent={selectIntent} onSelectProfile={selectProfile}/>} 
+      {view === 'home' && <MvpHomeFeed currentUser={currentUser} onCreate={() => setView('create')} onSelectIntent={selectIntent} onSelectProfile={selectPublicProfile}/>}
+      {view === 'public-profile' && selectedProfileId && <PublicUserProfile userId={selectedProfileId} onBack={() => setView('home')} onSelectIntent={selectIntent}/>}
       {view === 'create' && <CreationWizard currentUser={currentUser} onCancel={() => setView('home')} onComplete={(created) => { setToast('Intent publicada com sucesso.'); setSelectedIntentId(created.id); setView('detail'); }}/>} 
       {view === 'mine' && <MyIntentsDashboard currentUser={currentUser} onCreateNew={() => setView('create')} onSelectIntent={selectIntent}/>} 
       {view === 'detail' && selectedIntentId && <MvpIntentDetail intentId={selectedIntentId} currentUser={currentUser} onBack={() => setView('home')}/>} 

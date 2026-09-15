@@ -463,3 +463,30 @@ export async function removeIntentReaction(intentId: string): Promise<IntentReac
 }
 
 export { authenticatedRequest };
+
+export interface ApiPublicUserProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stats: {
+    intentsCreated: number;
+    intentsRealized: number;
+    totalSupportReceived: number;
+    totalReactionsReceived: number;
+    totalCommentsReceived: number;
+    publicIntentsCount: number;
+  };
+  intents: Array<{ id: string; title: string; story: string; status: string;
+    createdAt: string; supportCount: number }>;
+}
+
+export async function getPublicUserProfile(userId: string): Promise<ApiPublicUserProfile> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiPublicUserProfile>>(
+    `/v1/users/${encodeURIComponent(userId)}/profile`,
+  );
+  return result.data;
+}
