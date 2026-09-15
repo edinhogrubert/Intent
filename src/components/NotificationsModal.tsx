@@ -12,6 +12,7 @@ interface NotificationsModalProps {
   onClose: () => void;
   onRead: () => void;
   onAllRead?: () => void;
+  onSelectIntent?: (intentId: string) => void;
 }
 
 type NotificationFilter = 'all' | 'unread' | 'read';
@@ -64,7 +65,7 @@ function notificationDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function NotificationsModal({ onClose, onRead, onAllRead }: NotificationsModalProps) {
+export function NotificationsModal({ onClose, onRead, onAllRead, onSelectIntent }: NotificationsModalProps) {
   const [items, setItems] = useState<ApiNotification[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [loading, setLoading] = useState(true);
@@ -108,6 +109,21 @@ export function NotificationsModal({ onClose, onRead, onAllRead }: Notifications
     } finally {
       setMarkingId(null);
     }
+  }
+
+  async function handleNotificationClick(notification: ApiNotification) {
+    if (!notification.intent?.id) return;
+    const targetIntentId = notification.intent.id;
+    if (!notification.readAt) {
+      try {
+        await markNotificationRead(notification.id);
+        onRead();
+      } catch {
+        // Falha de leitura não deve decrementar o contador.
+      }
+    }
+    onSelectIntent?.(targetIntentId);
+    onClose();
   }
 
   async function handleMarkAllAsRead() {
@@ -161,7 +177,24 @@ export function NotificationsModal({ onClose, onRead, onAllRead }: Notifications
         {!loading && error && items.length === 0 && <div role="alert" className="m-5 rounded-xl bg-[#ffdad6] p-4 text-sm text-[#8c1d18] flex gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>{error}</div>}
         {!loading && !error && visibleItems.length === 0 && <div className="p-10 text-center"><Bell className="w-8 h-8 text-[#8b8994] mx-auto mb-3"/><p className="font-bold">{emptyMessages[filter]}</p><p className="text-sm text-[#666] mt-1">As novas atividades aparecerão aqui.</p></div>}
         {error && items.length > 0 && <div role="alert" className="m-4 rounded-xl bg-[#ffdad6] p-3 text-sm text-[#8c1d18]">{error}</div>}
-        <div className="divide-y divide-[#e4e2de]">{visibleItems.map((notification) => <article key={notification.id} className={`p-4 flex gap-3 ${notification.readAt ? 'bg-white' : 'bg-[#f0efff]'}`}>
+        <div className="divide-y divide-[#e4e2de]">{visibleItems.map((notification) => <article
+          key={notification.id}
+          {...(notification.intent?.id ? {
+            role: 'button',
+            tabIndex: 0,
+            onClick: () => void handleNotificationClick(notification),
+            onKeyDown: (event: React.KeyboardEvent) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                void handleNotificationClick(notification);
+              }
+            },
+            'aria-label': `Abrir Intent ${notification.intent.title ? `"${notification.intent.title}"` : ''}`.trim(),
+          } : {})}
+          className={`p-4 flex gap-3 ${notification.intent?.id
+            ? `cursor-pointer transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[#000666] focus-visible:ring-inset ${notification.readAt ? 'bg-white hover:bg-[#f7f6fc]' : 'bg-[#f0efff] hover:bg-[#e4e2fc]'}`
+            : notification.readAt ? 'bg-white' : 'bg-[#f0efff]'}`}
+        >
           <div className="relative shrink-0">
           <div className="w-10 h-10 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black">
             {notification.actor.avatarUrl ? <img src={notification.actor.avatarUrl} alt="" className="w-full h-full object-cover"/> : notification.actor.displayName.charAt(0).toUpperCase()}
@@ -174,7 +207,7 @@ export function NotificationsModal({ onClose, onRead, onAllRead }: Notifications
           </div>
           {notification.readAt
             ? <span className="text-[#28642f]" title="Lida"><Check className="w-4 h-4"/></span>
-            : <button type="button" onClick={() => void markAsRead(notification)} disabled={markingId !== null} className="self-center px-3 py-2 rounded-xl text-xs font-bold text-[#000666] border border-[#b8b7d8] bg-white disabled:opacity-50">{markingId === notification.id ? <LoaderCircle className="w-4 h-4 animate-spin"/> : 'Marcar como lida'}</button>}
+            : <button type="button" onClick={(event) => { event.stopPropagation(); void markAsRead(notification); }} onKeyDown={(event) => event.stopPropagation()} disabled={markingId !== null} className="self-center px-3 py-2 rounded-xl text-xs font-bold text-[#000666] border border-[#b8b7d8] bg-white disabled:opacity-50">{markingId === notification.id ? <LoaderCircle className="w-4 h-4 animate-spin"/> : 'Marcar como lida'}</button>}
         </article>)}</div>
       </div>
     </section>

@@ -124,6 +124,7 @@ export default function App() {
       onClose={() => setNotificationsOpen(false)}
       onRead={() => setUnreadCount((count) => count === null ? null : Math.max(0, count - 1))}
       onAllRead={() => setUnreadCount(0)}
+      onSelectIntent={selectIntent}
     />}
   </div>;
 }
