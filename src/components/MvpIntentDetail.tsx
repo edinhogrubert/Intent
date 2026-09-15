@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, Heart, LoaderCircle, Lock, MessageCircle, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
 import type { UserAccount } from '../types';
 import {
   approveGuardianIntent,
@@ -17,12 +17,22 @@ import {
   type ReactionType,
 } from '../services/intentApi';
 
-interface MvpIntentDetailProps { intentId: string; currentUser: UserAccount; onBack: () => void }
+interface MvpIntentDetailProps {
+  intentId: string;
+  currentUser: UserAccount;
+  onBack: () => void;
+}
 
 const categoryLabels: Record<IntentCategory, string> = {
-  SPORTS: 'Esportes', ENTERTAINMENT: 'Entretenimento', TECHNOLOGY: 'Tecnologia', EDUCATION: 'Educação',
-  HEALTH_WELLNESS: 'Saúde e bem-estar', CAREER_BUSINESS: 'Carreira e negócios', COMMUNITY_CAUSES: 'Comunidade e causas',
-  PERSONAL_LIFE: 'Vida pessoal', OTHER: 'Outros',
+  SPORTS: 'Esportes',
+  ENTERTAINMENT: 'Entretenimento',
+  TECHNOLOGY: 'Tecnologia',
+  EDUCATION: 'Educação',
+  HEALTH_WELLNESS: 'Saúde e bem-estar',
+  CAREER_BUSINESS: 'Carreira e negócios',
+  COMMUNITY_CAUSES: 'Comunidade e causas',
+  PERSONAL_LIFE: 'Vida pessoal',
+  OTHER: 'Outros',
 };
 
 function VisibilityBadge({ visibility }: { visibility: ApiIntent['visibility'] }) {
@@ -32,20 +42,50 @@ function VisibilityBadge({ visibility }: { visibility: ApiIntent['visibility'] }
   if (visibility === 'FOLLOWERS') {
     return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e8f5e9] text-[#2e7d32] text-xs font-bold"><Users className="w-3 h-3" />Seguidores</span>;
   }
-  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold"><Globe className="w-3 h-3" />Publica</span>;
+  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#e0e0ff] text-[#000666] text-xs font-bold"><Globe className="w-3 h-3" />Pública</span>;
 }
 
 function ConditionStatus({ intent }: { intent: ApiIntent }) {
   if (intent.conditionType === 'DATE') {
-    return <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3"><Calendar className="w-5 h-5 text-[#000666] shrink-0"/><div><p className="font-bold text-sm">Revela por data</p><p className="text-xs text-[#666] mt-1">{intent.revealAt ? `Revelacao programada para ${new Date(intent.revealAt).toLocaleString('pt-BR')}.` : 'Data de revelacao nao informada.'}</p></div></div>;
+    return (
+      <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3">
+        <Calendar className="w-5 h-5 text-[#000666] shrink-0 mt-0.5"/>
+        <div>
+          <p className="font-bold text-sm">Revelação por data</p>
+          <p className="text-xs text-[#666] mt-1">
+            {intent.revealAt ? `Revelação programada para ${new Date(intent.revealAt).toLocaleString('pt-BR')}.` : 'Data de revelação não informada.'}
+          </p>
+        </div>
+      </div>
+    );
   }
   if (intent.conditionType === 'GUARDIANS') {
     const approvals = intent.guardianApprovals?.length ?? 0;
     const goal = intent.guardianApprovalGoal ?? 1;
-    return <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3"><Vote className="w-5 h-5 text-[#000666] shrink-0"/><div><p className="font-bold text-sm">Aguardando guardioes</p><p className="text-xs text-[#666] mt-1">{approvals} de {goal} aprovacao(oes). A revelacao abre quando atingir o quorum.</p></div></div>;
+    return (
+      <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3">
+        <Vote className="w-5 h-5 text-[#000666] shrink-0 mt-0.5"/>
+        <div>
+          <p className="font-bold text-sm">Aguardando guardiões</p>
+          <p className="text-xs text-[#666] mt-1">
+            {approvals} de {goal} aprovação(ões). A revelação abre quando atingir o quórum.
+          </p>
+        </div>
+      </div>
+    );
   }
-  const progress = Math.min(100, Math.round(intent.supportCount * 100 / intent.supportGoal));
-  return <div className="mt-6"><div className="flex justify-between text-sm font-bold"><span>{intent.supportCount} de {intent.supportGoal} apoios</span><span>{progress}%</span></div><div className="h-3 bg-[#E0F2F1] rounded-full overflow-hidden mt-2"><div className="h-full bg-[#006a62]" style={{ width: `${progress}%` }}/></div></div>;
+  const progress = Math.min(100, Math.round((intent.supportCount * 100) / intent.supportGoal));
+  return (
+    <div className="mt-6 bg-[#f9f8f6] rounded-2xl p-4 border border-[#e4e2de]">
+      <div className="flex justify-between items-center text-sm font-bold text-[#1a1a1a]">
+        <span>{intent.supportCount} de {intent.supportGoal} apoios</span>
+        <span className="text-[#006a62]">{progress}%</span>
+      </div>
+      <div className="h-3 bg-[#E0F2F1] rounded-full overflow-hidden mt-2">
+        <div className="h-full bg-[#006a62] transition-all duration-300" style={{ width: `${progress}%` }}/>
+      </div>
+    </div>
+  );
 }
 
 export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDetailProps) {
@@ -54,45 +94,70 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [supporting, setSupporting] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
   const [comments, setComments] = useState<ApiIntentComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   const [commentBody, setCommentBody] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
+  const [commentNotice, setCommentNotice] = useState('');
+
   const [reactionPending, setReactionPending] = useState(false);
   const [reactionError, setReactionError] = useState('');
+  const [reactionNotice, setReactionNotice] = useState('');
 
   async function load() {
-    setLoading(true); setError('');
-    try { setIntent(await getIntent(intentId)); }
-    catch (caught) { setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível abrir esta Intent.'); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError('');
+    try {
+      setIntent(await getIntent(intentId));
+    } catch (caught) {
+      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar esta Intent.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadComments() {
-    setComments([]); setCommentsLoading(true); setCommentError('');
-    try { setComments(await listIntentComments(intentId)); }
-    catch (caught) { setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar os comentários.'); }
-    finally { setCommentsLoading(false); }
+    setComments([]);
+    setCommentsLoading(true);
+    setCommentError('');
+    try {
+      setComments(await listIntentComments(intentId));
+    } catch (caught) {
+      setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar os comentários.');
+    } finally {
+      setCommentsLoading(false);
+    }
   }
 
-  useEffect(() => { void load(); void loadComments(); }, [intentId]);
+  useEffect(() => {
+    void load();
+    void loadComments();
+  }, [intentId]);
 
   async function handleComment() {
     const body = commentBody.trim();
     if (!body || commentSubmitting) return;
-    setCommentSubmitting(true); setCommentError('');
+    setCommentSubmitting(true);
+    setCommentError('');
+    setCommentNotice('');
     try {
       const comment = await createIntentComment(intentId, body);
       setComments((current) => [...current, comment]);
       setCommentBody('');
+      setCommentNotice('Comentário publicado com sucesso!');
     } catch (caught) {
-      setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível publicar o comentário.');
-    } finally { setCommentSubmitting(false); }
+      setCommentError(caught instanceof IntentApiError ? caught.message : 'Não foi possível publicar seu comentário. Tente novamente.');
+    } finally {
+      setCommentSubmitting(false);
+    }
   }
 
   async function handleSupport() {
-    setSupporting(true); setError(''); setNotice('');
+    setSupporting(true);
+    setError('');
+    setNotice('');
     try {
       const result = intent?.viewerHasSupported
         ? await removeIntentSupport(intentId)
@@ -101,157 +166,385 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
       setIntent(await getIntent(intentId));
     } catch (caught) {
       setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar o apoio.');
-    } finally { setSupporting(false); }
+    } finally {
+      setSupporting(false);
+    }
   }
 
   async function handleGuardianApproval() {
-    setSupporting(true); setError(''); setNotice('');
+    setSupporting(true);
+    setError('');
+    setNotice('');
     try {
       const result = await approveGuardianIntent(intentId);
       setNotice(result.realizedNow ? 'Sua aprovação realizou esta Intent!' : 'Sua aprovação foi registrada.');
       setIntent(await getIntent(intentId));
     } catch (caught) {
       setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar a aprovação.');
-    } finally { setSupporting(false); }
+    } finally {
+      setSupporting(false);
+    }
   }
 
   async function handleReaction(type: ReactionType) {
     if (reactionPending || !intent) return;
     setReactionPending(true);
     setReactionError('');
+    setReactionNotice('');
     try {
       const isCurrent = intent.viewerReaction === type;
       const result = isCurrent
         ? await removeIntentReaction(intent.id)
         : await setIntentReaction(intent.id, type);
+
       setIntent((prev) => prev ? {
         ...prev,
         viewerReaction: result.viewerReaction,
         reactionCounts: result.reactionCounts,
       } : prev);
+
+      if (isCurrent) {
+        setReactionNotice('Sua reação foi removida.');
+      } else {
+        const labels: Record<ReactionType, string> = {
+          LIKE: '👍 Curtir',
+          LOVE: '❤️ Amar',
+          CELEBRATE: '🎉 Celebrar',
+        };
+        setReactionNotice(`Você reagiu com ${labels[type]}.`);
+      }
     } catch (caught) {
-      setReactionError(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar a reação.');
+      setReactionError(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar sua reação.');
     } finally {
       setReactionPending(false);
     }
   }
 
-  return <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
-    <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#000666] mb-5"><ArrowLeft className="w-4 h-4"/>Voltar</button>
-    {loading && <div className="bg-white border border-[#e4e2de] rounded-2xl p-10 text-center text-sm text-[#666]">Carregando Intent...</div>}
-    {!loading && error && !intent && <div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5 flex gap-3"><AlertCircle className="w-5 h-5"/><div><p className="font-bold">Não foi possível abrir</p><p className="text-sm mt-1">{error}</p></div></div>}
-    {intent && (() => {
-      const isMine = intent.creator.id === currentUser.id;
-      return <article className="bg-white border border-[#e4e2de] rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center font-black">{intent.creator.displayName.charAt(0).toUpperCase()}</div><div><p className="font-bold">{intent.creator.displayName}</p><p className="text-xs text-[#666]">@{intent.creator.username.replace(/^@+/, '')}</p></div></div>
-        <div className="flex flex-wrap gap-2 mt-5">
-          <span className="inline-block px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold">{categoryLabels[intent.category] || 'Outros'}</span>
-          <VisibilityBadge visibility={intent.visibility} />
+  return (
+    <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
+      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#000666] mb-5 hover:underline">
+        <ArrowLeft className="w-4 h-4"/>Voltar
+      </button>
+
+      {loading && (
+        <div className="bg-white border border-[#e4e2de] rounded-2xl p-10 text-center text-sm text-[#666] flex flex-col items-center justify-center gap-3">
+          <LoaderCircle className="w-6 h-6 animate-spin text-[#000666]"/>
+          <span>Carregando Intent...</span>
         </div>
-        <h1 className="text-2xl font-black mt-3">{intent.title}</h1><p className="text-sm text-[#454652] mt-3 whitespace-pre-wrap">{intent.story}</p>
-        <ConditionStatus intent={intent} />
+      )}
 
-        {notice && <div className="mt-5 p-4 bg-[#e8f5e9] text-[#2e7d32] rounded-xl flex items-center gap-2 text-sm font-bold"><CheckCircle2 className="w-5 h-5"/>{notice}</div>}
-        {error && <div className="mt-5 p-4 bg-[#ffdad6] text-[#8c1d18] rounded-xl flex items-center gap-2 text-sm"><AlertCircle className="w-5 h-5"/>{error}</div>}
-
-        {intent.status === 'REALIZED' ? <div className="mt-6 bg-[#e8f5e9] border border-[#a5d6a7] rounded-2xl p-5"><p className="text-xs font-bold text-[#2e7d32] flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/>INTENT REALIZADA</p><h2 className="font-black mt-3">A revelação</h2><p className="text-sm mt-2 whitespace-pre-wrap">{intent.revealContent || 'Conteúdo revelado.'}</p></div> : <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3"><Lock className="w-5 h-5 text-[#000666] shrink-0"/><div><p className="font-bold text-sm">Revelação protegida</p><p className="text-xs text-[#666] mt-1">Será aberta automaticamente quando a condição for cumprida.</p></div></div>}
-
-        <div className="mt-6 pt-5 border-t border-[#e4e2de]">
-          {isMine && <p className="text-sm text-[#666] text-center">Esta Intent é sua. Você acompanha a realização por aqui.</p>}
-          {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'SUPPORT' && <button onClick={() => void handleSupport()} disabled={supporting} aria-pressed={Boolean(intent.viewerHasSupported)} className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 ${intent.viewerHasSupported ? 'bg-[#e8f5e9] border border-[#2e7d32] text-[#28642f]' : 'bg-[#000666] text-white'}`}>{intent.viewerHasSupported ? <CheckCircle2 className="w-4 h-4"/> : <Users className="w-4 h-4"/>}{supporting ? 'Atualizando...' : intent.viewerHasSupported ? 'Apoiado — clicar para retirar' : 'Apoiar esta Intent'}</button>}
-          {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'GUARDIANS' && intent.viewerIsGuardian && <button onClick={() => void handleGuardianApproval()} disabled={supporting || intent.viewerHasApprovedAsGuardian} className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 bg-[#000666] text-white"><Vote className="w-4 h-4"/>{intent.viewerHasApprovedAsGuardian ? 'Aprovação registrada' : supporting ? 'Aprovando...' : 'Aprovar revelação'}</button>}
-          {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'DATE' && <p className="text-sm text-[#666] text-center">Esta Intent será aberta automaticamente na data definida.</p>}
-          {!isMine && intent.status === 'REALIZED' && <p className="text-sm text-[#2e7d32] font-bold text-center">{intent.viewerHasSupported ? 'Seu apoio está confirmado e registrado nesta realização.' : 'Esta Intent já foi realizada.'}</p>}
-        </div>
-
-        <div className="mt-6 pt-5 border-t border-[#e4e2de]">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#666]">Reações sociais</h3>
-            <span className="text-xs text-[#888]">Interação social leve (não é apoio)</span>
+      {!loading && error && !intent && (
+        <div className="bg-[#ffdad6] text-[#8c1d18] rounded-2xl p-5 flex gap-3 items-start">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5"/>
+          <div>
+            <p className="font-bold">Não foi possível carregar a Intent</p>
+            <p className="text-sm mt-1">{error}</p>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => void handleReaction('LIKE')}
-              disabled={reactionPending}
-              aria-pressed={intent.viewerReaction === 'LIKE'}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
-                intent.viewerReaction === 'LIKE'
-                  ? 'bg-[#e0e0ff] border-[#000666] text-[#000666]'
-                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
-              }`}
-            >
-              <ThumbsUp className="w-3.5 h-3.5" />
-              <span>Curtir</span>
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
-                {intent.reactionCounts?.LIKE ?? 0}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleReaction('LOVE')}
-              disabled={reactionPending}
-              aria-pressed={intent.viewerReaction === 'LOVE'}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
-                intent.viewerReaction === 'LOVE'
-                  ? 'bg-[#ffebee] border-[#c62828] text-[#c62828]'
-                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
-              }`}
-            >
-              <Heart className="w-3.5 h-3.5" />
-              <span>Amar</span>
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
-                {intent.reactionCounts?.LOVE ?? 0}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleReaction('CELEBRATE')}
-              disabled={reactionPending}
-              aria-pressed={intent.viewerReaction === 'CELEBRATE'}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border disabled:opacity-60 ${
-                intent.viewerReaction === 'CELEBRATE'
-                  ? 'bg-[#fff8e1] border-[#f57f17] text-[#f57f17]'
-                  : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f5f3ef]'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Celebrar</span>
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-black/5 text-[10px]">
-                {intent.reactionCounts?.CELEBRATE ?? 0}
-              </span>
-            </button>
-          </div>
-          {reactionError && (
-            <div role="alert" className="mt-2 text-xs text-[#8c1d18]">
-              {reactionError}
-            </div>
-          )}
         </div>
+      )}
 
-        <section className="mt-6 pt-6 border-t border-[#e4e2de]" aria-labelledby="comments-title">
-          <h2 id="comments-title" className="font-black flex items-center gap-2"><MessageCircle className="w-5 h-5 text-[#000666]"/>Comentários</h2>
+      {intent && (() => {
+        const isMine = intent.creator.id === currentUser.id;
+        const totalReactions = Object.values(intent.reactionCounts ?? {}).reduce((acc, count) => acc + count, 0);
 
-          {commentsLoading && <div className="py-8 text-center text-sm text-[#666]"><LoaderCircle className="w-5 h-5 animate-spin mx-auto mb-2"/>Carregando comentários...</div>}
-          {!commentsLoading && comments.length === 0 && !commentError && <p className="py-8 text-center text-sm text-[#666]">Nenhum comentário ainda.</p>}
-          {commentError && <div role="alert" className="mt-4 p-3 bg-[#ffdad6] text-[#8c1d18] rounded-xl text-sm flex gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>{commentError}</div>}
-
-          {!commentsLoading && comments.length > 0 && <div className="mt-4 divide-y divide-[#e4e2de]">{comments.map((comment) => <article key={comment.id} className="py-4 flex gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black shrink-0">
-              {comment.author.avatarUrl ? <img src={comment.author.avatarUrl} alt="" className="w-full h-full object-cover"/> : comment.author.displayName.charAt(0).toUpperCase()}
+        return (
+          <article className="bg-white border border-[#e4e2de] rounded-2xl p-5 sm:p-7 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-[#e0e0ff] text-[#000666] flex items-center justify-center font-black text-base shrink-0">
+                {intent.creator.displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-[#1a1a1a] truncate">{intent.creator.displayName}</p>
+                <p className="text-xs text-[#666] truncate">@{intent.creator.username.replace(/^@+/, '')}</p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-baseline gap-x-2"><p className="text-sm font-bold">{comment.author.displayName}</p><p className="text-xs text-[#666]">@{comment.author.username.replace(/^@+/, '')}</p></div><p className="mt-1 text-sm text-[#454652] whitespace-pre-wrap break-words">{comment.body}</p><time className="mt-1 block text-xs text-[#777]" dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleString('pt-BR')}</time></div>
-          </article>)}</div>}
 
-          <form className="mt-5" onSubmit={(event) => { event.preventDefault(); void handleComment(); }}>
-            <label htmlFor="intent-comment" className="text-sm font-bold">Novo comentário</label>
-            <textarea id="intent-comment" value={commentBody} maxLength={500} onChange={(event) => setCommentBody(event.target.value)} rows={3} placeholder="Escreva um comentário..." className="mt-2 w-full resize-none rounded-xl border border-[#c6c5d4] bg-[#fbf9f5] px-4 py-3 text-sm outline-none focus:border-[#000666]"/>
-            <div className="mt-2 flex items-center justify-between gap-4"><span className="text-xs text-[#666]">{commentBody.length}/500</span><button type="submit" disabled={commentSubmitting || commentBody.trim().length === 0} className="px-5 py-2.5 rounded-xl bg-[#000666] text-white text-sm font-bold disabled:opacity-50">{commentSubmitting ? 'Publicando...' : 'Comentar'}</button></div>
-          </form>
-        </section>
-      </article>;
-    })()}
-  </div>;
+            <div className="flex flex-wrap gap-2 mt-5">
+              <span className="inline-block px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold">
+                {categoryLabels[intent.category] || 'Outros'}
+              </span>
+              <VisibilityBadge visibility={intent.visibility} />
+            </div>
+
+            <h1 className="text-2xl font-black mt-3 text-[#1a1a1a] leading-tight">{intent.title}</h1>
+            <p className="text-sm text-[#454652] mt-3 whitespace-pre-wrap leading-relaxed">{intent.story}</p>
+
+            <ConditionStatus intent={intent} />
+
+            {notice && (
+              <div className="mt-5 p-4 bg-[#e8f5e9] text-[#2e7d32] rounded-xl flex items-center gap-2 text-sm font-bold">
+                <CheckCircle2 className="w-5 h-5 shrink-0"/>
+                <span>{notice}</span>
+              </div>
+            )}
+            {error && (
+              <div className="mt-5 p-4 bg-[#ffdad6] text-[#8c1d18] rounded-xl flex items-center gap-2 text-sm">
+                <AlertCircle className="w-5 h-5 shrink-0"/>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {intent.status === 'REALIZED' ? (
+              <div className="mt-6 bg-[#e8f5e9] border border-[#a5d6a7] rounded-2xl p-5">
+                <p className="text-xs font-bold text-[#2e7d32] flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4"/>INTENT REALIZADA
+                </p>
+                <h2 className="font-black mt-3 text-lg text-[#1b5e20]">A revelação</h2>
+                <p className="text-sm mt-2 whitespace-pre-wrap text-[#2e7d32] leading-relaxed">{intent.revealContent || 'Conteúdo revelado.'}</p>
+              </div>
+            ) : (
+              <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3 items-start">
+                <Lock className="w-5 h-5 text-[#000666] shrink-0 mt-0.5"/>
+                <div>
+                  <p className="font-bold text-sm">Revelação protegida</p>
+                  <p className="text-xs text-[#666] mt-1">Será aberta automaticamente quando a condição for cumprida.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 pt-5 border-t border-[#e4e2de]">
+              {isMine && <p className="text-sm text-[#666] text-center">Esta Intent é sua. Você acompanha a realização por aqui.</p>}
+              {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'SUPPORT' && (
+                <button
+                  onClick={() => void handleSupport()}
+                  disabled={supporting}
+                  aria-pressed={Boolean(intent.viewerHasSupported)}
+                  className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 transition-colors ${
+                    intent.viewerHasSupported
+                      ? 'bg-[#e8f5e9] border border-[#2e7d32] text-[#28642f]'
+                      : 'bg-[#000666] text-white hover:bg-[#000444]'
+                  }`}
+                >
+                  {supporting ? <LoaderCircle className="w-4 h-4 animate-spin"/> : intent.viewerHasSupported ? <CheckCircle2 className="w-4 h-4"/> : <Users className="w-4 h-4"/>}
+                  {supporting ? 'Atualizando...' : intent.viewerHasSupported ? 'Apoiado — clicar para retirar' : 'Apoiar esta Intent'}
+                </button>
+              )}
+              {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'GUARDIANS' && intent.viewerIsGuardian && (
+                <button
+                  onClick={() => void handleGuardianApproval()}
+                  disabled={supporting || intent.viewerHasApprovedAsGuardian}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 bg-[#000666] text-white hover:bg-[#000444]"
+                >
+                  {supporting ? <LoaderCircle className="w-4 h-4 animate-spin"/> : <Vote className="w-4 h-4"/>}
+                  {intent.viewerHasApprovedAsGuardian ? 'Aprovação registrada' : supporting ? 'Aprovando...' : 'Aprovar revelação'}
+                </button>
+              )}
+              {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'DATE' && (
+                <p className="text-sm text-[#666] text-center">Esta Intent será aberta automaticamente na data definida.</p>
+              )}
+              {!isMine && intent.status === 'REALIZED' && (
+                <p className="text-sm text-[#2e7d32] font-bold text-center">
+                  {intent.viewerHasSupported ? 'Seu apoio está confirmado e registrado nesta realização.' : 'Esta Intent já foi realizada.'}
+                </p>
+              )}
+            </div>
+
+            {/* REAÇÕES SOCIAIS */}
+            <div className="mt-6 pt-5 border-t border-[#e4e2de]">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[#1a1a1a]">Reações</h3>
+                  {totalReactions > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0efff] text-[#000666] font-bold">
+                      {totalReactions}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-[#777] flex items-center gap-1">
+                  <Info className="w-3 h-3 text-[#999]"/>
+                  Interação social leve (para trocar, escolha outra; para remover, toque novamente)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => void handleReaction('LIKE')}
+                  disabled={reactionPending}
+                  aria-pressed={intent.viewerReaction === 'LIKE'}
+                  className={`min-h-[44px] py-2.5 px-3.5 rounded-xl text-xs font-bold flex items-center justify-between sm:justify-center gap-2 transition-all border disabled:opacity-60 ${
+                    intent.viewerReaction === 'LIKE'
+                      ? 'bg-[#e0e0ff] border-[#000666] text-[#000666] ring-1 ring-[#000666]'
+                      : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#f0efff] hover:border-[#c0c0f0]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <ThumbsUp className={`w-4 h-4 ${intent.viewerReaction === 'LIKE' ? 'text-[#000666]' : 'text-[#666]'}`} />
+                    <span>Curtir</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full bg-black/5 text-xs font-bold">
+                      {intent.reactionCounts?.LIKE ?? 0}
+                    </span>
+                    {intent.viewerReaction === 'LIKE' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#000666] text-white font-bold">Sua reação</span>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleReaction('LOVE')}
+                  disabled={reactionPending}
+                  aria-pressed={intent.viewerReaction === 'LOVE'}
+                  className={`min-h-[44px] py-2.5 px-3.5 rounded-xl text-xs font-bold flex items-center justify-between sm:justify-center gap-2 transition-all border disabled:opacity-60 ${
+                    intent.viewerReaction === 'LOVE'
+                      ? 'bg-[#ffebee] border-[#c62828] text-[#c62828] ring-1 ring-[#c62828]'
+                      : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#ffebee] hover:border-[#ffcdd2]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Heart className={`w-4 h-4 ${intent.viewerReaction === 'LOVE' ? 'text-[#c62828] fill-[#c62828]' : 'text-[#666]'}`} />
+                    <span>Amar</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full bg-black/5 text-xs font-bold">
+                      {intent.reactionCounts?.LOVE ?? 0}
+                    </span>
+                    {intent.viewerReaction === 'LOVE' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#c62828] text-white font-bold">Sua reação</span>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleReaction('CELEBRATE')}
+                  disabled={reactionPending}
+                  aria-pressed={intent.viewerReaction === 'CELEBRATE'}
+                  className={`min-h-[44px] py-2.5 px-3.5 rounded-xl text-xs font-bold flex items-center justify-between sm:justify-center gap-2 transition-all border disabled:opacity-60 ${
+                    intent.viewerReaction === 'CELEBRATE'
+                      ? 'bg-[#fff8e1] border-[#f57f17] text-[#e65100] ring-1 ring-[#f57f17]'
+                      : 'bg-[#fbf9f5] border-[#e4e2de] text-[#454652] hover:bg-[#fff8e1] hover:border-[#ffe082]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className={`w-4 h-4 ${intent.viewerReaction === 'CELEBRATE' ? 'text-[#f57f17]' : 'text-[#666]'}`} />
+                    <span>Celebrar</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 rounded-full bg-black/5 text-xs font-bold">
+                      {intent.reactionCounts?.CELEBRATE ?? 0}
+                    </span>
+                    {intent.viewerReaction === 'CELEBRATE' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f57f17] text-white font-bold">Sua reação</span>
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {reactionNotice && (
+                <div role="status" className="mt-3 px-3 py-2 bg-[#e8f5e9] text-[#2e7d32] rounded-lg text-xs font-bold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{reactionNotice}</span>
+                </div>
+              )}
+
+              {reactionError && (
+                <div role="alert" className="mt-3 px-3 py-2 bg-[#ffdad6] text-[#8c1d18] rounded-lg text-xs font-medium flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{reactionError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* COMENTÁRIOS */}
+            <section className="mt-6 pt-6 border-t border-[#e4e2de]" aria-labelledby="comments-title">
+              <div className="flex items-center justify-between mb-4">
+                <h2 id="comments-title" className="font-black text-lg text-[#1a1a1a] flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-[#000666]"/>
+                  Comentários
+                </h2>
+                {comments.length > 0 && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] font-bold">
+                    {comments.length}
+                  </span>
+                )}
+              </div>
+
+              {commentsLoading && (
+                <div className="py-8 text-center text-sm text-[#666] flex flex-col items-center justify-center gap-2">
+                  <LoaderCircle className="w-5 h-5 animate-spin text-[#000666]"/>
+                  <span>Carregando comentários...</span>
+                </div>
+              )}
+
+              {!commentsLoading && comments.length === 0 && !commentError && (
+                <div className="py-8 text-center bg-[#fbf9f5] border border-dashed border-[#e4e2de] rounded-2xl p-6">
+                  <MessageCircle className="w-8 h-8 text-[#a09e98] mx-auto mb-2" />
+                  <p className="font-bold text-sm text-[#333]">Seja o primeiro a comentar nesta Intent</p>
+                  <p className="text-xs text-[#666] mt-1">Participe da conversa e compartilhe suas impressões com a comunidade.</p>
+                </div>
+              )}
+
+              {commentError && (
+                <div role="alert" className="mt-3 p-3.5 bg-[#ffdad6] text-[#8c1d18] rounded-xl text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0"/>
+                  <span>{commentError}</span>
+                </div>
+              )}
+
+              {!commentsLoading && comments.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {comments.map((comment) => (
+                    <article key={comment.id} className="p-4 bg-[#fbf9f5] border border-[#e4e2de] rounded-xl flex gap-3 shadow-xs">
+                      <div className="w-9 h-9 rounded-full bg-[#e0e0ff] text-[#000666] overflow-hidden flex items-center justify-center font-black text-sm shrink-0">
+                        {comment.author.avatarUrl ? (
+                          <img src={comment.author.avatarUrl} alt="" className="w-full h-full object-cover"/>
+                        ) : (
+                          comment.author.displayName.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                          <p className="text-sm font-bold text-[#1a1a1a]">{comment.author.displayName}</p>
+                          <p className="text-xs text-[#666]">@{comment.author.username.replace(/^@+/, '')}</p>
+                        </div>
+                        <p className="mt-1.5 text-sm text-[#333] whitespace-pre-wrap break-words leading-relaxed">{comment.body}</p>
+                        <time className="mt-2 block text-[11px] text-[#888]" dateTime={comment.createdAt}>
+                          {new Date(comment.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                        </time>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {commentNotice && (
+                <div role="status" className="mt-4 p-3 bg-[#e8f5e9] text-[#2e7d32] rounded-xl text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0"/>
+                  <span>{commentNotice}</span>
+                </div>
+              )}
+
+              <form className="mt-5" onSubmit={(event) => { event.preventDefault(); void handleComment(); }}>
+                <label htmlFor="intent-comment" className="text-sm font-bold text-[#1a1a1a] block">Novo comentário</label>
+                <textarea
+                  id="intent-comment"
+                  value={commentBody}
+                  maxLength={500}
+                  onChange={(event) => setCommentBody(event.target.value)}
+                  rows={3}
+                  disabled={commentSubmitting}
+                  placeholder="Escreva seu comentário sobre esta Intent..."
+                  className="mt-2 w-full resize-none rounded-xl border border-[#c6c5d4] bg-[#fbf9f5] px-4 py-3 text-sm outline-none focus:border-[#000666] focus:bg-white disabled:opacity-60 transition-colors"
+                />
+                <div className="mt-2 flex items-center justify-between gap-4">
+                  <span className="text-xs text-[#666]">{commentBody.length}/500</span>
+                  <button
+                    type="submit"
+                    disabled={commentSubmitting || commentBody.trim().length === 0}
+                    className="px-5 py-2.5 rounded-xl bg-[#000666] text-white text-sm font-bold hover:bg-[#000444] disabled:opacity-50 flex items-center gap-2 transition-colors"
+                  >
+                    {commentSubmitting && <LoaderCircle className="w-4 h-4 animate-spin"/>}
+                    <span>{commentSubmitting ? 'Publicando...' : 'Comentar'}</span>
+                  </button>
+                </div>
+              </form>
+            </section>
+          </article>
+        );
+      })()}
+    </div>
+  );
 }
