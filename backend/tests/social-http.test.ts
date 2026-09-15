@@ -5,15 +5,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // Real app, routes, authentication middleware and feed services; no external I/O.
 const { db, verifyIdToken } = vi.hoisted(() => ({
   db: {
-    user: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
-    intent: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
+    user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+    intent: { count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
     domainEvent: { create: vi.fn() },
     follow: { findUnique: vi.fn() },
-    support: { findUnique: vi.fn() },
+    support: { count: vi.fn(), findUnique: vi.fn() },
     notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
-    intentComment: { findMany: vi.fn(), create: vi.fn() },
-    intentReaction: { groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
+    intentComment: { count: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+    intentReaction: { count: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -82,6 +82,76 @@ beforeEach(() => {
 function get(path: string, authorization?: string) {
   return fetch(`${baseUrl}${path}`, { headers: authorization ? { authorization } : {} });
 }
+
+describe('perfil público HTTP', () => {
+  const path = `/v1/users/${creatorId}/profile`;
+  it('exige autenticação sem consultar perfil público', async () => {
+    expect((await get(path)).status).toBe(401);
+    expect(db.user.findFirst).not.toHaveBeenCalled();
+  });
+
+  it.each(['inexistente', 'suspenso'])('oculta usuário %s', async () => {
+    db.user.findFirst.mockResolvedValue(null);
+    const response = await get(path, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(404);
+    expect(db.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: creatorId, status: 'ACTIVE' },
+    }));
+    expect(db.intent.findMany).not.toHaveBeenCalled();
+  });
+
+  it('retorna allowlist pública e estatísticas sem dados sensíveis', async () => {
+    db.user.findFirst.mockResolvedValue({ ...viewer, id: creatorId });
+    db.intent.count.mockResolvedValueOnce(3).mockResolvedValueOnce(1);
+    db.support.count.mockResolvedValue(7);
+    db.intentReaction.count.mockResolvedValue(4);
+    db.intentComment.count.mockResolvedValue(2);
+    const response = await get(path, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(Object.keys(data).sort()).toEqual(['id', 'username', 'displayName', 'bio', 'avatarUrl', 'createdAt', 'updatedAt', 'stats', 'intents'].sort());
+    expect(data.stats).toEqual({ intentsCreated: 3, intentsRealized: 1,
+      totalSupportReceived: 7, totalReactionsReceived: 4,
+      totalCommentsReceived: 2, publicIntentsCount: 3 });
+    expect(data.intents).toEqual([]);
+    expect(db.user.findFirst.mock.calls[0]![0].select).toEqual({
+      id: true, username: true, displayName: true, bio: true,
+      avatarUrl: true, createdAt: true, updatedAt: true,
+    });
+  });
+
+  it('restringe lista e todos os agregados a Intents públicas, inclusive do próprio usuário', async () => {
+    db.user.findFirst.mockResolvedValue(viewer);
+    const publicIntent = { id: intentId, title: 'Acontecimento', story: 'História pública',
+      status: 'PUBLISHED', createdAt: viewer.createdAt, supportCount: 2 };
+    const records = [{ ...publicIntent, visibility: 'PUBLIC' },
+      { ...publicIntent, id: 'private', visibility: 'PRIVATE' },
+      { ...publicIntent, id: 'followers', visibility: 'FOLLOWERS' }];
+    db.intent.findMany.mockImplementation(async ({ where }) => records
+      .filter((record) => record.visibility === where.visibility)
+      .map(({ visibility: _visibility, ...record }) => record));
+    db.intent.count.mockResolvedValue(1);
+    db.support.count.mockResolvedValue(2);
+    db.intentReaction.count.mockResolvedValue(0);
+    db.intentComment.count.mockResolvedValue(0);
+    const response = await get(`/v1/users/${viewer.id}/profile`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.intents).toEqual([{ ...publicIntent, createdAt: viewer.createdAt.toISOString() }]);
+    const scope = { creatorId: viewer.id, visibility: 'PUBLIC',
+      status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE' } };
+    expect(db.intent.findMany).toHaveBeenCalledWith({ where: scope, take: 20,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, title: true, story: true, status: true, createdAt: true, supportCount: true } });
+    expect(db.intent.count).toHaveBeenCalledWith({ where: scope });
+    expect(db.intent.count).toHaveBeenCalledWith({ where: { ...scope, status: 'REALIZED' } });
+    expect(db.support.count).toHaveBeenCalledWith({ where: { intent: scope } });
+    expect(db.intentReaction.count).toHaveBeenCalledWith({ where: { intent: scope } });
+    expect(db.intentComment.count).toHaveBeenCalledWith({ where: { intent: scope, author: { status: 'ACTIVE' } } });
+    expect(db.domainEvent.create).not.toHaveBeenCalled();
+    expect(db.intent.create).not.toHaveBeenCalled();
+  });
+});
 
 describe('regressão HTTP dos feeds e autenticação', () => {
   it.each(['/v1/intents/feed', '/v1/intents/feed?scope=public'])('Para você permite leitura anônima (%s)', async (path) => {

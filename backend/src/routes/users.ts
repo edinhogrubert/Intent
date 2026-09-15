@@ -6,6 +6,7 @@ import { updateProfileSchema } from '../domain/intent-schemas.js';
 import { publicUserSelect, toPublicUser } from '../domain/public-user.js';
 import { prisma } from '../lib/prisma.js';
 import { followUser, getSocialProfile, listConnections, unfollowUser } from '../services/social-service.js';
+import { getPublicUserProfile } from '../services/public-profile-service.js';
 
 export const usersRouter = Router();
 const userIdSchema = z.string().uuid();
@@ -19,6 +20,15 @@ const userSearchQuerySchema = z.object({
 });
 
 usersRouter.use(requireAuthenticatedUser);
+
+usersRouter.get('/:id/profile', async (request, response, next) => {
+  try {
+    const userId = userIdSchema.parse(request.params.id);
+    response.json({ data: await getPublicUserProfile(userId) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 usersRouter.post('/me/sync', (request, response) => {
   response.status(200).json({ data: toPublicUser(request.appUser!) });
