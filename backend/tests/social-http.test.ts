@@ -10,10 +10,10 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     $transaction: vi.fn(),
     domainEvent: { create: vi.fn() },
     follow: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn().mockResolvedValue(0), createManyAndReturn: vi.fn().mockResolvedValue([]), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    support: { count: vi.fn(), findUnique: vi.fn() },
+    support: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn() },
     notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
     intentComment: { count: vi.fn(), findMany: vi.fn(), create: vi.fn() },
-    intentReaction: { count: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
+    intentReaction: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
   },
   verifyIdToken: vi.fn(),
 }));
@@ -73,6 +73,8 @@ beforeEach(() => {
   db.follow.deleteMany.mockResolvedValue({ count: 0 });
   db.intent.count.mockResolvedValue(0);
   db.support.count.mockResolvedValue(0);
+  db.support.findMany.mockResolvedValue([]);
+  db.intentReaction.findMany.mockResolvedValue([]);
   db.support.findUnique.mockResolvedValue(null);
   db.notification.findMany.mockResolvedValue([]);
   db.notification.count.mockResolvedValue(0);
@@ -241,12 +243,69 @@ describe('rotas HTTP de seguir e deixar de seguir', () => {
 });
 
 describe('regressão HTTP dos feeds e autenticação', () => {
-  it.each(['/v1/intents/feed', '/v1/intents/feed?scope=public'])('Para você permite leitura anônima (%s)', async (path) => {
+  it.each(['/v1/intents/feed', '/v1/intents/feed?scope=public', '/v1/intents/feed?scope=all'])('Para você permite leitura anônima (%s)', async (path) => {
     const response = await get(path);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ data: { items: [], nextCursor: null } });
     expect(db.intent.findMany.mock.calls[0]![0].where.visibility).toBe('PUBLIC');
     expect(verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it('Seguindo retorna Intents de usuários seguidos e respeita paginação', async () => {
+    const mockIntent = {
+      id: intentId,
+      type: 'SUPPORT_REVEAL',
+      conditionType: 'SUPPORT',
+      status: 'PUBLISHED',
+      visibility: 'PUBLIC',
+      category: 'TECHNOLOGY',
+      title: 'Acontecimento de quem eu sigo',
+      story: 'História do acontecimento',
+      supportGoal: 10,
+      supportCount: 3,
+      revealAt: null,
+      guardianApprovalGoal: null,
+      publishedAt: new Date().toISOString(),
+      realizedAt: null,
+      createdAt: new Date().toISOString(),
+      creator: {
+        id: creatorId,
+        username: 'criador',
+        displayName: 'Criador Seguido',
+        avatarUrl: null,
+        status: 'ACTIVE',
+      },
+    };
+    db.intent.findMany.mockResolvedValue([mockIntent, { ...mockIntent, id: '20000000-0000-4000-8000-000000000002' }]);
+
+    db.intentReaction.groupBy.mockResolvedValue([{ intentId, type: 'LOVE', _count: { _all: 2 } }]);
+    db.intentReaction.findMany.mockResolvedValue([{ intentId, type: 'LOVE' }]);
+    db.support.findMany.mockResolvedValue([{ intentId }]);
+    const response = await get('/v1/intents/feed?scope=following&limit=1', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.items).toHaveLength(1);
+    expect(data.items[0]).toMatchObject({
+      id: intentId,
+      title: 'Acontecimento de quem eu sigo',
+      creator: { id: creatorId, username: 'criador', displayName: 'Criador Seguido' },
+    });
+    expect(data.items[0].creator).not.toHaveProperty('email');
+    expect(data.items[0].creator).not.toHaveProperty('firebaseUid');
+    expect(data.items[0]).not.toHaveProperty('revealCiphertext');
+    expect(data.items[0]).toMatchObject({ reactionCounts: { LIKE: 0, LOVE: 2, CELEBRATE: 0, total: 2 }, viewerReaction: 'LOVE', viewerHasSupported: true });
+    const query = db.intent.findMany.mock.calls[0]![0];
+    expect(query.where).toEqual({ visibility: 'PUBLIC', status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE', followers: { some: { followerId: viewer.id } } } });
+    expect(query.select.creator.select).toEqual({ id: true, username: true, displayName: true, avatarUrl: true });
+    for (const field of ['email', 'firebaseUid', 'passwordHash']) expect(data.items[0].creator).not.toHaveProperty(field);
+    for (const field of ['revealCiphertext', 'revealIv', 'revealAuthTag']) {
+      expect(data.items[0]).not.toHaveProperty(field);
+      expect(query.select).not.toHaveProperty(field);
+    }
+    expect(db.support.findMany).toHaveBeenCalledWith({ where: { userId: viewer.id, intentId: { in: [intentId] } }, select: { intentId: true } });
+    expect(db.intentReaction.groupBy.mock.calls[0]![0].where).toEqual({ intentId: { in: [intentId] } });
+    expect(data.nextCursor).toBe(intentId);
+    expect(db.intent.findMany.mock.calls[0]![0].orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
   });
 
   it('Seguindo exige autenticação mesmo sem dados no feed', async () => {
@@ -1082,5 +1141,18 @@ describe('Bloco 22 — identidade social pública', () => {
     expect(db.follow.deleteMany).not.toHaveBeenCalled();
     expect(db.intentComment.create).not.toHaveBeenCalled();
     expect(db.intentReaction.upsert).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('Bloco 23 — feed seguindo vazio', () => {
+  it('sem seguidos retorna página vazia sem consultas sociais adicionais', async () => {
+    db.intent.findMany.mockResolvedValue([]);
+    const response = await get('/v1/intents/feed?scope=following', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { items: [], nextCursor: null } });
+    expect(db.intentReaction.groupBy).not.toHaveBeenCalled();
+    expect(db.intentReaction.findMany).not.toHaveBeenCalled();
+    expect(db.support.findMany).not.toHaveBeenCalled();
   });
 });

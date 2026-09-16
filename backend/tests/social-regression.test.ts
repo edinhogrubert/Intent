@@ -10,8 +10,8 @@ const { db, key } = vi.hoisted(() => ({
     user: { findUnique: vi.fn() },
     intent: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
-    support: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
-    intentReaction: { groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
+    support: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
+    intentReaction: { findMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
     domainEvent: { create: vi.fn() },
     notification: { createMany: vi.fn() },
   },
@@ -40,6 +40,8 @@ beforeEach(() => {
   db.intent.findUnique.mockResolvedValue({ ...intent });
   db.user.findUnique.mockResolvedValue(creator);
   db.follow.findUnique.mockResolvedValue(null);
+  db.support.findMany.mockResolvedValue([]);
+  db.intentReaction.findMany.mockResolvedValue([]);
   db.support.findUnique.mockResolvedValue(null);
   db.domainEvent.create.mockResolvedValue({});
   db.follow.createManyAndReturn.mockResolvedValue([{ id: 'relation' }]);
@@ -173,16 +175,18 @@ describe('contratos de consulta dos feeds', () => {
     expect(db.intent.findMany.mock.calls[0]![0].where).toEqual({ visibility: 'PUBLIC', status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE' } });
   });
 
-  it('Seguindo aceita públicas e exclusivas apenas de criadores ativos seguidos pelo visitante', async () => {
+  it('Seguindo aceita apenas públicas de criadores ativos seguidos pelo visitante', async () => {
     db.intent.findMany.mockResolvedValue([]);
     expect(await listFollowingFeed(viewerId)).toEqual({ items: [], nextCursor: null });
-    expect(db.intent.findMany.mock.calls[0]![0].where).toEqual({ visibility: { in: ['PUBLIC', 'FOLLOWERS'] }, status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE', followers: { some: { followerId: viewerId } } } });
+    expect(db.intent.findMany.mock.calls[0]![0].where).toEqual({ visibility: 'PUBLIC', status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE', followers: { some: { followerId: viewerId } } } });
   });
 
   it.each(['public', 'following'] as const)('pagina o feed %s sem entregar o item extra ou selecionar segredos', async (scope) => {
     db.intent.findMany.mockResolvedValue([{ id: 'first' }, { id: 'second' }, { id: 'extra' }]);
     const result = scope === 'public' ? await listPublicFeed('cursor', 2) : await listFollowingFeed(viewerId, 'cursor', 2);
-    expect(result).toEqual({ items: [{ id: 'first' }, { id: 'second' }], nextCursor: 'second' });
+    expect(result).toEqual({ items: ['first', 'second'].map((id) => ({ id,
+      ...(scope === 'following' ? { reactionCounts: { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 }, viewerReaction: null, viewerHasSupported: false } : {}),
+    })), nextCursor: 'second' });
     const query = db.intent.findMany.mock.calls[0]![0];
     expect(query).toMatchObject({ take: 3, cursor: { id: 'cursor' }, skip: 1, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
     for (const field of ['revealCiphertext', 'revealIv', 'revealAuthTag', 'revealContent']) expect(query.select).not.toHaveProperty(field);
