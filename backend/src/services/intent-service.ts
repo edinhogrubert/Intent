@@ -277,7 +277,7 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
   const safeLimit = Math.min(Math.max(limit, 1), 50);
   const items = await prisma.intent.findMany({
     where: {
-      visibility: { in: ['PUBLIC', 'FOLLOWERS'] },
+      visibility: 'PUBLIC',
       status: { in: ['PUBLISHED', 'REALIZED'] },
       creator: {
         status: 'ACTIVE',
@@ -293,8 +293,31 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
   const hasMore = items.length > safeLimit;
   const page = hasMore ? items.slice(0, safeLimit) : items;
 
+  const ids = page.map((intent) => intent.id);
+  const [groups, viewerReactions, viewerSupports] = ids.length ? await Promise.all([
+    prisma.intentReaction.groupBy({ by: ['intentId', 'type'],
+      where: { intentId: { in: ids } }, _count: { _all: true } }),
+    prisma.intentReaction.findMany({ where: { userId: viewerId, intentId: { in: ids } },
+      select: { intentId: true, type: true } }),
+    prisma.support.findMany({ where: { userId: viewerId, intentId: { in: ids } },
+      select: { intentId: true } }),
+  ]) : [[], [], []];
+  const counts = new Map<string, { LIKE: number; LOVE: number; CELEBRATE: number; total: number }>();
+  for (const group of groups) {
+    const count = counts.get(group.intentId) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 };
+    count[group.type] = group._count._all;
+    count.total += group._count._all;
+    counts.set(group.intentId, count);
+  }
+  const reactions = new Map(viewerReactions.map((reaction) => [reaction.intentId, reaction.type]));
+  const supported = new Set(viewerSupports.map((support) => support.intentId));
+
   return {
-    items: page,
+    items: page.map((intent) => ({ ...intent,
+      reactionCounts: counts.get(intent.id) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 },
+      viewerReaction: reactions.get(intent.id) ?? null,
+      viewerHasSupported: supported.has(intent.id),
+    })),
     nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
   };
 }
