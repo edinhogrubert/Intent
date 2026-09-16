@@ -472,6 +472,8 @@ export interface ApiPublicUserProfile {
   avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  isMe: boolean;
+  viewerIsFollowing: boolean;
   stats: {
     intentsCreated: number;
     intentsRealized: number;
@@ -479,6 +481,8 @@ export interface ApiPublicUserProfile {
     totalReactionsReceived: number;
     totalCommentsReceived: number;
     publicIntentsCount: number;
+    followersCount: number;
+    followingCount: number;
   };
   intents: Array<{ id: string; title: string; story: string; status: string;
     createdAt: string; supportCount: number }>;

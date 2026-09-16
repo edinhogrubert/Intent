@@ -113,6 +113,7 @@ export async function getSocialProfile(targetUserId: string, viewerUserId: strin
     createdAt: user.createdAt,
     isMe,
     isFollowing: Boolean(followingRelation),
+    viewerIsFollowing: Boolean(followingRelation),
     stats: {
       intentsCreated,
       intentsRealized,
@@ -163,6 +164,14 @@ export async function followUser(followerId: string, followingId: string) {
 export async function unfollowUser(followerId: string, followingId: string) {
   if (followerId === followingId) {
     throw new AppError(409, 'SELF_FOLLOW_NOT_ALLOWED', 'Você não pode deixar de seguir a própria conta.');
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: followingId },
+    select: { id: true, status: true },
+  });
+  if (!target || target.status !== 'ACTIVE') {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Perfil não encontrado.');
   }
 
   await prisma.follow.deleteMany({ where: { followerId, followingId } });
