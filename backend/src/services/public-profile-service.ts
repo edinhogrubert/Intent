@@ -16,6 +16,13 @@ export async function getPublicUserProfile(userId: string, viewerId?: string) {
     creator: { status: 'ACTIVE' },
   };
 
+  // Public aggregates must not reveal activity in private/followers-only Intents.
+  const participationScope = {
+    visibility: 'PUBLIC',
+    status: { in: ['PUBLISHED', 'REALIZED'] },
+    creator: { status: 'ACTIVE' },
+  };
+
   const isMe = Boolean(viewerId && userId === viewerId);
 
   const [
@@ -28,6 +35,10 @@ export async function getPublicUserProfile(userId: string, viewerId?: string) {
     followingCount,
     followRelation,
     intents,
+    supportedIntentsCount,
+    reactionsGivenCount,
+    commentsGivenCount,
+    realizedParticipationsCount,
   ] = await Promise.all([
     prisma.intent.count({ where: scope }),
     prisma.intent.count({ where: { ...scope, status: 'REALIZED' } }),
@@ -55,6 +66,20 @@ export async function getPublicUserProfile(userId: string, viewerId?: string) {
         supportCount: true,
       },
     }),
+    prisma.support.count({ where: { userId, intent: participationScope } }),
+    prisma.intentReaction.count({ where: { userId, intent: participationScope } }),
+    prisma.intentComment.count({ where: { authorId: userId, intent: participationScope } }),
+    prisma.intent.count({
+      where: {
+        ...participationScope,
+        status: 'REALIZED',
+        OR: [
+          { supports: { some: { userId } } },
+          { comments: { some: { authorId: userId } } },
+          { reactions: { some: { userId } } },
+        ],
+      },
+    }),
   ]);
 
   return {
@@ -62,14 +87,18 @@ export async function getPublicUserProfile(userId: string, viewerId?: string) {
     isMe,
     viewerIsFollowing: Boolean(followRelation),
     stats: {
+      publicIntentsCount: intentsCreated,
       intentsCreated,
       intentsRealized,
       totalSupportReceived,
       totalReactionsReceived,
       totalCommentsReceived,
-      publicIntentsCount: intentsCreated,
       followersCount,
       followingCount,
+      supportedIntentsCount,
+      reactionsGivenCount,
+      commentsGivenCount,
+      realizedParticipationsCount,
     },
     intents,
   };

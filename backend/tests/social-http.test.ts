@@ -79,7 +79,9 @@ beforeEach(() => {
   db.notification.createMany.mockResolvedValue({ count: 1 });
   db.notification.updateMany.mockResolvedValue({ count: 0 });
   db.notification.findFirst.mockResolvedValue(null);
+  db.intentComment.count.mockResolvedValue(0);
   db.intentComment.findMany.mockResolvedValue([]);
+  db.intentReaction.count.mockResolvedValue(0);
   db.intentReaction.groupBy.mockResolvedValue([]);
   db.intentReaction.findUnique.mockResolvedValue(null);
   db.$transaction.mockImplementation(async (operation) => operation(db));
@@ -119,7 +121,8 @@ describe('perfil público HTTP', () => {
     expect(data.stats).toEqual({ intentsCreated: 3, intentsRealized: 1,
       totalSupportReceived: 7, totalReactionsReceived: 4,
       totalCommentsReceived: 2, publicIntentsCount: 3,
-      followersCount: 0, followingCount: 0 });
+      followersCount: 0, followingCount: 0, supportedIntentsCount: 7,
+      reactionsGivenCount: 4, commentsGivenCount: 2, realizedParticipationsCount: 0 });
     expect(data.intents).toEqual([]);
     expect(db.user.findFirst.mock.calls[0]![0].select).toEqual({
       id: true, username: true, displayName: true, bio: true,
@@ -1024,4 +1027,60 @@ describe('Bloco 21 — integração social', () => {
       expect(db.follow.deleteMany).not.toHaveBeenCalled();
       expect(db.follow.findMany).not.toHaveBeenCalled();
     });
+});
+
+
+describe('Bloco 22 — identidade social pública', () => {
+  const auth = 'Bearer synthetic-test-token';
+  const fields = ['supportedIntentsCount', 'reactionsGivenCount', 'commentsGivenCount', 'realizedParticipationsCount'];
+
+  it('perfil sem atividade retorna zero nas quatro métricas e mantém conexões', async () => {
+    db.user.findFirst.mockResolvedValue({ ...viewer, id: creatorId });
+    const response = await get(`/v1/users/${creatorId}/profile`, auth);
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    for (const field of fields) expect(data.stats[field]).toBe(0);
+    expect(data).toMatchObject({ viewerIsFollowing: false, stats: { followersCount: 0, followingCount: 0 }, intents: [] });
+    for (const key of ['email', 'firebaseUid', 'passwordHash', 'tokens']) expect(data).not.toHaveProperty(key);
+  });
+
+  it('distingue atividade dada da recebida e preserva viewerIsFollowing', async () => {
+    db.user.findFirst.mockResolvedValue({ ...viewer, id: creatorId });
+    db.intent.count.mockResolvedValueOnce(3).mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+    db.support.count.mockResolvedValueOnce(7).mockResolvedValueOnce(4);
+    db.intentReaction.count.mockResolvedValueOnce(8).mockResolvedValueOnce(5);
+    db.intentComment.count.mockResolvedValueOnce(9).mockResolvedValueOnce(6);
+    db.follow.count.mockResolvedValueOnce(10).mockResolvedValueOnce(11);
+    db.follow.findUnique.mockResolvedValue({ id: 'relation' });
+    const response = await get(`/v1/users/${creatorId}/profile`, auth);
+    expect(response.status).toBe(200);
+    const { data } = await response.json();
+    expect(data.viewerIsFollowing).toBe(true);
+    expect(data.stats).toEqual({ publicIntentsCount: 3, intentsCreated: 3, intentsRealized: 1,
+      totalSupportReceived: 7, totalReactionsReceived: 8, totalCommentsReceived: 9,
+      followersCount: 10, followingCount: 11, supportedIntentsCount: 4,
+      reactionsGivenCount: 5, commentsGivenCount: 6, realizedParticipationsCount: 2 });
+    for (const key of ['email', 'firebaseUid', 'passwordHash', 'tokens']) expect(data).not.toHaveProperty(key);
+  });
+
+  it.each([creatorId, viewer.id])('exclui atividade privada, de seguidores, não publicada e de autores inativos (%s)', async (userId) => {
+    db.user.findFirst.mockResolvedValue({ ...viewer, id: userId });
+    const response = await get(`/v1/users/${userId}/profile`, auth);
+    expect(response.status).toBe(200);
+    const scope = { visibility: 'PUBLIC', status: { in: ['PUBLISHED', 'REALIZED'] }, creator: { status: 'ACTIVE' } };
+    expect(db.support.count).toHaveBeenCalledWith({ where: { userId, intent: scope } });
+    expect(db.intentReaction.count).toHaveBeenCalledWith({ where: { userId, intent: scope } });
+    expect(db.intentComment.count).toHaveBeenCalledWith({ where: { authorId: userId, intent: scope } });
+    // Count Intents once with OR, not the sum of support/comment/reaction counts.
+    expect(db.intent.count).toHaveBeenCalledWith({ where: { ...scope, status: 'REALIZED', OR: [
+      { supports: { some: { userId } } }, { comments: { some: { authorId: userId } } }, { reactions: { some: { userId } } },
+    ] } });
+    expect(db.intent.create).not.toHaveBeenCalled();
+    expect(db.domainEvent.create).not.toHaveBeenCalled();
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+    expect(db.follow.createManyAndReturn).not.toHaveBeenCalled();
+    expect(db.follow.deleteMany).not.toHaveBeenCalled();
+    expect(db.intentComment.create).not.toHaveBeenCalled();
+    expect(db.intentReaction.upsert).not.toHaveBeenCalled();
+  });
 });
