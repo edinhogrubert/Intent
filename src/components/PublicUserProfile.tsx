@@ -13,6 +13,7 @@ import {
   LoaderCircle,
   MessageSquare,
   RefreshCw,
+  Share2,
   Sparkles,
   ThumbsUp,
   TrendingUp,
@@ -32,6 +33,7 @@ import {
   type ApiPublicUserProfile,
   type ApiSocialConnection,
 } from '../services/intentApi';
+import { copyToClipboard, getUserProfileShareUrl } from '../utils/shareLink';
 import { PublicUserActivity } from './PublicUserActivity';
 
 interface PublicUserProfileProps {
@@ -83,6 +85,19 @@ function PublicUserProfileContent({ userId, onBack, onSelectIntent }: PublicUser
   const [modalItems, setModalItems] = useState<ApiSocialConnection[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [copyError, setCopyError] = useState('');
+
+  async function handleCopyProfileLink() {
+    const ok = await copyToClipboard(getUserProfileShareUrl(userId));
+    setCopySuccess(ok);
+    setCopyError(ok ? '' : 'Não foi possível copiar o link.');
+  }
+  useEffect(() => {
+    if (!copySuccess) return;
+    const timer = window.setTimeout(() => setCopySuccess(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [copySuccess]);
 
   const [activeTab, setActiveTab] = useState<'activity' | 'intents'>('activity');
 
@@ -358,6 +373,31 @@ function PublicUserProfileContent({ userId, onBack, onSelectIntent }: PublicUser
 
                 {/* Ação Social de Seguir / Deixar de Seguir ou Badge "Seu Perfil" */}
                 <div className="flex items-center gap-3 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={handleCopyProfileLink}
+                    title="Copiar link do perfil público"
+                    aria-live="polite"
+                    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold min-h-[44px] border transition-all ${
+                      copySuccess
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-white text-[#454652] border-[#e4e2de] hover:bg-[#f7f6fc] hover:text-[#000666]'
+                    }`}
+                  >
+                    {copySuccess ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span>Link copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-4 h-4" />
+                        <span>Compartilhar</span>
+                      </>
+                    )}
+                  </button>
+
+                  {copyError && <span role="alert" className="text-xs text-red-700">{copyError}</span>}
                   {profile.isMe ? (
                     <span className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold bg-[#f7f6fc] text-[#000666] border border-[#e4e2de]">
                       <UserCheck className="w-4 h-4 text-[#000666]" />
