@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Home, LogOut, PlusCircle, Target, UserRound } from 'lucide-react';
+import { Bell, Home, LogOut, Pencil, PlusCircle, Target, UserRound } from 'lucide-react';
 import type { UserAccount } from './types';
 import { AuthGate } from './components/AuthGate';
 import { CreationWizard } from './components/CreationWizard';
@@ -8,6 +8,7 @@ import { MvpHomeFeed } from './components/MvpHomeFeed';
 import { MvpIntentDetail } from './components/MvpIntentDetail';
 import { MvpSocialProfile } from './components/MvpSocialProfile';
 import { PublicUserProfile } from './components/PublicUserProfile';
+import { EditProfileModal } from './components/EditProfileModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { auth, onAuthStateChanged, signOut } from './utils/firebase';
 import { logoutUser, setCurrentSessionUser } from './utils/storage';
@@ -32,6 +33,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [publicProfileEditorOpen, setPublicProfileEditorOpen] = useState(false);
+  const [publicProfileRefreshKey, setPublicProfileRefreshKey] = useState(0);
   const manualAuthentication = useRef(false);
 
   async function synchronizeSession() {
@@ -78,7 +81,7 @@ export default function App() {
 
   async function handleLogout() {
     await signOut(auth);
-    logoutUser(); setCurrentUser(null); setUnreadCount(null); setNotificationsOpen(false); navigateToView('home'); setSessionStatus('unauthenticated');
+    logoutUser(); setCurrentUser(null); setUnreadCount(null); setNotificationsOpen(false); setPublicProfileEditorOpen(false); navigateToView('home'); setSessionStatus('unauthenticated');
   }
 
   async function openNotifications() {
@@ -105,6 +108,7 @@ export default function App() {
       setSelectedProfileId(target.type === 'user' || target.type === 'profile' ? target.id! : null);
       setView(target.type === 'intent' ? 'detail' : target.type === 'user' ? 'public-profile' : target.type);
       setNotificationsOpen(false);
+      setPublicProfileEditorOpen(false);
     }
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -126,13 +130,17 @@ export default function App() {
     { id: 'mine', label: 'Minhas Intents', icon: Target },
     { id: 'profile', label: 'Perfil', icon: UserRound },
   ];
+  const isViewingOwnPublicProfile = view === 'public-profile' && selectedProfileId === currentUser.id;
 
   return <div className="min-h-screen bg-[#f7f6fc] text-[#1b1c1a]">
     <header className="sticky top-0 z-30 bg-white border-b border-[#e4e2de]"><div className="max-w-5xl mx-auto h-16 px-4 flex items-center justify-between"><button onClick={() => navigateToView('home')} className="text-xl font-black tracking-tight text-[#000666]">INTENT</button><nav className="hidden sm:flex items-center gap-1">{items.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => { navigateToView(id, id === 'profile' ? currentUser.id : undefined); }} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${view === id ? 'bg-[#e0e0ff] text-[#000666]' : 'text-[#666] hover:bg-[#f5f3ef]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav><div className="flex items-center gap-2"><button type="button" onClick={() => void openNotifications()} className="relative p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label={unreadCount && unreadCount > 0 ? `Abrir notificações: ${unreadCount} não lidas` : 'Abrir notificações'}><Bell className="w-5 h-5"/>{unreadCount !== null && unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#ba1a1a] text-white text-[10px] font-black flex items-center justify-center border-2 border-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button><button onClick={() => selectProfile(currentUser.id)} className="hidden md:block text-right"><p className="text-xs font-bold">{currentUser.name}</p><p className="text-[11px] text-[#666]">@{currentUser.username.replace(/^@+/, '')}</p></button><button onClick={() => void handleLogout()} className="p-2 rounded-full hover:bg-[#f5f3ef] text-[#666]" aria-label="Sair"><LogOut className="w-5 h-5"/></button></div></div></header>
 
     <main className="pb-24 sm:pb-8">
       {view === 'home' && <MvpHomeFeed currentUser={currentUser} onCreate={() => navigateToView('create')} onSelectIntent={selectIntent} onSelectProfile={selectPublicProfile}/>}
-      {view === 'public-profile' && selectedProfileId && <PublicUserProfile userId={selectedProfileId} onBack={() => navigateToView('home')} onSelectIntent={selectIntent}/>}
+      {view === 'public-profile' && selectedProfileId && <>
+        {isViewingOwnPublicProfile && <div className="max-w-4xl mx-auto px-4 pt-6 -mb-2 flex justify-end"><button type="button" onClick={() => setPublicProfileEditorOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-[#000666] text-sm font-bold border border-[#c6c5d4] hover:bg-[#f7f6fc] transition-colors min-h-[44px]"><Pencil className="w-4 h-4"/>Editar perfil</button></div>}
+        <PublicUserProfile key={`${selectedProfileId}:${publicProfileRefreshKey}`} userId={selectedProfileId} onBack={() => navigateToView('home')} onSelectIntent={selectIntent}/>
+      </>}
       {view === 'create' && <CreationWizard currentUser={currentUser} onCancel={() => navigateToView('home')} onComplete={(created) => { setToast('Intent publicada com sucesso.'); selectIntent(created.id); }}/>}
       {view === 'mine' && <MyIntentsDashboard currentUser={currentUser} onCreateNew={() => navigateToView('create')} onSelectIntent={selectIntent}/>}
       {view === 'detail' && selectedIntentId && <MvpIntentDetail intentId={selectedIntentId} currentUser={currentUser} onBack={() => navigateToView('home')}/>}
@@ -153,6 +161,14 @@ export default function App() {
       onRead={() => setUnreadCount((count) => count === null ? null : Math.max(0, count - 1))}
       onAllRead={() => setUnreadCount(0)}
       onSelectIntent={selectIntent}
+    />}
+    {publicProfileEditorOpen && <EditProfileModal
+      user={currentUser}
+      onClose={() => setPublicProfileEditorOpen(false)}
+      onSaved={(updated) => {
+        setCurrentUser(updated);
+        setPublicProfileRefreshKey((key) => key + 1);
+      }}
     />}
   </div>;
 }
