@@ -6,7 +6,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 
 ## Regra de interface
 
-- O usuário chama apenas `função PC(...)` ou `função VM(...)`.
+- O usuário chama apenas executor com caminho absoluto.
 - O ChatGPT não deve mandar o usuário chamar scripts auxiliares diretamente.
 - O número da função tem o mesmo significado no PC e na VM.
 - Se não servir para um ambiente, o executor deve retornar N/A.
@@ -17,7 +17,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 | Script | Estado | Função responsável | Observação |
 |---|---|---:|---|
 | `/home/grubert/intent-automacao/intent-executor-PC.sh` | executor oficial | entrada única | Deve receber números de função. |
-| `/home/grubert/intent-automacao/intent-backup-git-PC.sh` | auxiliar | 6 | Não chamar direto; backup Git deve passar pela função 6. |
+| `/home/grubert/intent-automacao/intent-backup-git-PC.sh` | auxiliar legado | nenhuma no executor novo | Não chamar direto. Foi identificado como preso ao `mvp-1.0.23`; a função PC 6 passou a criar o bundle internamente. |
 | `/home/grubert/intent-automacao/intent-retomada-PC.sh` | auxiliar | 14 | Não chamar direto; relatório/retomada deve passar pela função 14. |
 | `/home/grubert/intent-automacao/intent-atualizar-controle-release-PC.sh`, se existir | auxiliar legado | 10 ou 11 | Deve ser absorvido por preparar release ou criar/validar release. |
 | scripts avulsos de correção de continuidade, se existirem | auxiliares legados | 9 | Devem ser absorvidos por validar/atualizar continuidade. |
@@ -41,7 +41,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 | 3 | Verificar release/tag atual | aplica | aplica |
 | 4 | Verificar recursos do ambiente | aplica | aplica |
 | 5 | Validar backup existente | Git bundle | PostgreSQL dump |
-| 6 | Criar e validar backup | chama backup Git | chama backup PostgreSQL |
+| 6 | Criar e validar backup | cria bundle Git internamente | chama backup PostgreSQL |
 | 7 | Sincronizar código com origem oficial | sincroniza main local | sincroniza/fetch na VM |
 | 8 | Rodar validações/testes do ambiente | lint/build/testes | containers/endpoints/smoke |
 | 9 | Atualizar/validar continuidade | valida contratos/estado | valida presença implantada |
@@ -56,7 +56,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 
 Scripts identificados no histórico:
 
-- `intent-backup-git-PC.sh`: deve ficar atrás da função PC 6.
+- `intent-backup-git-PC.sh`: legado; não deve ser chamado diretamente nem pela função PC 6 nova, pois foi identificado como fixo em `mvp-1.0.23`.
 - `intent-retomada-PC.sh`: deve ficar atrás da função PC 14.
 - `intent-atualizar-controle-release-PC.sh`: deve ser absorvido pelas funções PC 10/11.
 - `intent-corrigir-continuidade-PC.sh`: deve ser absorvido pela função PC 9.
