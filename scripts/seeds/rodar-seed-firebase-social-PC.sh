@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="intent-firebase-social-runner-PC-2026.09.18.03"
+VERSION="intent-firebase-social-runner-PC-2026.09.18.04"
 OWNER_REPO="edinhogrubert/Intent"
 REF="${INTENT_SEED_REF:-main}"
 REPO="/home/grubert/Projetos/Intent-local"
@@ -46,6 +46,59 @@ restore_original_ref() {
 
   echo "REF_RESTAURADA=$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
   echo "HEAD_RESTAURADO=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+}
+
+trim_spaces() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+load_env_file() {
+  local env_file="$1"
+
+  [[ -f "$env_file" ]] || return 0
+
+  echo "ENV_FILE_CARREGADO=$env_file"
+
+  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+    raw_line="${raw_line%$'\r'}"
+    [[ -z "$(trim_spaces "$raw_line")" ]] && continue
+    [[ "$(trim_spaces "$raw_line")" == \#* ]] && continue
+
+    if [[ "$raw_line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      local key="${BASH_REMATCH[1]}"
+      local value="${BASH_REMATCH[2]}"
+      value="$(trim_spaces "$value")"
+
+      if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+
+      export "$key=$value"
+    fi
+  done < "$env_file"
+}
+
+require_env_presence() {
+  local missing=()
+  local name
+
+  for name in DATABASE_URL FIREBASE_PROJECT_ID REVEAL_ENCRYPTION_KEY; do
+    if [[ -n "${!name:-}" ]]; then
+      echo "ENV_${name}=OK"
+    else
+      echo "ENV_${name}=AUSENTE"
+      missing+=("$name")
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    fail "variáveis obrigatórias ausentes para executar o seed: ${missing[*]}"
+  fi
 }
 
 trap restore_original_ref EXIT
@@ -124,6 +177,10 @@ rm -f "$backup_log"
 section "Preparando backend"
 
 cd "$BACKEND"
+
+load_env_file "$BACKEND/.env"
+load_env_file "$BACKEND/.env.local"
+require_env_presence
 
 if [[ ! -d node_modules ]]; then
   echo "node_modules ausente; executando npm ci"
