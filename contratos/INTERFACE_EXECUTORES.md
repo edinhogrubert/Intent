@@ -14,22 +14,47 @@ PC:
 bash /home/grubert/intent-automacao/intent-executor-PC.sh <função>
 ```
 
-VM:
+VM, quando já estiver dentro da VM:
 
 ```bash
 bash /home/ubuntu/intent-executor-VM.sh <função>
 ```
 
-Na conversa, o ChatGPT deve usar a forma humana:
+VM, quando o comando for executado a partir do PC por SSH:
+
+```bash
+ssh -i /home/grubert/.ssh/id_ed25519 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ubuntu@157.151.255.227 'bash /home/ubuntu/intent-executor-VM.sh <função>'
+```
+
+## Regra de caminho absoluto
+
+O ChatGPT deve sempre indicar o caminho completo do executor.
+
+É proibido orientar apenas:
 
 ```text
 Execute função PC(...)
+Execute função VM(...)
 ```
 
-ou:
+Essas formas podem aparecer como explicação humana, mas a instrução operacional final deve trazer o comando completo com o caminho absoluto.
 
-```text
-Execute função VM(...)
+Formato correto para PC:
+
+```bash
+bash /home/grubert/intent-automacao/intent-executor-PC.sh 1 2 3
+```
+
+Formato correto para VM via SSH a partir do PC:
+
+```bash
+ssh -i /home/grubert/.ssh/id_ed25519 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ubuntu@157.151.255.227 'bash /home/ubuntu/intent-executor-VM.sh 1 2 3'
+```
+
+Formato correto se o usuário já estiver dentro da VM:
+
+```bash
+bash /home/ubuntu/intent-executor-VM.sh 1 2 3
 ```
 
 ## Regra de interface
@@ -82,16 +107,22 @@ Execute função 8
 
 sem indicar ambiente.
 
-O formato correto é:
+Também não deve deixar a instrução final apenas como:
 
 ```text
 Execute função PC(8)
 ```
 
-ou:
+O formato operacional correto deve conter caminho absoluto:
 
-```text
-Execute função VM(8)
+```bash
+bash /home/grubert/intent-automacao/intent-executor-PC.sh 8
+```
+
+ou, para VM via PC:
+
+```bash
+ssh -i /home/grubert/.ssh/id_ed25519 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ubuntu@157.151.255.227 'bash /home/ubuntu/intent-executor-VM.sh 8'
 ```
 
 ## Regra para relatórios
