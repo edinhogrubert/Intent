@@ -3,13 +3,14 @@ set -Eeuo pipefail
 
 BASE=/home/grubert/intent-automacao
 REPO=/home/grubert/Projetos/Intent-local
-BACKUP_SCRIPT="$BASE/intent-backup-git-PC.sh"
+BACKUP_DIR="$BASE/backups/git"
+LEGACY_BACKUP_SCRIPT="$BASE/intent-backup-git-PC.sh"
 RETOMADA_SCRIPT="$BASE/intent-retomada-PC.sh"
 LOCK="$BASE/executor-PC.lock"
 IDS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
 declare -A STATUS DETAIL
 
-mkdir -p "$BASE/relatorios"
+mkdir -p "$BASE/relatorios" "$BACKUP_DIR"
 exec 9>"$LOCK"
 flock -n 9 || { echo 'ERRO: outro executor PC em andamento'; exit 1; }
 
@@ -43,13 +44,28 @@ has_npm_script(){
   node -e 'const fs=require("fs");const p=process.argv[1],n=process.argv[2];const j=JSON.parse(fs.readFileSync(p));process.exit(j.scripts&&j.scripts[n]?0:1)' "$dir/package.json" "$name" >/dev/null 2>&1
 }
 
-latest_bundle(){ find "$BASE" "$REPO" -maxdepth 6 -type f -name '*.bundle' 2>/dev/null | xargs -r ls -1t 2>/dev/null | head -n 1; }
+latest_bundle(){ find "$BACKUP_DIR" "$BASE" "$REPO" -maxdepth 6 -type f -name '*.bundle' 2>/dev/null | xargs -r ls -1t 2>/dev/null | head -n 1; }
 valid_bundle(){ local b="$1"; [[ -n "$b" && -s "$b" ]] || return 1; git -C "$REPO" bundle verify "$b" >/dev/null; }
+
+write_backup_metadata(){
+  local bundle="$1" meta="$2" sha_file="$3"
+  {
+    echo "INTENT - BACKUP GIT PC"
+    echo "Criado em: $(date -Iseconds)"
+    echo "Repo: $REPO"
+    echo "Branch: $(git -C "$REPO" branch --show-current || true)"
+    echo "HEAD: $(git -C "$REPO" rev-parse HEAD)"
+    echo "Tag exata: $(git -C "$REPO" describe --tags --exact-match 2>/dev/null || echo 'SEM TAG EXATA')"
+    echo "Origin: $(git -C "$REPO" remote get-url origin 2>/dev/null || echo ausente)"
+    echo "Bundle: $bundle"
+    echo "SHA256: $(cut -d' ' -f1 "$sha_file")"
+  } > "$meta"
+}
 
 task_1(){
   [[ "$(id -un)" == grubert ]] || { fail 1 "usuário inesperado: $(id -un)"; return 1; }
   [[ "$(hostname -s)" == lubuntu ]] || { fail 1 "host inesperado: $(hostname -s)"; return 1; }
-  for c in bash git find df flock; do command -v "$c" >/dev/null || { fail 1 "comando ausente: $c"; return 1; }; done
+  for c in bash git find df flock sha256sum mktemp date; do command -v "$c" >/dev/null || { fail 1 "comando ausente: $c"; return 1; }; done
   [[ -d "$BASE" && -d "$REPO" ]] || { fail 1 'paths base/repo ausentes'; return 1; }
   ok 1 'ambiente PC validado'
 }
@@ -77,17 +93,44 @@ task_5(){
   need_repo || { fail 5 'repo inválido'; return 1; }
   local b; b="$(latest_bundle || true)"
   valid_bundle "$b" || { fail 5 "backup Git inválido/ausente: ${b:-nenhum}"; return 1; }
+  if [[ -f "$b.sha256" ]]; then
+    (cd "$(dirname "$b")" && sha256sum -c "$(basename "$b").sha256") >/dev/null || { fail 5 "checksum inválido: $b.sha256"; return 1; }
+  fi
   ok 5 "backup Git válido: $b"
 }
 
 task_6(){
   task_4 || { fail 6 'verificação de recursos falhou'; return 1; }
-  [[ -f "$BACKUP_SCRIPT" ]] || { fail 6 "script auxiliar ausente: $BACKUP_SCRIPT"; return 1; }
-  bash -n "$BACKUP_SCRIPT" || { fail 6 'sintaxe inválida no backup Git'; return 1; }
-  bash "$BACKUP_SCRIPT" || { fail 6 'backup Git falhou'; return 1; }
-  local b; b="$(latest_bundle || true)"
-  valid_bundle "$b" || { fail 6 "bundle gerado inválido: ${b:-nenhum}"; return 1; }
-  ok 6 "backup Git criado/validado: $b"
+  need_repo || { fail 6 'repo inválido'; return 1; }
+  [[ -z "$(git -C "$REPO" status --porcelain)" ]] || { fail 6 'árvore suja; backup bloqueado'; return 1; }
+
+  local branch head stamp safe_branch tmp bundle sha_file meta
+  branch="$(git -C "$REPO" branch --show-current || true)"
+  head="$(git -C "$REPO" rev-parse --short=12 HEAD)"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  safe_branch="${branch:-detached}"
+  safe_branch="${safe_branch//[^A-Za-z0-9._-]/_}"
+  bundle="$BACKUP_DIR/intent-git-${safe_branch}-${head}-${stamp}.bundle"
+  tmp="$bundle.tmp"
+  sha_file="$bundle.sha256"
+  meta="$bundle.txt"
+
+  echo "INTENT - BACKUP GIT PC"
+  echo "Data: $(date)"
+  echo "Repo: $REPO"
+  echo "Branch: ${branch:-DETACHED}"
+  echo "HEAD: $(git -C "$REPO" rev-parse HEAD)"
+  if [[ -f "$LEGACY_BACKUP_SCRIPT" ]]; then
+    echo "Aviso: script legado encontrado, mas ignorado pela função 6: $LEGACY_BACKUP_SCRIPT"
+  fi
+
+  git -C "$REPO" bundle create "$tmp" --all || { rm -f "$tmp"; fail 6 'criação do bundle falhou'; return 1; }
+  git -C "$REPO" bundle verify "$tmp" >/dev/null || { rm -f "$tmp"; fail 6 'bundle criado não passou na verificação'; return 1; }
+  mv -f "$tmp" "$bundle"
+  (cd "$(dirname "$bundle")" && sha256sum "$(basename "$bundle")" > "$(basename "$sha_file")") || { fail 6 'geração do checksum falhou'; return 1; }
+  write_backup_metadata "$bundle" "$meta" "$sha_file"
+  valid_bundle "$bundle" || { fail 6 "bundle final inválido: $bundle"; return 1; }
+  ok 6 "backup Git criado/validado: $bundle"
 }
 
 task_7(){
