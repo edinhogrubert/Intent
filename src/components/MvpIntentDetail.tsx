@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, Check, CheckCircle2, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Share2, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
+import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import type { UserAccount } from '../types';
 import {
   approveGuardianIntent,
@@ -105,6 +106,22 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [reactionPending, setReactionPending] = useState(false);
   const [reactionError, setReactionError] = useState('');
   const [reactionNotice, setReactionNotice] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [copyError, setCopyError] = useState('');
+
+  async function handleCopyIntentLink() {
+    const ok = await copyToClipboard(getIntentShareUrl(intentId));
+    setCopySuccess(ok);
+    setCopyError(ok ? '' : 'Não foi possível copiar o link.');
+  }
+  useEffect(() => {
+    setCopySuccess(false); setCopyError('');
+  }, [intentId]);
+  useEffect(() => {
+    if (!copySuccess) return;
+    const timer = window.setTimeout(() => setCopySuccess(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [copySuccess]);
 
   async function load() {
     setLoading(true);
@@ -264,6 +281,12 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
                 {categoryLabels[intent.category] || 'Outros'}
               </span>
               <VisibilityBadge visibility={intent.visibility} />
+              <button type="button" onClick={() => void handleCopyIntentLink()} aria-live="polite"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold text-[#000666]">
+                {copySuccess ? <Check className="w-4 h-4"/> : <Share2 className="w-4 h-4"/>}
+                {copySuccess ? 'Link copiado!' : 'Compartilhar'}
+              </button>
+              {copyError && <span role="alert" className="text-xs text-red-700">{copyError}</span>}
             </div>
 
             <h1 className="text-2xl font-black mt-3 text-[#1a1a1a] leading-tight">{intent.title}</h1>

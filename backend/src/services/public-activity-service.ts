@@ -9,6 +9,8 @@ export type PublicActivityType =
   | 'INTENT_COMMENTED'
   | 'INTENT_REALIZED_PARTICIPATION';
 
+export type PublicActivityFilter = 'ALL' | PublicActivityType;
+
 export interface PublicActivityItem {
   id: string;
   type: PublicActivityType;
@@ -47,6 +49,14 @@ export function encodeActivityCursor(occurredAt: Date | string, id: string): str
 const eventPrefixes = ['intent_created', 'intent_supported', 'intent_reacted',
   'intent_commented', 'intent_realized_participation'];
 
+const filterPrefix: Record<Exclude<PublicActivityFilter, 'ALL'>, string> = {
+  INTENT_CREATED: 'intent_created',
+  INTENT_SUPPORTED: 'intent_supported',
+  INTENT_REACTED: 'intent_reacted',
+  INTENT_COMMENTED: 'intent_commented',
+  INTENT_REALIZED_PARTICIPATION: 'intent_realized_participation',
+};
+
 export function decodeActivityCursor(cursor: string): { occurredAt: Date; id: string } | null {
   if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) return null;
   const raw = Buffer.from(cursor, 'base64url').toString('utf8');
@@ -62,8 +72,6 @@ export function decodeActivityCursor(cursor: string): { occurredAt: Date; id: st
   return { occurredAt, id };
 }
 
-// Apply the global (timestamp DESC, event ID DESC) boundary before each SQL LIMIT.
-// UUIDs are canonical lowercase, so raw UUID order matches the suffix order.
 function pageBoundary(field: 'createdAt' | 'updatedAt' | 'realizedAt', prefix: string,
   cursor: ReturnType<typeof decodeActivityCursor>) {
   if (!cursor) return {};
@@ -72,6 +80,10 @@ function pageBoundary(field: 'createdAt' | 'updatedAt' | 'realizedAt', prefix: s
   if (prefix > cursorPrefix) return older;
   return { OR: [older, { [field]: cursor.occurredAt,
     ...(prefix === cursorPrefix ? { id: { lt: sourceId } } : {}) }] };
+}
+
+function includeFilter(filter: PublicActivityFilter, type: Exclude<PublicActivityFilter, 'ALL'>) {
+  return filter === 'ALL' || filter === type;
 }
 
 const creatorSelect = { id: true, username: true, displayName: true, avatarUrl: true };
@@ -90,6 +102,7 @@ export async function listUserPublicActivity(
   userId: string,
   cursorString?: string,
   limit = 20,
+  filterType: PublicActivityFilter = 'ALL',
 ): Promise<ListPublicActivityResult> {
   const user = await prisma.user.findFirst({
     where: { id: userId, status: 'ACTIVE' },
@@ -105,57 +118,57 @@ export async function listUserPublicActivity(
   if (cursorString !== undefined && !parsedCursor) {
     throw new AppError(400, 'INVALID_CURSOR', 'Cursor de atividade inválido.');
   }
+  if (parsedCursor && filterType !== 'ALL' && !parsedCursor.id.startsWith(`${filterPrefix[filterType]}:`)) {
+    throw new AppError(400, 'INVALID_CURSOR', 'Cursor de atividade incompatível com o filtro selecionado.');
+  }
+
   const publicIntentScope = {
     visibility: 'PUBLIC', status: { in: ['PUBLISHED', 'REALIZED'] },
     creator: { status: 'ACTIVE' },
   };
   const take = safeLimit + 1;
+
   const [createdIntents, supports, reactions, comments, realizedIntents] = await Promise.all([
-    prisma.intent.findMany({
+    includeFilter(filterType, 'INTENT_CREATED') ? prisma.intent.findMany({
       where: { creatorId: userId, ...publicIntentScope,
         ...pageBoundary('createdAt', 'intent_created', parsedCursor) },
       take, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { ...intentSelect, createdAt: true },
-    }),
-    prisma.support.findMany({
+    }) : Promise.resolve([]),
+    includeFilter(filterType, 'INTENT_SUPPORTED') ? prisma.support.findMany({
       where: { userId, intent: publicIntentScope,
         ...pageBoundary('createdAt', 'intent_supported', parsedCursor) },
       take, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { id: true, createdAt: true, intent: { select: intentSelect } },
-    }),
-    prisma.intentReaction.findMany({
+    }) : Promise.resolve([]),
+    includeFilter(filterType, 'INTENT_REACTED') ? prisma.intentReaction.findMany({
       where: { userId, intent: publicIntentScope,
         ...pageBoundary('updatedAt', 'intent_reacted', parsedCursor) },
       take, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: { id: true, type: true, updatedAt: true, intent: { select: intentSelect } },
-    }),
-    prisma.intentComment.findMany({
+    }) : Promise.resolve([]),
+    includeFilter(filterType, 'INTENT_COMMENTED') ? prisma.intentComment.findMany({
       where: { authorId: userId, intent: publicIntentScope,
         ...pageBoundary('createdAt', 'intent_commented', parsedCursor) },
       take, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { id: true, body: true, createdAt: true, intent: { select: intentSelect } },
-    }),
-    // Same participation rule as the official profile statistics: any current
-    // support/comment/reaction. One event per realized Intent, never per relation.
-    prisma.intent.findMany({
+    }) : Promise.resolve([]),
+    includeFilter(filterType, 'INTENT_REALIZED_PARTICIPATION') ? prisma.intent.findMany({
       where: { ...publicIntentScope, status: 'REALIZED', realizedAt: { not: null },
         AND: [{ OR: [ { supports: { some: { userId } } },
           { comments: { some: { authorId: userId } } }, { reactions: { some: { userId } } } ] },
           pageBoundary('realizedAt', 'intent_realized_participation', parsedCursor)] },
       take, orderBy: [{ realizedAt: 'desc' }, { id: 'desc' }], select: intentSelect,
-    }),
+    }) : Promise.resolve([]),
   ]);
 
   const rawEvents: PublicActivityItem[] = [];
 
-  // Mapear Intents criadas
   for (const intent of createdIntents) {
-    const rawId = `intent_created:${intent.id}`;
-    const occurredAt = intent.createdAt.toISOString();
     rawEvents.push({
-      id: rawId,
+      id: `intent_created:${intent.id}`,
       type: 'INTENT_CREATED',
-      occurredAt,
+      occurredAt: intent.createdAt.toISOString(),
       metadata: {
         supportGoal: intent.supportGoal,
         supportCount: intent.supportCount,
@@ -165,7 +178,6 @@ export async function listUserPublicActivity(
     });
   }
 
-  // Keep the support event when an Intent realizes; realization is a separate event.
   for (const support of supports) {
     rawEvents.push({ id: `intent_supported:${support.id}`, type: 'INTENT_SUPPORTED',
       occurredAt: support.createdAt.toISOString(),
@@ -180,14 +192,11 @@ export async function listUserPublicActivity(
       intent: publicIntent(intent) });
   }
 
-  // Mapear Reações
   for (const reaction of reactions) {
-    const rawId = `intent_reacted:${reaction.id}`;
-    const occurredAt = reaction.updatedAt.toISOString();
     rawEvents.push({
-      id: rawId,
+      id: `intent_reacted:${reaction.id}`,
       type: 'INTENT_REACTED',
-      occurredAt,
+      occurredAt: reaction.updatedAt.toISOString(),
       metadata: {
         reactionType: reaction.type,
       },
@@ -195,16 +204,12 @@ export async function listUserPublicActivity(
     });
   }
 
-  // Mapear Comentários
   for (const comment of comments) {
-    const rawId = `intent_commented:${comment.id}`;
-    const occurredAt = comment.createdAt.toISOString();
-    // Trecho seguro e truncado do comentário (máximo 120 caracteres)
     const snippet = comment.body.length > 120 ? `${comment.body.slice(0, 117)}...` : comment.body;
     rawEvents.push({
-      id: rawId,
+      id: `intent_commented:${comment.id}`,
       type: 'INTENT_COMMENTED',
-      occurredAt,
+      occurredAt: comment.createdAt.toISOString(),
       metadata: {
         commentSnippet: snippet,
       },
@@ -212,7 +217,6 @@ export async function listUserPublicActivity(
     });
   }
 
-  // Ordenação global cronológica: occurredAt DESC, id DESC
   rawEvents.sort((a, b) => {
     const timeDiff = new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
     if (timeDiff !== 0) return timeDiff;

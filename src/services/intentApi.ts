@@ -507,6 +507,8 @@ export type ApiPublicActivityType =
   | 'INTENT_COMMENTED'
   | 'INTENT_REALIZED_PARTICIPATION';
 
+export type PublicActivityFilter = 'ALL' | ApiPublicActivityType;
+
 export interface ApiPublicActivityItem {
   id: string;
   type: ApiPublicActivityType;
@@ -541,10 +543,12 @@ export async function listUserPublicActivity(
   userId: string,
   cursor?: string,
   limit = 20,
+  type: PublicActivityFilter = 'ALL',
 ): Promise<ApiPublicActivityResponse> {
   const query = new URLSearchParams();
   if (cursor) query.set('cursor', cursor);
   if (limit) query.set('limit', String(limit));
+  if (type && type !== 'ALL') query.set('type', type);
   const qs = query.toString();
   const url = `/v1/users/${encodeURIComponent(userId)}/activity${qs ? `?${qs}` : ''}`;
   const result = await authenticatedRequest<ApiEnvelope<ApiPublicActivityResponse>>(url);
