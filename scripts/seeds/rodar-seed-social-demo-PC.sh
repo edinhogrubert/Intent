@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="intent-social-demo-runner-PC-2026.09.18.01"
+VERSION="intent-social-demo-runner-PC-2026.09.18.02"
 REPO="/home/grubert/Projetos/Intent-local"
 BACKEND="$REPO/backend"
 EXECUTOR_PC="/home/grubert/intent-automacao/intent-executor-PC.sh"
+SEED_REF="${INTENT_SEED_REF:-main}"
 
 section() {
   echo
@@ -23,6 +24,7 @@ section "Intent — seed social demo PC"
 echo "VERSAO_RUNNER=$VERSION"
 echo "REPO=$REPO"
 echo "BACKEND=$BACKEND"
+echo "REF=$SEED_REF"
 echo "MODO=${INTENT_SEED_DRY_RUN:-SIM}"
 
 echo "Usuário: $(id -un)"
@@ -34,11 +36,11 @@ echo "Host: $(hostname -s)"
 [[ -d "$BACKEND" ]] || fail "backend não encontrado: $BACKEND"
 [[ -x "$EXECUTOR_PC" || -f "$EXECUTOR_PC" ]] || fail "executor PC não encontrado: $EXECUTOR_PC"
 
-section "Sincronizando main local"
+section "Sincronizando ref local"
 
 git -C "$REPO" fetch origin --prune
-git -C "$REPO" checkout main
-git -C "$REPO" pull --ff-only origin main
+git -C "$REPO" checkout "$SEED_REF"
+git -C "$REPO" pull --ff-only origin "$SEED_REF"
 
 git -C "$REPO" status --short
 
@@ -75,4 +77,5 @@ section "Resumo"
 
 echo "RUNNER_OK=$VERSION"
 echo "HEAD=$(git -C "$REPO" rev-parse HEAD)"
+echo "REF_FINAL=$SEED_REF"
 echo "MODO_FINAL=${INTENT_SEED_DRY_RUN:-SIM}"
