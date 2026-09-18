@@ -63,19 +63,44 @@ Executor oficial da VM:
 bash /home/ubuntu/intent-executor-VM.sh <função>
 ```
 
-Na conversa com o usuário, o formato humano deve ser:
+Quando o usuário pedir, ou quando a conversa definir essa preferência, o ChatGPT deve fornecer o caminho absoluto completo do executor.
 
-```text
-Execute função PC(1,2,3)
+Exemplo PC:
+
+```bash
+bash /home/grubert/intent-automacao/intent-executor-PC.sh 1 2 3
 ```
 
-ou:
+Exemplo VM a partir do PC:
 
-```text
-Execute função VM(1,2,3)
+```bash
+ssh -i /home/grubert/.ssh/id_ed25519 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ubuntu@157.151.255.227 'bash /home/ubuntu/intent-executor-VM.sh 1 2 3'
 ```
 
-O ChatGPT só deve mostrar o comando físico do executor quando o usuário pedir explicitamente.
+## Execução assistida via GitHub
+
+Quando o ChatGPT não puder executar algo diretamente no ambiente do usuário, deve preferir criar ou atualizar um script versionado no GitHub em vez de depender de instruções manuais longas ou de outro agente sem necessidade.
+
+Essa regra existe para facilitar o fluxo operacional:
+
+- o ChatGPT prepara o script no repositório;
+- o script precisa ser idempotente quando possível;
+- o script precisa imprimir versão operacional, fonte GitHub usada e relatório final;
+- o usuário executa uma única linha direta do GitHub;
+- o usuário cola o relatório no ChatGPT;
+- o ChatGPT analisa o relatório e decide o próximo passo.
+
+Formato preferencial para bootstrap controlado:
+
+```bash
+/usr/bin/bash <(/usr/bin/curl -fsSL https://raw.githubusercontent.com/edinhogrubert/Intent/<ref>/scripts/executores/<script>.sh)
+```
+
+Essa forma é permitida para **bootstrap, atualização de executor, instalador controlado ou automação operacional versionada**.
+
+Ela não substitui as funções oficiais no fluxo normal. Depois do bootstrap, o usuário deve voltar a executar os caminhos absolutos dos executores PC/VM.
+
+O ChatGPT não deve criar scripts soltos sem registro. Todo script operacional novo deve ser registrado no mapa de scripts ou estar claramente identificado como bootstrap versionado.
 
 ## Proibição de comandos soltos
 
@@ -90,7 +115,7 @@ npm test
 
 salvo pedido explícito do usuário por comando manual.
 
-Se a ação pertence ao fluxo operacional, ela deve virar função do executor.
+Se a ação pertence ao fluxo operacional, ela deve virar função do executor ou script versionado de bootstrap no GitHub.
 
 ## Regra da interface
 
@@ -137,6 +162,8 @@ Execute função VM(...)
 Depois cole aqui o relatório do executor.
 ```
 
+Quando o usuário pedir caminho completo, ou quando essa preferência estiver vigente, substituir a forma humana pelo comando absoluto correspondente.
+
 ## Erro que este contrato evita
 
 O ChatGPT não deve repetir o erro de transformar uma frase informal como:
@@ -169,6 +196,6 @@ Essas etapas não são a mesma coisa.
 
 ## Limite de autonomia
 
-O ChatGPT pode criar documentação, branch, PR e commits quando o usuário pedir explicitamente.
+O ChatGPT pode criar documentação, branch, PR, commits e scripts operacionais versionados quando o usuário pedir explicitamente ou quando a conversa estabelecer esse fluxo.
 
 O ChatGPT não deve fazer release, tag, deploy, rollback, alteração de VM ou mudança destrutiva sem autorização explícita.
