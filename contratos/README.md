@@ -41,17 +41,38 @@ Por isso, estes contratos devem ser escritos como instruções claras, não como
 - `ARQUITETURA_ATUAL_PC.md`
   - Registro da estação local de desenvolvimento e integração, incluindo bootstrap seguro em outro PC sem copiar segredos ou o ambiente da VM.
 
+- `MAPA_SCRIPTS_OPERACIONAIS.md`
+  - Registro dos scripts auxiliares existentes e da função numerada que deve chamá-los.
+
+## Scripts de execução
+
+Os executores e instaladores ficam em:
+
+```text
+scripts/executores/
+```
+
+Arquivos principais:
+
+- `scripts/executores/intent-executor-PC.sh`
+- `scripts/executores/intent-executor-VM.sh`
+- `scripts/executores/instalar-executor-PC.sh`
+- `scripts/executores/instalar-executor-VM.sh`
+
+Esses arquivos implementam a interface documentada, mas a regra humana continua valendo: o usuário chama função numerada; agentes não devem mandar comandos auxiliares soltos.
+
 ## Ordem de autoridade
 
 Quando houver dúvida, a ordem de leitura é:
 
 1. `CONTRATO_AGENTE_SENIOR_CHATGPT.md`
 2. `INTERFACE_EXECUTORES.md`
-3. `ARQUITETURA_ATUAL_PC.md` para trabalho local, ou `ARQUITETURA_ATUAL_VM.md` para VM/deploy
-4. `FLUXO_FUNCIONALIDADE.md`
-5. `CONTRATO_AGENTES_LABORATORIO_INTEGRACAO.md`
-6. `docs/ai-handoff/continuidade/CONTRATO_CONTINUIDADE_INTENT.md`
-7. `docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md`
+3. `MAPA_SCRIPTS_OPERACIONAIS.md`
+4. `ARQUITETURA_ATUAL_PC.md` para trabalho local, ou `ARQUITETURA_ATUAL_VM.md` para VM/deploy
+5. `FLUXO_FUNCIONALIDADE.md`
+6. `CONTRATO_AGENTES_LABORATORIO_INTEGRACAO.md`
+7. `docs/ai-handoff/continuidade/CONTRATO_CONTINUIDADE_INTENT.md`
+8. `docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md`
 
 A conversa atual não deve sobrescrever esses contratos sem confirmação explícita do usuário.
 
