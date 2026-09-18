@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="intent-firebase-social-runner-PC-2026.09.18.01"
+VERSION="intent-firebase-social-runner-PC-2026.09.18.02"
+OWNER_REPO="edinhogrubert/Intent"
+REF="${INTENT_SEED_REF:-main}"
 REPO="/home/grubert/Projetos/Intent-local"
 BACKEND="$REPO/backend"
 EXECUTOR_PC="/home/grubert/intent-automacao/intent-executor-PC.sh"
@@ -21,6 +23,8 @@ fail() {
 section "Intent — seed Firebase social PC"
 
 echo "VERSAO_RUNNER=$VERSION"
+echo "OWNER_REPO=$OWNER_REPO"
+echo "REF=$REF"
 echo "REPO=$REPO"
 echo "BACKEND=$BACKEND"
 echo "MODO=${INTENT_SEED_DRY_RUN:-SIM}"
@@ -34,11 +38,20 @@ echo "Host: $(hostname -s)"
 [[ -d "$BACKEND" ]] || fail "backend não encontrado: $BACKEND"
 [[ -x "$EXECUTOR_PC" || -f "$EXECUTOR_PC" ]] || fail "executor PC não encontrado: $EXECUTOR_PC"
 
-section "Sincronizando main local"
+section "Sincronizando repositório local com ${REF}"
 
 git -C "$REPO" fetch origin --prune
-git -C "$REPO" checkout main
-git -C "$REPO" pull --ff-only origin main
+
+if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
+  git -C "$REPO" status --short
+  fail "árvore local suja antes da troca de referência; seed bloqueado"
+fi
+
+git -C "$REPO" checkout "$REF"
+git -C "$REPO" pull --ff-only origin "$REF"
+
+echo "HEAD_LOCAL=$(git -C "$REPO" rev-parse HEAD)"
+echo "BRANCH_LOCAL=$(git -C "$REPO" branch --show-current || true)"
 
 if [[ -n "$(git -C "$REPO" status --porcelain)" ]]; then
   git -C "$REPO" status --short
@@ -47,7 +60,7 @@ fi
 
 section "Validando backup Git existente"
 
-bash "$EXECUTOR_PC" 5
+bash "$EXECUTOR_PC" 5 || fail "backup Git local inválido; seed bloqueado"
 
 section "Preparando backend"
 
@@ -73,5 +86,6 @@ fi
 section "Resumo"
 
 echo "RUNNER_OK=$VERSION"
+echo "REF=$REF"
 echo "HEAD=$(git -C "$REPO" rev-parse HEAD)"
 echo "MODO_FINAL=${INTENT_SEED_DRY_RUN:-SIM}"
