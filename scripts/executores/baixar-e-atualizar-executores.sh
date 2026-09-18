@@ -17,6 +17,8 @@ set -Eeuo pipefail
 # - Scripts auxiliares não devem ser chamados diretamente.
 # =====================================================================
 
+BOOTSTRAP_VERSION="intent-bootstrap-2026.09.18.03"
+EXECUTOR_INTERFACE_VERSION="intent-executor-interface-2026.09.18.03"
 OWNER_REPO="edinhogrubert/Intent"
 BRANCH_CANDIDATES=("${INTENT_EXECUTOR_REF:-}" "main" "docs/contratos-agentes")
 RAW_BASE="https://raw.githubusercontent.com/${OWNER_REPO}"
@@ -50,12 +52,23 @@ section() {
 
 fail() {
   echo "ERRO: $1"
+  echo "VERSAO_BOOTSTRAP=${BOOTSTRAP_VERSION}"
+  echo "VERSAO_INTERFACE=${EXECUTOR_INTERFACE_VERSION}"
   echo "Log salvo em: $LOG_FILE"
   exit 1
 }
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "comando obrigatório ausente: $1"
+}
+
+file_sha256() {
+  local path="$1"
+  if [[ -f "$path" ]] && command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$path" | awk '{print $1}'
+  else
+    echo "indisponivel"
+  fi
 }
 
 fetch_ok() {
@@ -78,6 +91,8 @@ resolve_ref() {
 
 section "Intent — bootstrap único dos executores"
 
+echo "VERSAO_BOOTSTRAP=${BOOTSTRAP_VERSION}"
+echo "VERSAO_INTERFACE=${EXECUTOR_INTERFACE_VERSION}"
 echo "Log: $LOG_FILE"
 echo "Usuário local: $(id -un)"
 echo "Host local: $(hostname -s)"
@@ -96,6 +111,7 @@ need_cmd mktemp
 need_cmd date
 need_cmd tee
 need_cmd ssh
+need_cmd sha256sum
 
 SSH_OPTS=(
   -i "$VM_SSH_KEY"
@@ -121,6 +137,8 @@ INTENT_EXECUTOR_REF="$REF" bash "$PC_TMP"
 section "Verificando executor do PC"
 
 bash /home/grubert/intent-automacao/intent-executor-PC.sh list
+PC_EXECUTOR_SHA256="$(file_sha256 /home/grubert/intent-automacao/intent-executor-PC.sh)"
+echo "PC_EXECUTOR_SHA256=${PC_EXECUTOR_SHA256}"
 
 section "Atualizando executor da VM via SSH"
 
@@ -136,9 +154,15 @@ section "Verificando executor da VM"
 
 ssh "${SSH_OPTS[@]}" "${VM_USER}@${VM_HOST}" \
   'bash /home/ubuntu/intent-executor-VM.sh list'
+VM_EXECUTOR_SHA256="$(ssh "${SSH_OPTS[@]}" "${VM_USER}@${VM_HOST}" 'sha256sum /home/ubuntu/intent-executor-VM.sh 2>/dev/null | awk '\''{print $1}'\'' || echo indisponivel')"
+echo "VM_EXECUTOR_SHA256=${VM_EXECUTOR_SHA256}"
 
 section "Resumo"
 
+echo "VERSAO_BOOTSTRAP=${BOOTSTRAP_VERSION}"
+echo "VERSAO_INTERFACE=${EXECUTOR_INTERFACE_VERSION}"
+echo "PC_EXECUTOR_SHA256=${PC_EXECUTOR_SHA256}"
+echo "VM_EXECUTOR_SHA256=${VM_EXECUTOR_SHA256}"
 echo "PC: executor instalado/atualizado e listado."
 echo "VM: executor instalado/atualizado via SSH e listado."
 echo "Fonte usada: ${OWNER_REPO}@${REF}"
