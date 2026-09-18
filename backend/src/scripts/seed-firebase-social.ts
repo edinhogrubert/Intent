@@ -1,449 +1,358 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { PrismaClient, IntentReactionType, NotificationType } from '@prisma/client';
-import { firebaseAuth } from '../lib/firebase.js';
-import { config } from '../config.js';
-import { revealAssociatedData, sealReveal } from '../domain/reveal-crypto.js';
 
 const prisma = new PrismaClient();
-const VERSION = 'intent-firebase-social-seed-2026.09.18.01';
 
-type RealUserInput = {
-  key: string;
-  username: string;
-  displayName?: string;
-  bio?: string;
-  avatarUrl?: string;
-  firebaseUid?: string;
-  email?: string;
-};
+const DRY_RUN = process.env.INTENT_SEED_DRY_RUN !== 'NAO';
+const ALLOW_WRITE = process.env.INTENT_ALLOW_EXISTING_USERS_SOCIAL_SEED === 'SIM';
+const ALLOW_PRODUCTION = process.env.INTENT_ALLOW_PRODUCTION_SEED === 'SIM';
+const USER_LIMIT = Number.parseInt(process.env.INTENT_SOCIAL_SEED_USER_LIMIT ?? '7', 10);
+const USERNAME_FILTER = (process.env.INTENT_SOCIAL_SEED_USERNAMES ?? '')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
 
-type SeedManifest = {
-  users: RealUserInput[];
-};
-
-type ResolvedSeedUser = Required<Pick<RealUserInput, 'key' | 'username'>> & {
-  firebaseUid: string;
-  email: string | null;
-  displayName: string;
-  bio: string | null;
-  avatarUrl: string | null;
-};
-
-type SeedIntent = {
-  slug: string;
-  creatorKey: string;
-  title: string;
-  story: string;
-  category: string;
-  supportGoal: number;
-  status: 'PUBLISHED' | 'REALIZED';
-  reveal: string;
-};
-
-const dryRun = process.env.INTENT_SEED_DRY_RUN !== 'NAO';
-const allowSeed = process.env.INTENT_ALLOW_FIREBASE_SOCIAL_SEED === 'SIM';
-const allowProduction = process.env.INTENT_ALLOW_PRODUCTION_SEED === 'SIM';
-
-const defaultManifestCandidates = [
-  process.env.INTENT_FIREBASE_SOCIAL_USERS_FILE,
-  resolve(dirname(fileURLToPath(import.meta.url)), '../../prisma/firebase-social-users.json'),
-].filter(Boolean) as string[];
-
-const intents: SeedIntent[] = [
-  {
-    slug: 'biblioteca-comunitaria',
-    creatorKey: 'edinho_grubert',
-    title: 'Liberar biblioteca comunitária do bairro',
-    story: 'Uma intent para mobilizar pessoas, livros e voluntários em torno de uma biblioteca comunitária local.',
-    category: 'SOCIAL_IMPACT',
-    supportGoal: 6,
-    status: 'REALIZED',
-    reveal: 'A biblioteca foi organizada com prateleiras, livros separados por idade e uma escala inicial de voluntários.',
-  },
-  {
-    slug: 'oficina-tecnologia',
-    creatorKey: 'will',
-    title: 'Oficina aberta de tecnologia para iniciantes',
-    story: 'Se a comunidade demonstrar interesse, abriremos uma oficina prática de tecnologia para quem está começando.',
-    category: 'TECHNOLOGY',
-    supportGoal: 5,
-    status: 'PUBLISHED',
-    reveal: 'Link da primeira turma: será liberado quando a meta de apoio for atingida.',
-  },
-  {
-    slug: 'mutirao-praca',
-    creatorKey: 'miranha',
-    title: 'Mutirão para revitalizar uma praça',
-    story: 'Um chamado público para reunir moradores em uma ação simples de cuidado com a praça.',
-    category: 'COMMUNITY',
-    supportGoal: 5,
-    status: 'REALIZED',
-    reveal: 'O mutirão aconteceu com pintura, limpeza e reorganização dos espaços de convivência.',
-  },
-  {
-    slug: 'playlist-cultural',
-    creatorKey: 'snoop',
-    title: 'Playlist colaborativa de cultura local',
-    story: 'Uma intent para reunir recomendações de música, eventos e artistas locais indicados pela rede.',
-    category: 'CULTURE',
-    supportGoal: 4,
-    status: 'PUBLISHED',
-    reveal: 'Playlist e curadoria serão publicadas após a meta.',
-  },
-  {
-    slug: 'grupo-estudos',
-    creatorKey: 'henry',
-    title: 'Grupo de estudos com encontros semanais',
-    story: 'Um experimento para organizar encontros de estudo com compromisso público e participação recorrente.',
-    category: 'EDUCATION',
-    supportGoal: 5,
-    status: 'PUBLISHED',
-    reveal: 'Agenda inicial e material de apoio ficam disponíveis quando a meta for atingida.',
-  },
-  {
-    slug: 'desafio-criadores',
-    creatorKey: 'willian_santos',
-    title: 'Desafio de criadores por 7 dias',
-    story: 'Criadores publicam um pequeno avanço por dia e liberam o bastidor completo ao final.',
-    category: 'CREATOR',
-    supportGoal: 5,
-    status: 'PUBLISHED',
-    reveal: 'Bastidores e roteiro do desafio serão liberados para os apoiadores.',
-  },
+const INTENT_IDS = [
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444',
+  '55555555-5555-4555-8555-555555555555',
+  '66666666-6666-4666-8666-666666666666',
 ];
 
-const followPairs: Array<[string, string]> = [
-  ['miranha', 'edinho_grubert'],
-  ['batima', 'edinho_grubert'],
-  ['snoop', 'edinho_grubert'],
-  ['will', 'edinho_grubert'],
-  ['henry', 'edinho_grubert'],
-  ['willian_santos', 'edinho_grubert'],
-  ['edinho_grubert', 'miranha'],
-  ['edinho_grubert', 'will'],
-  ['miranha', 'batima'],
-  ['batima', 'miranha'],
-  ['snoop', 'will'],
-  ['will', 'snoop'],
-  ['henry', 'willian_santos'],
-  ['willian_santos', 'henry'],
-  ['batima', 'snoop'],
-  ['will', 'henry'],
+const COMMENT_IDS = [
+  'aaaaaaaa-1111-4111-8111-aaaaaaaaaaa1',
+  'aaaaaaaa-2222-4222-8222-aaaaaaaaaaa2',
+  'aaaaaaaa-3333-4333-8333-aaaaaaaaaaa3',
+  'aaaaaaaa-4444-4444-8444-aaaaaaaaaaa4',
+  'aaaaaaaa-5555-4555-8555-aaaaaaaaaaa5',
+  'aaaaaaaa-6666-4666-8666-aaaaaaaaaaa6',
 ];
 
-const comments = [
-  'Isso tem potencial de virar referência para a comunidade.',
-  'A ideia ficou clara e dá vontade de participar.',
-  'Quando abrir, quero acompanhar os próximos passos.',
-  'Esse tipo de acontecimento combina muito com o Intent.',
-  'Boa mobilização. O próximo passo ficou objetivo.',
-];
-
-function log(message: string) {
-  console.log(message);
-}
-
-function fail(message: string): never {
-  throw new Error(message);
-}
-
-function readManifest(): SeedManifest {
-  const inline = process.env.INTENT_FIREBASE_SOCIAL_USERS_JSON;
-  if (inline?.trim()) {
-    return JSON.parse(inline) as SeedManifest;
+function assertSafeExecution() {
+  if (process.env.NODE_ENV === 'production' && !ALLOW_PRODUCTION) {
+    throw new Error('Seed bloqueado em NODE_ENV=production. Use INTENT_ALLOW_PRODUCTION_SEED=SIM somente com autorização explícita.');
   }
 
-  for (const candidate of defaultManifestCandidates) {
-    if (existsSync(candidate)) {
-      return JSON.parse(readFileSync(candidate, 'utf8')) as SeedManifest;
-    }
-  }
-
-  fail([
-    'Manifesto de usuários reais não encontrado.',
-    'Defina INTENT_FIREBASE_SOCIAL_USERS_JSON ou INTENT_FIREBASE_SOCIAL_USERS_FILE.',
-    'Cada usuário precisa ter key, username e firebaseUid ou email resolvível no Firebase Auth.',
-  ].join(' '));
-}
-
-function validateManifest(manifest: SeedManifest) {
-  if (!Array.isArray(manifest.users) || manifest.users.length < 2) {
-    fail('Manifesto inválido: informe ao menos 2 usuários reais.');
-  }
-
-  const keys = new Set<string>();
-  const usernames = new Set<string>();
-  for (const user of manifest.users) {
-    if (!user.key || !user.username) fail('Manifesto inválido: key e username são obrigatórios.');
-    if (!user.firebaseUid && !user.email) fail(`Usuário ${user.key} precisa de firebaseUid ou email.`);
-    if (keys.has(user.key)) fail(`key duplicada no manifesto: ${user.key}`);
-    if (usernames.has(user.username)) fail(`username duplicado no manifesto: ${user.username}`);
-    keys.add(user.key);
-    usernames.add(user.username);
+  if (!DRY_RUN && !ALLOW_WRITE) {
+    throw new Error('Seed real bloqueado. Use INTENT_ALLOW_EXISTING_USERS_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO.');
   }
 }
 
-async function resolveFirebaseUser(input: RealUserInput): Promise<ResolvedSeedUser> {
-  const authUser = input.firebaseUid
-    ? await firebaseAuth.getUser(input.firebaseUid)
-    : await firebaseAuth.getUserByEmail(input.email as string);
-
-  if (input.email && authUser.email && input.email.toLowerCase() !== authUser.email.toLowerCase()) {
-    fail(`E-mail divergente para ${input.key}: manifesto=${input.email} firebase=${authUser.email}`);
+function getRevealKey(): Buffer {
+  const raw = process.env.REVEAL_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new Error('REVEAL_ENCRYPTION_KEY ausente.');
   }
+
+  const key = Buffer.from(raw, 'base64');
+  if (key.length !== 32) {
+    throw new Error('REVEAL_ENCRYPTION_KEY deve conter exatamente 32 bytes em Base64.');
+  }
+
+  return key;
+}
+
+function sealReveal(plaintext: string, intentId: string, version = 1) {
+  const key = getRevealKey();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(Buffer.from(`intent:${intentId}:reveal:v${version}`, 'utf8'));
+
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final(),
+  ]);
 
   return {
-    key: input.key,
-    username: input.username,
-    firebaseUid: authUser.uid,
-    email: authUser.email ?? input.email ?? null,
-    displayName: input.displayName ?? authUser.displayName ?? input.username,
-    bio: input.bio ?? null,
-    avatarUrl: input.avatarUrl ?? authUser.photoURL ?? null,
+    revealCiphertext: encrypted.toString('base64'),
+    revealIv: iv.toString('base64'),
+    revealAuthTag: cipher.getAuthTag().toString('base64'),
+    revealVersion: version,
   };
 }
 
-async function preflightConflicts(users: ResolvedSeedUser[]) {
-  for (const user of users) {
-    const byUid = await prisma.user.findUnique({ where: { firebaseUid: user.firebaseUid } });
-    if (byUid && byUid.username !== user.username) {
-      fail(`Conflito: firebaseUid ${user.firebaseUid} já pertence ao username ${byUid.username}, não ${user.username}.`);
-    }
+type ExistingUser = Awaited<ReturnType<typeof loadUsers>>[number];
 
-    const byUsername = await prisma.user.findUnique({ where: { username: user.username } });
-    if (byUsername && byUsername.firebaseUid !== user.firebaseUid) {
-      fail(`Conflito: username ${user.username} já pertence a outro firebaseUid.`);
-    }
-
-    if (user.email) {
-      const byEmail = await prisma.user.findUnique({ where: { email: user.email } });
-      if (byEmail && byEmail.firebaseUid !== user.firebaseUid) {
-        fail(`Conflito: email ${user.email} já pertence a outro firebaseUid.`);
-      }
-    }
-  }
-}
-
-function idFor(prefix: string, value: string) {
-  const hex = createHash('sha256').update(`intent:${prefix}:${value}`).digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
-async function upsertUsers(users: ResolvedSeedUser[]) {
-  const map = new Map<string, string>();
-  for (const user of users) {
-    const row = await prisma.user.upsert({
-      where: { firebaseUid: user.firebaseUid },
-      create: {
-        id: idFor('user', user.firebaseUid),
-        firebaseUid: user.firebaseUid,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
+async function loadUsers() {
+  if (USERNAME_FILTER.length > 0) {
+    const users = await prisma.user.findMany({
+      where: {
+        username: { in: USERNAME_FILTER },
         status: 'ACTIVE',
       },
-      update: {
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
-        status: 'ACTIVE',
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const found = new Set(users.map((user) => user.username));
+    const missing = USERNAME_FILTER.filter((username) => !found.has(username));
+    if (missing.length > 0) {
+      throw new Error(`Usuários informados não existem na base users: ${missing.join(', ')}`);
+    }
+
+    return users;
+  }
+
+  return prisma.user.findMany({
+    where: { status: 'ACTIVE' },
+    orderBy: { createdAt: 'asc' },
+    take: Number.isFinite(USER_LIMIT) && USER_LIMIT > 0 ? USER_LIMIT : 7,
+  });
+}
+
+function intentPlans(users: ExistingUser[]) {
+  const categories = ['SOCIAL', 'TECHNOLOGY', 'CULTURE', 'EDUCATION', 'COMMUNITY', 'OTHER'];
+  const titles = [
+    'Organizar um encontro aberto para testar o Intent',
+    'Publicar um protótipo social validado por apoiadores',
+    'Liberar uma curadoria cultural quando a meta for alcançada',
+    'Criar um guia público para novos participantes',
+    'Mobilizar pessoas para uma ação local simples',
+    'Registrar uma conquista coletiva da rede',
+  ];
+  const stories = [
+    'Uma Intent para reunir pessoas reais em torno de um acontecimento simples e verificável.',
+    'Um teste social usando usuários já existentes para validar feed, perfil, apoios e reações.',
+    'Uma proposta de conteúdo liberado por engajamento, mantendo a lógica de expectativa do Intent.',
+    'Uma Intent educacional para demonstrar como participantes acompanham uma meta pública.',
+    'Um acontecimento social pensado para mostrar mobilização e reputação por realização.',
+    'Uma publicação de fechamento para validar histórico, notificações e participação.',
+  ];
+  const reveals = [
+    'Revelação: o encontro será usado para validar o fluxo social ponta a ponta.',
+    'Revelação: o protótipo foi aprovado pelos apoiadores e pode virar bloco oficial.',
+    'Revelação: a curadoria será publicada em formato aberto para os participantes.',
+    'Revelação: o guia será usado para explicar o Intent para usuários novos.',
+    'Revelação: a ação local terá registro público de participação.',
+    'Revelação: a conquista coletiva ficará registrada no perfil dos envolvidos.',
+  ];
+
+  return INTENT_IDS.map((id, index) => {
+    const creator = users[index % users.length];
+    const status = index === 1 || index === 5 ? 'REALIZED' : 'PUBLISHED';
+    const supportGoal = 3 + index;
+
+    return {
+      id,
+      creator,
+      data: {
+        type: 'SUPPORT_REVEAL',
+        conditionType: 'SUPPORT',
+        status,
+        visibility: 'PUBLIC',
+        category: categories[index],
+        title: titles[index],
+        story: stories[index],
+        supportGoal,
+        realizedAt: status === 'REALIZED' ? new Date(Date.now() - (index + 1) * 60 * 60 * 1000) : null,
+        publishedAt: new Date(Date.now() - (index + 2) * 24 * 60 * 60 * 1000),
+        revealPlaintext: reveals[index],
+      },
+    };
+  });
+}
+
+async function upsertIntent(plan: ReturnType<typeof intentPlans>[number]) {
+  const existing = await prisma.intent.findUnique({ where: { id: plan.id } });
+
+  if (existing) {
+    await prisma.intent.update({
+      where: { id: plan.id },
+      data: {
+        creatorId: plan.creator.id,
+        type: plan.data.type,
+        conditionType: plan.data.conditionType,
+        status: plan.data.status,
+        visibility: plan.data.visibility,
+        category: plan.data.category,
+        title: plan.data.title,
+        story: plan.data.story,
+        supportGoal: plan.data.supportGoal,
+        realizedAt: plan.data.realizedAt,
+        publishedAt: plan.data.publishedAt,
       },
     });
-    map.set(user.key, row.id);
+    return;
   }
-  return map;
-}
 
-async function upsertFollow(followerId: string, followingId: string) {
-  if (followerId === followingId) return;
-  await prisma.follow.upsert({
-    where: { followerId_followingId: { followerId, followingId } },
-    create: { followerId, followingId },
-    update: {},
-  });
-}
+  const sealed = sealReveal(plan.data.revealPlaintext, plan.id, 1);
 
-async function upsertIntent(seed: SeedIntent, userIds: Map<string, string>) {
-  const creatorId = userIds.get(seed.creatorKey);
-  if (!creatorId) fail(`Creator ausente no manifesto: ${seed.creatorKey}`);
-
-  const id = idFor('intent', seed.slug);
-  const sealed = sealReveal(seed.reveal, config.revealEncryptionKey, revealAssociatedData(id, 1));
-  const realizedAt = seed.status === 'REALIZED' ? new Date() : null;
-
-  return prisma.intent.upsert({
-    where: { id },
-    create: {
-      id,
-      creatorId,
-      type: 'SUPPORT_REVEAL',
-      conditionType: 'SUPPORT',
-      status: seed.status,
-      visibility: 'PUBLIC',
-      category: seed.category,
-      title: seed.title,
-      story: seed.story,
-      supportGoal: seed.supportGoal,
+  await prisma.intent.create({
+    data: {
+      id: plan.id,
+      creatorId: plan.creator.id,
+      type: plan.data.type,
+      conditionType: plan.data.conditionType,
+      status: plan.data.status,
+      visibility: plan.data.visibility,
+      category: plan.data.category,
+      title: plan.data.title,
+      story: plan.data.story,
+      supportGoal: plan.data.supportGoal,
       supportCount: 0,
-      revealCiphertext: sealed.ciphertext,
-      revealIv: sealed.iv,
-      revealAuthTag: sealed.authTag,
-      revealVersion: 1,
-      realizedAt,
+      guardianIds: [],
+      guardianApprovals: [],
+      guardianApprovalGoal: null,
+      revealCiphertext: sealed.revealCiphertext,
+      revealIv: sealed.revealIv,
+      revealAuthTag: sealed.revealAuthTag,
+      revealVersion: sealed.revealVersion,
+      realizedAt: plan.data.realizedAt,
+      publishedAt: plan.data.publishedAt,
     },
-    update: {
-      creatorId,
-      status: seed.status,
-      visibility: 'PUBLIC',
-      category: seed.category,
-      title: seed.title,
-      story: seed.story,
-      supportGoal: seed.supportGoal,
-      revealCiphertext: sealed.ciphertext,
-      revealIv: sealed.iv,
-      revealAuthTag: sealed.authTag,
-      revealVersion: 1,
-      realizedAt,
-    },
-  });
-}
-
-async function upsertSupport(intentId: string, userId: string) {
-  await prisma.support.upsert({
-    where: { intentId_userId: { intentId, userId } },
-    create: { intentId, userId },
-    update: {},
-  });
-}
-
-async function upsertReaction(intentId: string, userId: string, type: IntentReactionType) {
-  await prisma.intentReaction.upsert({
-    where: { intentId_userId: { intentId, userId } },
-    create: { intentId, userId, type },
-    update: { type },
-  });
-}
-
-async function upsertComment(intentId: string, authorId: string, body: string) {
-  const id = idFor('comment', `${intentId}:${authorId}:${body}`);
-  await prisma.intentComment.upsert({
-    where: { id },
-    create: { id, intentId, authorId, body },
-    update: { body },
-  });
-}
-
-async function upsertNotification(userId: string, actorId: string, type: NotificationType, intentId: string | null, key: string) {
-  await prisma.notification.upsert({
-    where: { deduplicationKey: key },
-    create: { userId, actorId, type, intentId, deduplicationKey: key },
-    update: { userId, actorId, type, intentId },
-  });
-}
-
-async function upsertEvent(intentId: string | null, actorId: string | null, type: string, payload: unknown, key: string) {
-  await prisma.domainEvent.upsert({
-    where: { idempotencyKey: key },
-    create: { intentId, actorId, type, payload: payload as object, idempotencyKey: key },
-    update: { intentId, actorId, type, payload: payload as object },
   });
 }
 
 async function main() {
-  log(`VERSAO_SEED=${VERSION}`);
-  log(`NODE_ENV=${config.nodeEnv}`);
-  log(`FIREBASE_PROJECT_ID=${config.firebaseProjectId}`);
-  log(`DRY_RUN=${dryRun ? 'SIM' : 'NAO'}`);
+  assertSafeExecution();
 
-  if (config.nodeEnv === 'production' && !allowProduction) {
-    fail('Seed bloqueado em production. Use INTENT_ALLOW_PRODUCTION_SEED=SIM para autorizar explicitamente.');
+  console.log('INTENT_EXISTING_USERS_SOCIAL_SEED');
+  console.log(`DRY_RUN=${DRY_RUN ? 'SIM' : 'NAO'}`);
+  console.log(`NODE_ENV=${process.env.NODE_ENV ?? 'indefinido'}`);
+  console.log(`USER_LIMIT=${USER_LIMIT}`);
+  console.log(`USERNAME_FILTER=${USERNAME_FILTER.length > 0 ? USERNAME_FILTER.join(',') : 'AUTO'}`);
+
+  const users = await loadUsers();
+
+  if (users.length < 3) {
+    throw new Error(`Seed social exige pelo menos 3 usuários ACTIVE já existentes na tabela users. Encontrados: ${users.length}.`);
   }
 
-  if (!dryRun && !allowSeed) {
-    fail('Para gravar, use INTENT_ALLOW_FIREBASE_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO.');
+  console.log(`USERS_EXISTENTES=${users.length}`);
+  for (const user of users) {
+    console.log(`USER=${user.username} | firebaseUid=${user.firebaseUid} | email=${user.email ?? 'sem-email'}`);
   }
 
-  const manifest = readManifest();
-  validateManifest(manifest);
+  const plans = intentPlans(users);
+  const followPairs = users.flatMap((user, index) => {
+    const next = users[(index + 1) % users.length];
+    const previous = users[(index + users.length - 1) % users.length];
+    return [
+      { followerId: user.id, followingId: next.id },
+      { followerId: user.id, followingId: previous.id },
+    ].filter((pair) => pair.followerId !== pair.followingId);
+  });
 
-  const resolvedUsers = [] as ResolvedSeedUser[];
-  for (const user of manifest.users) {
-    resolvedUsers.push(await resolveFirebaseUser(user));
-  }
+  const supportPlans = plans.flatMap((plan, intentIndex) => users
+    .filter((user) => user.id !== plan.creator.id)
+    .slice(0, Math.min(users.length - 1, 4 + (intentIndex % 2)))
+    .map((user) => ({ intentId: plan.id, userId: user.id })));
 
-  await preflightConflicts(resolvedUsers);
+  const reactionTypes = [IntentReactionType.LIKE, IntentReactionType.LOVE, IntentReactionType.CELEBRATE];
+  const reactionPlans = supportPlans.map((support, index) => ({
+    ...support,
+    type: reactionTypes[index % reactionTypes.length],
+  }));
 
-  const resolvedKeys = new Set(resolvedUsers.map((user) => user.key));
-  for (const intent of intents) {
-    if (!resolvedKeys.has(intent.creatorKey)) {
-      fail(`Manifesto não contém usuário necessário para intent ${intent.slug}: ${intent.creatorKey}`);
-    }
-  }
+  const commentPlans = plans.map((plan, index) => {
+    const author = users[(index + 1) % users.length];
+    return {
+      id: COMMENT_IDS[index],
+      intentId: plan.id,
+      authorId: author.id,
+      body: `Comentário de validação social da Intent por @${author.username}.`,
+    };
+  });
 
-  log(`USUARIOS_FIREBASE_RESOLVIDOS=${resolvedUsers.length}`);
-  for (const user of resolvedUsers) {
-    log(` - ${user.key} | ${user.username} | ${user.email ?? 'sem-email'} | ${user.firebaseUid}`);
-  }
+  console.log(`PLANO_INTENTS=${plans.length}`);
+  console.log(`PLANO_FOLLOWS=${followPairs.length}`);
+  console.log(`PLANO_SUPPORTS=${supportPlans.length}`);
+  console.log(`PLANO_REACTIONS=${reactionPlans.length}`);
+  console.log(`PLANO_COMMENTS=${commentPlans.length}`);
 
-  if (dryRun) {
-    log('DRY_RUN_OK=SIM');
-    log('Nenhuma escrita foi feita.');
+  if (DRY_RUN) {
+    console.log('DRY_RUN_OK=nenhuma escrita executada');
     return;
   }
 
-  await prisma.$transaction(async () => {
-    const userIds = await upsertUsers(resolvedUsers);
+  for (const pair of followPairs) {
+    await prisma.follow.upsert({
+      where: { followerId_followingId: pair },
+      update: {},
+      create: pair,
+    });
+  }
 
-    for (const [followerKey, followingKey] of followPairs) {
-      const followerId = userIds.get(followerKey);
-      const followingId = userIds.get(followingKey);
-      if (followerId && followingId) {
-        await upsertFollow(followerId, followingId);
-        await upsertNotification(followingId, followerId, NotificationType.FOLLOW_RECEIVED, null, `seed-firebase-social:follow:${followerId}:${followingId}`);
-        await upsertEvent(null, followerId, 'FOLLOW_CREATED', { followingId }, `seed-firebase-social:event:follow:${followerId}:${followingId}`);
-      }
-    }
+  for (const plan of plans) {
+    await upsertIntent(plan);
+  }
 
-    const allUserIds = Array.from(userIds.values());
-    for (const seed of intents) {
-      const intent = await upsertIntent(seed, userIds);
-      await upsertEvent(intent.id, intent.creatorId, 'INTENT_SEEDED', { slug: seed.slug, status: seed.status }, `seed-firebase-social:event:intent:${seed.slug}`);
+  for (const support of supportPlans) {
+    await prisma.support.upsert({
+      where: { intentId_userId: support },
+      update: {},
+      create: support,
+    });
+  }
 
-      const supporters = allUserIds.filter((id) => id !== intent.creatorId).slice(0, Math.min(seed.supportGoal, Math.max(2, allUserIds.length - 1)));
-      for (const supporterId of supporters) {
-        await upsertSupport(intent.id, supporterId);
-        await upsertNotification(intent.creatorId, supporterId, NotificationType.SUPPORT_RECEIVED, intent.id, `seed-firebase-social:support:${intent.id}:${supporterId}`);
-      }
+  for (const reaction of reactionPlans) {
+    await prisma.intentReaction.upsert({
+      where: {
+        intentId_userId: {
+          intentId: reaction.intentId,
+          userId: reaction.userId,
+        },
+      },
+      update: { type: reaction.type },
+      create: reaction,
+    });
+  }
 
-      const reactionTypes = [IntentReactionType.LIKE, IntentReactionType.LOVE, IntentReactionType.CELEBRATE];
-      for (let i = 0; i < supporters.length; i += 1) {
-        await upsertReaction(intent.id, supporters[i], reactionTypes[i % reactionTypes.length]);
-        await upsertNotification(intent.creatorId, supporters[i], NotificationType.INTENT_REACTION_RECEIVED, intent.id, `seed-firebase-social:reaction:${intent.id}:${supporters[i]}`);
-      }
+  for (const comment of commentPlans) {
+    await prisma.intentComment.upsert({
+      where: { id: comment.id },
+      update: { body: comment.body, authorId: comment.authorId, intentId: comment.intentId },
+      create: comment,
+    });
+  }
 
-      for (let i = 0; i < Math.min(3, supporters.length); i += 1) {
-        await upsertComment(intent.id, supporters[i], comments[i % comments.length]);
-        await upsertNotification(intent.creatorId, supporters[i], NotificationType.INTENT_COMMENT_RECEIVED, intent.id, `seed-firebase-social:comment:${intent.id}:${supporters[i]}:${i}`);
-      }
+  for (const plan of plans) {
+    const supportCount = await prisma.support.count({ where: { intentId: plan.id } });
+    await prisma.intent.update({ where: { id: plan.id }, data: { supportCount } });
+  }
 
-      const supportCount = await prisma.support.count({ where: { intentId: intent.id } });
-      await prisma.intent.update({ where: { id: intent.id }, data: { supportCount } });
-    }
-  }, { timeout: 20000 });
+  for (const plan of plans) {
+    const actor = users.find((user) => user.id !== plan.creator.id) ?? users[0];
+    await prisma.notification.upsert({
+      where: { deduplicationKey: `seed-existing-users-social:intent:${plan.id}:support` },
+      update: {},
+      create: {
+        userId: plan.creator.id,
+        actorId: actor.id,
+        intentId: plan.id,
+        type: NotificationType.SUPPORT_RECEIVED,
+        deduplicationKey: `seed-existing-users-social:intent:${plan.id}:support`,
+      },
+    });
 
-  log('SEED_FIREBASE_SOCIAL_OK=SIM');
+    await prisma.domainEvent.upsert({
+      where: { idempotencyKey: `seed-existing-users-social:intent:${plan.id}:published` },
+      update: {},
+      create: {
+        intentId: plan.id,
+        actorId: plan.creator.id,
+        type: 'SEED_EXISTING_USERS_SOCIAL_INTENT_READY',
+        payload: {
+          source: 'seed-existing-users-social',
+          title: plan.data.title,
+        },
+        idempotencyKey: `seed-existing-users-social:intent:${plan.id}:published`,
+      },
+    });
+  }
+
+  console.log('SEED_GRAVADO=SIM');
+  console.log(`USERS_REAPROVEITADOS=${users.length}`);
+  console.log(`INTENTS_UPSERT=${plans.length}`);
+  console.log(`FOLLOWS_UPSERT=${followPairs.length}`);
+  console.log(`SUPPORTS_UPSERT=${supportPlans.length}`);
+  console.log(`REACTIONS_UPSERT=${reactionPlans.length}`);
+  console.log(`COMMENTS_UPSERT=${commentPlans.length}`);
 }
 
 main()
   .catch((error) => {
-    console.error('SEED_FIREBASE_SOCIAL_ERRO=SIM');
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   })
