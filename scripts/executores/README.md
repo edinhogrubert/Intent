@@ -7,6 +7,24 @@ O objetivo é impedir comandos soltos no fluxo diário. O usuário não deve cha
 - PC: `/home/grubert/intent-automacao/intent-executor-PC.sh <função>`
 - VM: `/home/ubuntu/intent-executor-VM.sh <função>`
 
+## Bootstrap único
+
+Para evitar vários comandos soltos, existe um bootstrap único para baixar na pasta `Downloads` e executar manualmente:
+
+```text
+scripts/executores/baixar-e-atualizar-executores.sh
+```
+
+Esse bootstrap:
+
+1. valida que está rodando no PC esperado;
+2. busca os instaladores no GitHub;
+3. instala/atualiza o executor do PC;
+4. tenta acessar a VM por SSH;
+5. se o SSH estiver disponível, instala/atualiza o executor da VM;
+6. lista as funções instaladas;
+7. grava relatório em `~/Downloads/intent-relatorios/`.
+
 ## Interface única
 
 PC e VM usam a mesma numeração. Quando uma função não se aplica ao ambiente, o executor deve responder `N/A` sem reaproveitar o número para outra finalidade.
@@ -48,6 +66,7 @@ O método operacional é baixar o instalador do GitHub e executá-lo no ambiente
 
 Arquivos de instalação:
 
+- `scripts/executores/baixar-e-atualizar-executores.sh`
 - `scripts/executores/instalar-executor-PC.sh`
 - `scripts/executores/instalar-executor-VM.sh`
 
