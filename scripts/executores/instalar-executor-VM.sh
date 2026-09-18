@@ -4,7 +4,8 @@ set -Eeuo pipefail
 BASE=/home/ubuntu/intent-automacao
 TARGET=/home/ubuntu/intent-executor-VM.sh
 LOCK="$BASE/instalador-executor-VM.lock"
-SRC_URL="${INTENT_EXECUTOR_VM_URL:-https://raw.githubusercontent.com/edinhogrubert/Intent/docs/contratos-agentes/scripts/executores/intent-executor-VM.sh}"
+REF="${INTENT_EXECUTOR_REF:-main}"
+SRC_URL="${INTENT_EXECUTOR_VM_URL:-https://raw.githubusercontent.com/edinhogrubert/Intent/$REF/scripts/executores/intent-executor-VM.sh}"
 
 mkdir -p "$BASE"
 exec 9>"$LOCK"
