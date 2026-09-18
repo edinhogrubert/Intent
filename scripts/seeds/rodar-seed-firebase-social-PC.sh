@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="intent-firebase-social-runner-PC-2026.09.18.04"
+VERSION="intent-existing-users-social-runner-PC-2026.09.18.05"
 OWNER_REPO="edinhogrubert/Intent"
 REF="${INTENT_SEED_REF:-main}"
 REPO="/home/grubert/Projetos/Intent-local"
@@ -21,33 +21,6 @@ fail() {
   exit 1
 }
 
-ORIGINAL_BRANCH=""
-ORIGINAL_HEAD=""
-
-restore_original_ref() {
-  if [[ "$RESTORE_REF" != "SIM" ]]; then
-    return 0
-  fi
-
-  if [[ -z "$ORIGINAL_HEAD" ]]; then
-    return 0
-  fi
-
-  echo
-  echo "================================================================"
-  echo "Restaurando referência local original"
-  echo "================================================================"
-
-  if [[ -n "$ORIGINAL_BRANCH" ]]; then
-    git -C "$REPO" checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1 || true
-  else
-    git -C "$REPO" checkout "$ORIGINAL_HEAD" >/dev/null 2>&1 || true
-  fi
-
-  echo "REF_RESTAURADA=$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-  echo "HEAD_RESTAURADO=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
-}
-
 trim_spaces() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -57,9 +30,7 @@ trim_spaces() {
 
 load_env_file() {
   local env_file="$1"
-
   [[ -f "$env_file" ]] || return 0
-
   echo "ENV_FILE_CARREGADO=$env_file"
 
   while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
@@ -87,7 +58,7 @@ require_env_presence() {
   local missing=()
   local name
 
-  for name in DATABASE_URL FIREBASE_PROJECT_ID REVEAL_ENCRYPTION_KEY; do
+  for name in DATABASE_URL REVEAL_ENCRYPTION_KEY; do
     if [[ -n "${!name:-}" ]]; then
       echo "ENV_${name}=OK"
     else
@@ -101,9 +72,29 @@ require_env_presence() {
   fi
 }
 
+ORIGINAL_BRANCH=""
+ORIGINAL_HEAD=""
+
+restore_original_ref() {
+  if [[ "$RESTORE_REF" != "SIM" || -z "$ORIGINAL_HEAD" ]]; then
+    return 0
+  fi
+
+  section "Restaurando referência local original"
+
+  if [[ -n "$ORIGINAL_BRANCH" ]]; then
+    git -C "$REPO" checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1 || true
+  else
+    git -C "$REPO" checkout "$ORIGINAL_HEAD" >/dev/null 2>&1 || true
+  fi
+
+  echo "REF_RESTAURADA=$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  echo "HEAD_RESTAURADO=$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)"
+}
+
 trap restore_original_ref EXIT
 
-section "Intent — seed Firebase social PC"
+section "Intent — seed social com usuários existentes no PostgreSQL"
 
 echo "VERSAO_RUNNER=$VERSION"
 echo "OWNER_REPO=$OWNER_REPO"
@@ -111,7 +102,7 @@ echo "REF=$REF"
 echo "REPO=$REPO"
 echo "BACKEND=$BACKEND"
 echo "MODO=${INTENT_SEED_DRY_RUN:-SIM}"
-echo "MANIFESTO=${INTENT_FIREBASE_SOCIAL_USERS_FILE:-inline-ou-default}"
+echo "USERS_SOURCE=PostgreSQL.users existente"
 echo "RESTORE_REF=$RESTORE_REF"
 echo "Usuário: $(id -un)"
 echo "Host: $(hostname -s)"
@@ -189,14 +180,14 @@ fi
 
 npm run prisma:generate
 
-section "Executando seed Firebase social"
+section "Executando seed social com usuários existentes"
 
 if [[ "${INTENT_SEED_DRY_RUN:-SIM}" != "NAO" ]]; then
   echo "DRY RUN: nenhuma escrita será feita."
   INTENT_SEED_DRY_RUN=SIM npm run seed:firebase-social
 else
-  [[ "${INTENT_ALLOW_FIREBASE_SOCIAL_SEED:-}" == "SIM" ]] || fail "para gravar, use INTENT_ALLOW_FIREBASE_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO"
-  INTENT_ALLOW_FIREBASE_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO npm run seed:firebase-social
+  [[ "${INTENT_ALLOW_EXISTING_USERS_SOCIAL_SEED:-}" == "SIM" ]] || fail "para gravar, use INTENT_ALLOW_EXISTING_USERS_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO"
+  INTENT_ALLOW_EXISTING_USERS_SOCIAL_SEED=SIM INTENT_SEED_DRY_RUN=NAO npm run seed:firebase-social
 fi
 
 section "Resumo"
