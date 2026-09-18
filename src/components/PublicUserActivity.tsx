@@ -102,10 +102,13 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const requestIdRef = useRef(0);
+  const activeFilterRef = useRef<PublicActivityFilter>('ALL');
 
   const loadInitialActivity = (filter: PublicActivityFilter = activeFilter) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    activeFilterRef.current = filter;
+    setLoadingMore(false);
     setLoading(true);
     setError('');
     setItems([]);
@@ -134,29 +137,44 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
 
   useEffect(() => {
     loadInitialActivity(activeFilter);
+    return () => { requestIdRef.current += 1; };
   }, [userId, activeFilter]);
 
   const handleFilterChange = (filter: PublicActivityFilter) => {
     if (filter === activeFilter) return;
+    // Invalidate synchronously, before the effect for the new filter runs.
+    requestIdRef.current += 1;
+    activeFilterRef.current = filter;
+    setItems([]);
+    setNextCursor(null);
+    setError('');
+    setLoadingMore(false);
+    setLoading(true);
     setActiveFilter(filter);
   };
 
   const handleLoadMore = async () => {
-    if (!nextCursor || loadingMore) return;
+    if (!nextCursor || loading || loadingMore || activeFilterRef.current !== activeFilter) return;
+    const filter = activeFilter;
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () => requestIdRef.current === requestId && activeFilterRef.current === filter;
+    setError('');
     setLoadingMore(true);
 
     try {
-      const res = await listUserPublicActivity(userId, nextCursor, 15, activeFilter);
+      const res = await listUserPublicActivity(userId, nextCursor, 15, filter);
+      if (!isCurrent()) return;
       setItems((prev) => [...prev, ...res.items]);
       setNextCursor(res.nextCursor);
     } catch (caught) {
+      if (!isCurrent()) return;
       setError(
         caught instanceof IntentApiError
           ? caught.message
           : 'Não foi possível carregar mais atividades.',
       );
     } finally {
-      setLoadingMore(false);
+      if (isCurrent()) setLoadingMore(false);
     }
   };
 
