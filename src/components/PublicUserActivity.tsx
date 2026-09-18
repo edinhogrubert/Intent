@@ -14,6 +14,7 @@ import {
   listUserPublicActivity,
   IntentApiError,
   type ApiPublicActivityItem,
+  type PublicActivityFilter,
 } from '../services/intentApi';
 
 interface PublicUserActivityProps {
@@ -21,6 +22,19 @@ interface PublicUserActivityProps {
   displayName: string;
   onSelectIntent: (intentId: string) => void;
 }
+
+const ACTIVITY_FILTERS: Array<{
+  type: PublicActivityFilter;
+  label: string;
+  description: string;
+}> = [
+  { type: 'ALL', label: 'Todos', description: 'Todos os eventos públicos.' },
+  { type: 'INTENT_CREATED', label: 'Criadas', description: 'Intents criadas por este perfil.' },
+  { type: 'INTENT_REALIZED_PARTICIPATION', label: 'Realizadas', description: 'Participações concluídas.' },
+  { type: 'INTENT_SUPPORTED', label: 'Apoios', description: 'Apoios feitos em Intents públicas.' },
+  { type: 'INTENT_REACTED', label: 'Reações', description: 'Reações registradas em Intents.' },
+  { type: 'INTENT_COMMENTED', label: 'Comentários', description: 'Comentários feitos em Intents.' },
+];
 
 function formatRelativeTime(dateString: string): string {
   try {
@@ -63,34 +77,49 @@ function formatFullDate(dateString: string): string {
   }
 }
 
+function emptyMessage(filter: PublicActivityFilter, displayName: string) {
+  switch (filter) {
+    case 'INTENT_CREATED':
+      return { title: 'Nenhuma Intent criada ainda', description: `${displayName} ainda não criou Intents públicas.` };
+    case 'INTENT_REALIZED_PARTICIPATION':
+      return { title: 'Nenhuma realização pública ainda', description: 'As participações em Intents realizadas aparecerão aqui.' };
+    case 'INTENT_SUPPORTED':
+      return { title: 'Nenhum apoio público ainda', description: 'Os apoios em Intents públicas aparecerão aqui.' };
+    case 'INTENT_REACTED':
+      return { title: 'Nenhuma reação pública ainda', description: 'As reações em Intents públicas aparecerão aqui.' };
+    case 'INTENT_COMMENTED':
+      return { title: 'Nenhum comentário público ainda', description: 'Os comentários em Intents públicas aparecerão aqui.' };
+    default:
+      return { title: 'Nenhuma atividade pública registrada ainda', description: 'As criações de Intents, apoios, comentários e reações públicas aparecerão listadas aqui cronologicamente.' };
+  }
+}
+
 export function PublicUserActivity({ userId, displayName, onSelectIntent }: PublicUserActivityProps) {
   const [items, setItems] = useState<ApiPublicActivityItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<PublicActivityFilter>('ALL');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const requestIdRef = useRef(0);
 
-  const [retryCount, setRetryCount] = useState(0);
-  const generation = useRef(0);
-
-  useEffect(() => {
-    generation.current += 1;
-    setLoadingMore(false);
-    let active = true;
+  const loadInitialActivity = (filter: PublicActivityFilter = activeFilter) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setLoading(true);
     setError('');
     setItems([]);
     setNextCursor(null);
 
-    listUserPublicActivity(userId, undefined, 15)
+    listUserPublicActivity(userId, undefined, 15, filter)
       .then((res) => {
-        if (active) {
+        if (requestIdRef.current === requestId) {
           setItems(res.items);
           setNextCursor(res.nextCursor);
         }
       })
       .catch((caught) => {
-        if (active) {
+        if (requestIdRef.current === requestId) {
           setError(
             caught instanceof IntentApiError
               ? caught.message
@@ -99,38 +128,35 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (requestIdRef.current === requestId) setLoading(false);
       });
+  };
 
-    return () => {
-      active = false;
-      generation.current += 1;
-    };
-  }, [userId, retryCount]);
+  useEffect(() => {
+    loadInitialActivity(activeFilter);
+  }, [userId, activeFilter]);
+
+  const handleFilterChange = (filter: PublicActivityFilter) => {
+    if (filter === activeFilter) return;
+    setActiveFilter(filter);
+  };
 
   const handleLoadMore = async () => {
     if (!nextCursor || loadingMore) return;
-    const requestGeneration = generation.current;
-    setError('');
     setLoadingMore(true);
 
     try {
-      const res = await listUserPublicActivity(userId, nextCursor, 15);
-      if (generation.current !== requestGeneration) return;
-      setItems((prev) => {
-        const ids = new Set(prev.map((item) => item.id));
-        return [...prev, ...res.items.filter((item) => !ids.has(item.id))];
-      });
+      const res = await listUserPublicActivity(userId, nextCursor, 15, activeFilter);
+      setItems((prev) => [...prev, ...res.items]);
       setNextCursor(res.nextCursor);
     } catch (caught) {
-      if (generation.current !== requestGeneration) return;
       setError(
         caught instanceof IntentApiError
           ? caught.message
           : 'Não foi possível carregar mais atividades.',
       );
     } finally {
-      if (generation.current === requestGeneration) setLoadingMore(false);
+      setLoadingMore(false);
     }
   };
 
@@ -192,9 +218,11 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
     }
   };
 
+  const empty = emptyMessage(activeFilter, displayName);
+
   return (
     <section aria-labelledby="public-activity-heading" className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="public-activity-heading" className="text-xl font-black text-[#1b1c1a]">
             Atividade pública
@@ -205,7 +233,29 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
         </div>
       </div>
 
-      {/* Loading state */}
+      <div role="tablist" aria-label="Filtrar atividade pública" className="flex gap-2 overflow-x-auto pb-1">
+        {ACTIVITY_FILTERS.map((filter) => {
+          const selected = activeFilter === filter.type;
+          return (
+            <button
+              key={filter.type}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              title={filter.description}
+              onClick={() => handleFilterChange(filter.type)}
+              className={`shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold border transition-colors ${
+                selected
+                  ? 'bg-[#000666] text-white border-[#000666] shadow-sm'
+                  : 'bg-white text-[#454652] border-[#e4e2de] hover:bg-[#f7f6fc] hover:text-[#000666]'
+              }`}
+            >
+              {filter.label}
+            </button>
+          );
+        })}
+      </div>
+
       {loading && (
         <div role="status" aria-label="Carregando atividades" className="py-12 text-center space-y-3">
           <LoaderCircle className="w-6 h-6 animate-spin text-[#000666] mx-auto" />
@@ -213,7 +263,6 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
         </div>
       )}
 
-      {/* Error state */}
       {error && !loading && (
         <div
           role="alert"
@@ -228,7 +277,7 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
           </div>
           <button
             type="button"
-            onClick={() => setRetryCount((value) => value + 1)}
+            onClick={() => loadInitialActivity(activeFilter)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#000666] text-white text-xs font-bold hover:bg-[#1b237b] transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -237,23 +286,30 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && !error && items.length === 0 && (
         <div className="rounded-3xl border border-[#e4e2de] bg-white p-8 sm:p-12 text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-[#f7f6fc] text-[#000666] flex items-center justify-center mx-auto">
             <Sparkles className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-base text-[#1b1c1a]">
-            Nenhuma atividade pública registrada ainda
+            {empty.title}
           </h3>
           <p className="text-sm text-[#666] max-w-md mx-auto">
-            As criações de Intents, apoios, comentários e reações públicas aparecerão listadas aqui cronologicamente.
+            {empty.description}
           </p>
+          {activeFilter !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => handleFilterChange('ALL')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#f7f6fc] text-[#000666] text-xs font-bold hover:bg-[#e0e0ff] transition-colors"
+            >
+              Ver todos os eventos
+            </button>
+          )}
         </div>
       )}
 
-      {/* Timeline items */}
-      {!loading && items.length > 0 && (
+      {!loading && !error && items.length > 0 && (
         <div className="space-y-3">
           {items.map((item) => {
             const details = getEventDetails(item);
@@ -265,7 +321,6 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
                 className="rounded-2xl border border-[#e4e2de] bg-white p-4 sm:p-5 shadow-sm hover:border-[#000666]/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="space-y-2 flex-1">
-                  {/* Tipo de evento e tempo relativo */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${details.badgeBg}`}
@@ -282,7 +337,6 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
                     </span>
                   </div>
 
-                  {/* Descrição textual do acontecimento */}
                   <div>
                     <h3 className="text-sm font-extrabold text-[#1b1c1a]">
                       {details.titleText}
@@ -292,14 +346,12 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
                     </p>
                   </div>
 
-                  {/* Trecho de comentário se aplicável */}
                   {item.type === 'INTENT_COMMENTED' && item.metadata?.commentSnippet && (
                     <blockquote className="text-xs text-[#555] bg-[#f7f6fc] border-l-2 border-[#000666]/40 px-3 py-1.5 rounded-r-lg italic break-words line-clamp-2">
                       &ldquo;{item.metadata.commentSnippet}&rdquo;
                     </blockquote>
                   )}
 
-                  {/* Informações complementares de realização */}
                   {item.type === 'INTENT_REALIZED_PARTICIPATION' && item.metadata?.realizedAt && (
                     <p className="text-[11px] text-emerald-700 font-medium">
                       Concluída em {formatFullDate(item.metadata.realizedAt)}
@@ -307,7 +359,6 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
                   )}
                 </div>
 
-                {/* Botão de ação para navegar para a Intent */}
                 <div className="shrink-0 flex sm:flex-col items-end justify-between sm:justify-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#f0eee9]">
                   {isRealized && (
                     <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
@@ -328,7 +379,6 @@ export function PublicUserActivity({ userId, displayName, onSelectIntent }: Publ
             );
           })}
 
-          {/* Botão Carregar Mais */}
           {nextCursor && (
             <div className="pt-4 text-center">
               <button
