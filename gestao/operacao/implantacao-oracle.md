@@ -50,7 +50,7 @@ sudo bash deploy/oracle/08-deploy-backend.sh
 Em primeira implantação, sem frontend anterior, omitir a preservação dessa imagem.
 Em ambiente existente, interromper se não for possível preservá-la.
 
-O [script existente](../deploy/oracle/08-deploy-backend.sh) valida credenciais,
+O [script existente](../../deploy/oracle/08-deploy-backend.sh) valida credenciais,
 gera o ambiente preservando a chave de revelação existente, constrói a imagem,
 para a API, chama o backup externo e sobe a API com migrações. Faz health checks
 e tenta recuperar banco/imagem em erros capturados. O script não verifica o hash
