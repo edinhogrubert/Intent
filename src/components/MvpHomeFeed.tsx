@@ -349,10 +349,10 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
   const profileValue = (value: number | undefined) => profileLoading ? '…' : value ?? '—';
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+    <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(208px,260px)_minmax(0,1fr)_minmax(216px,280px)]">
         {/* Sidebar Esquerda (Perfil Resumido & CTA) */}
-        <aside className="hidden space-y-4 lg:sticky lg:top-20 lg:col-span-3 lg:block">
+        <aside className="hidden space-y-4 lg:sticky lg:top-20 lg:block">
           <section className="overflow-hidden rounded-2xl border border-[#e4e2de] bg-white shadow-xs">
             <div className="h-20 bg-gradient-to-r from-[#000666] via-[#3434a5] to-[#8787e8]"/>
             <div className="relative px-5 pb-5 pt-10">
@@ -416,7 +416,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
         </aside>
 
         {/* Coluna Central do Feed */}
-        <main className="space-y-4 lg:col-span-6">
+        <main className="min-w-0 space-y-4">
           {/* Caixa de Criação Rápida */}
           <section className="rounded-2xl border border-[#e4e2de] bg-white p-4 shadow-xs">
             <div className="flex items-center gap-3">
@@ -653,7 +653,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
         </main>
 
         {/* Sidebar Direita (Destaques & Filtros) */}
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:col-span-3">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
           <section className="rounded-2xl border border-[#e4e2de] bg-white p-4 shadow-xs">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-[#000666]"/>
