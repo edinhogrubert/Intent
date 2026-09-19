@@ -131,3 +131,13 @@ jobs:
             echo 'Função 9 ainda aponta para caminhos anteriores à reorganização.'
             exit 1
           fi
+
+      - name: Inventariar referências e links Markdown de toda a árvore
+        run: python3 scripts/auditar-referencias-gestao.py > "$RUNNER_TEMP/intent-referencias.json" && tail -n 1 "$RUNNER_TEMP/intent-referencias.json"
+
+      - name: Publicar inventário para revisão humana
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventario-referencias-gestao
+          path: ${{ runner.temp }}/intent-referencias.json
+          retention-days: 14
