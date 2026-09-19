@@ -167,7 +167,7 @@ bash /home/ubuntu/intent-executor-VM.sh <funcao>
 
 A numeração das funções deve seguir o contrato:
 
-- `contratos/INTERFACE_EXECUTORES.md`
+- `gestao/governanca/contratos/INTERFACE_EXECUTORES.md`
 
 Regra:
 
@@ -317,7 +317,7 @@ ou:
 
 ```text
 Arquitetura: alterada
-Arquivo atualizado: contratos/ARQUITETURA_ATUAL_VM.md
+Arquivo atualizado: gestao/governanca/contratos/ARQUITETURA_ATUAL_VM.md
 ```
 
 Se a arquitetura mudou e este arquivo não foi atualizado, o PR/release não está completo.
