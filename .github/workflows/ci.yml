@@ -67,6 +67,17 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      # A paginação de atividade pública testa um componente React real a
+      # partir desta suíte. Use as dependências já declaradas na raiz.
+      - name: Preparar Bun para testes de componente
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Instalar dependências do frontend usadas pelos testes
+        run: bun install --frozen-lockfile
+        working-directory: .
+
       - name: Instalar dependências
         run: npm ci --no-audit --no-fund
 

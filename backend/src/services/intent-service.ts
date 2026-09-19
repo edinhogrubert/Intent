@@ -44,6 +44,16 @@ const socialFeedCommentSelection = {
   author: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
 } satisfies Prisma.IntentCommentSelect;
 
+// Feed summaries never expose guardian membership or approvals. Those remain
+// available only through the detail projection and its access rules.
+const socialFeedIntentSelection = {
+  id: true, type: true, conditionType: true, status: true, visibility: true,
+  category: true, title: true, story: true, supportGoal: true, supportCount: true,
+  revealAt: true, guardianApprovalGoal: true, publishedAt: true, realizedAt: true,
+  createdAt: true,
+  creator: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+} satisfies Prisma.IntentSelect;
+
 function assertPublishedState(intent: { supportCount: number; supportGoal: number; realizedAt: Date | null }) {
   if (!Number.isInteger(intent.supportCount) || intent.supportCount < 0
     || !Number.isInteger(intent.supportGoal) || intent.supportGoal < 1
@@ -345,7 +355,7 @@ export async function listSocialFeed(viewerId: string, filter: SocialFeedFilter 
   const orderBy = filter === 'popular'
     ? [{ supportCount: 'desc' as const }, { createdAt: 'desc' as const }, { id: 'desc' as const }]
     : [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
-  const rows = await prisma.intent.findMany({ where, orderBy, take: safeLimit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: publicIntentSelection });
+  const rows = await prisma.intent.findMany({ where, orderBy, take: safeLimit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: socialFeedIntentSelection });
   const page = rows.slice(0, safeLimit);
   const ids = page.map((intent) => intent.id);
   const [groups, reactions, supports, comments] = ids.length ? await Promise.all([
@@ -360,7 +370,26 @@ export async function listSocialFeed(viewerId: string, filter: SocialFeedFilter 
   const supportedIds = new Set(supports.map((item) => item.intentId));
   const commentsByIntent = new Map<string, typeof comments>();
   for (const comment of comments) { const items = commentsByIntent.get(comment.intentId) ?? []; if (items.length < 2) items.push(comment); commentsByIntent.set(comment.intentId, items); }
-  return { items: page.map((intent) => ({ ...intent, reactionCounts: counts.get(intent.id) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 }, viewerReaction: reactionByIntent.get(intent.id) ?? null, viewerSupported: supportedIds.has(intent.id), viewerHasSupported: supportedIds.has(intent.id), recentComments: (commentsByIntent.get(intent.id) ?? []).map(({ id, body, createdAt, updatedAt, author }) => ({ id, body, createdAt, updatedAt, author })) })), nextCursor: rows.length > safeLimit ? page.at(-1)?.id ?? null : null };
+  return {
+    items: page.map((intent) => {
+      // Prisma's select already excludes these. Dropping them defensively keeps
+      // the feed safe if a future repository implementation widens a row.
+      const { guardianIds: _guardianIds, guardianApprovals: _guardianApprovals,
+        revealCiphertext: _revealCiphertext, revealIv: _revealIv,
+        revealAuthTag: _revealAuthTag, revealContent: _revealContent,
+        ...summary } = intent as typeof intent & Record<string, unknown>;
+      return {
+        ...summary,
+        reactionCounts: counts.get(intent.id) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 },
+        viewerReaction: reactionByIntent.get(intent.id) ?? null,
+        viewerSupported: supportedIds.has(intent.id),
+        viewerHasSupported: supportedIds.has(intent.id),
+        recentComments: (commentsByIntent.get(intent.id) ?? [])
+          .map(({ id, body, createdAt, updatedAt, author }) => ({ id, body, createdAt, updatedAt, author })),
+      };
+    }),
+    nextCursor: rows.length > safeLimit ? page.at(-1)?.id ?? null : null,
+  };
 }
 
 export async function getIntent(intentId: string, viewerId?: string) {

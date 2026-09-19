@@ -149,6 +149,13 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
         <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[#454652]">
           {intent.story}
         </p>
+        {intent.recentComments && intent.recentComments.length > 0 && (
+          <div className="mt-3 space-y-1 border-t border-[#e4e2de] pt-3 text-sm text-[#454652]">
+            {intent.recentComments.map((comment) => (
+              <p key={comment.id}><span className="font-semibold text-[#1b1c1a]">{comment.author.displayName}</span> {comment.body}</p>
+            ))}
+          </div>
+        )}
       </button>
 
       {/* Caixa de Condição e Progresso */}
