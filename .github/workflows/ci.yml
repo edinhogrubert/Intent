@@ -71,6 +71,15 @@ jobs:
       - name: Instalar dependências
         run: npm ci --no-audit --no-fund
 
+      - name: Preparar Bun para testes que importam componentes do frontend
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Instalar dependências do frontend para testes cruzados
+        working-directory: .
+        run: bun install --frozen-lockfile
+
       - name: Verificar TypeScript
         run: npm run lint
 
