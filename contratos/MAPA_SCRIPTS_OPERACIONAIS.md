@@ -29,6 +29,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 | `/home/ubuntu/intent-executor-VM.sh` | executor oficial | entrada única | Deve receber números de função. |
 | `/opt/intent/scripts/executar-backup-postgres.sh` | auxiliar | 6 e 12 | Não chamar direto; backup PostgreSQL deve passar pela função 6 ou pelo deploy controlado. |
 | `/opt/intent/source/deploy/oracle/08-deploy-backend.sh` | auxiliar | 12 | Não chamar direto; deploy deve passar pela função 12. |
+| `/opt/intent/source/deploy/oracle/09-deploy-frontend.sh` | auxiliar | 12 | Não chamar direto; implanta somente o frontend, preserva imagem anterior e valida `/healthz`. |
 | `/opt/intent/source/deploy/oracle/21-verificar-intent-completo.sh`, se existir | auxiliar | 13 | Não chamar direto; validação operacional deve passar pela função 13. |
 | `/home/ubuntu/intent-retomada-VM.sh` | auxiliar | 14 | Não chamar direto; relatório/retomada deve passar pela função 14. |
 
@@ -47,7 +48,7 @@ A regra é simples: scripts auxiliares podem existir, mas não devem virar coman
 | 9 | Atualizar/validar continuidade | valida contratos/estado | valida presença implantada |
 | 10 | Preparar release | aplica | N/A |
 | 11 | Criar/validar tag ou release | cria tag com autorização | valida existência da tag |
-| 12 | Deploy controlado | N/A | chama deploy backend |
+| 12 | Deploy controlado | N/A | exige `INTENT_DEPLOY_COMPONENT=api`, `frontend` ou `all`; chama somente os componentes selecionados |
 | 13 | Validar aplicação em execução | N/A | chama verificador ou smoke |
 | 14 | Relatório final de fechamento | chama retomada PC se existir | chama retomada VM se existir |
 | 15 | Rollback controlado | N/A | reservado; não automatizado sem procedimento validado |

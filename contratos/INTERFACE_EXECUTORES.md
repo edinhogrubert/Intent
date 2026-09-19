@@ -81,7 +81,7 @@ bash /home/ubuntu/intent-executor-VM.sh 1 2 3
 | 9 | Atualizar ou validar continuidade | Atualizar/validar arquivos de continuidade e contratos | Validar presença dos arquivos de continuidade no código implantado ou retornar N/A |
 | 10 | Preparar release | Validar estado para release, changelog, versão e pré-condições | Retornar N/A, salvo se houver preparação específica na VM |
 | 11 | Criar ou validar tag/release | Criar/validar tag ou release quando autorizado | Validar que a tag/release autorizada existe e é a esperada |
-| 12 | Deploy controlado | Retornar N/A | Executar deploy controlado conforme release/tag autorizada |
+| 12 | Deploy controlado | Retornar N/A | Exigir `INTENT_DEPLOY_COMPONENT=api`, `frontend` ou `all`; validar Git e backup antes de implantar somente os componentes escolhidos |
 | 13 | Validar aplicação em execução | Validar ambiente local, se existir | Validar produção/VM após deploy |
 | 14 | Gerar relatório final de fechamento | Relatório PC/Git/release/pendências | Relatório VM/deploy/produção/pendências |
 | 15 | Rollback controlado | Retornar N/A | Executar rollback controlado quando autorizado |
