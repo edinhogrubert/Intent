@@ -157,7 +157,7 @@ task_8(){
 
 task_9(){
   need_repo || { fail 9 'repo inválido'; return 1; }
-  local files=(contratos/README.md contratos/INTERFACE_EXECUTORES.md contratos/ARQUITETURA_ATUAL_VM.md docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md docs/ai-handoff/continuidade/PROMPT_RETOMADA_CHATGPT.md)
+  local files=(gestao/governanca/contratos/README.md gestao/governanca/contratos/INTERFACE_EXECUTORES.md gestao/governanca/contratos/ARQUITETURA_ATUAL_VM.md gestao/comunicacao/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md gestao/comunicacao/ai-handoff/continuidade/PROMPT_RETOMADA_CHATGPT.md)
   local miss=0; for f in "${files[@]}"; do [[ -f "$REPO/$f" ]] || { echo "ausente: $f"; miss=1; }; done
   [[ $miss -eq 0 ]] || { fail 9 'continuidade incompleta'; return 1; }
   ok 9 'continuidade validada'
