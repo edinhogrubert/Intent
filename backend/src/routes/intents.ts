@@ -13,6 +13,7 @@ import {
   listUserIntents,
   listFollowingFeed,
   listPublicFeed,
+  listSocialFeed,
   removeSupport,
   supportIntent,
 } from '../services/intent-service.js';
@@ -26,6 +27,10 @@ const feedQuerySchema = z.object({
   scope: z.enum(['public', 'following', 'all']).default('public'),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+const socialFeedQuerySchema = z.object({ filter: z.enum(['recent', 'realized', 'supported', 'mine', 'popular']).default('recent'), cursor: z.string().uuid().optional(), limit: z.coerce.number().int().min(1).max(50).default(20) });
+intentsRouter.get('/social-feed', requireAuthenticatedUser, async (request, response, next) => {
+  try { const query = socialFeedQuerySchema.parse(request.query); response.json({ data: await listSocialFeed(request.appUser!.id, query.filter, query.cursor, query.limit) }); } catch (error) { next(error); }
 });
 intentsRouter.get('/feed', optionalAuthenticatedUser, async (request, response, next) => {
   try {

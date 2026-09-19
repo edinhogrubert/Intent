@@ -38,6 +38,12 @@ const publicIntentSelection = {
   },
 } as Prisma.IntentSelect;
 
+export type SocialFeedFilter = 'recent' | 'realized' | 'supported' | 'mine' | 'popular';
+const socialFeedCommentSelection = {
+  id: true, intentId: true, body: true, createdAt: true, updatedAt: true,
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+} satisfies Prisma.IntentCommentSelect;
+
 function assertPublishedState(intent: { supportCount: number; supportGoal: number; realizedAt: Date | null }) {
   if (!Number.isInteger(intent.supportCount) || intent.supportCount < 0
     || !Number.isInteger(intent.supportGoal) || intent.supportGoal < 1
@@ -320,6 +326,41 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
     })),
     nextCursor: hasMore ? page.at(-1)?.id ?? null : null,
   };
+}
+
+/** Public, viewer-authorized projection; encrypted reveal fields are never selected. */
+export async function listSocialFeed(viewerId: string, filter: SocialFeedFilter = 'recent', cursor?: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const where: Prisma.IntentWhereInput = {
+    OR: [
+      { visibility: 'PUBLIC' }, { creatorId: viewerId },
+      { visibility: 'FOLLOWERS', creator: { followers: { some: { followerId: viewerId } } } },
+      { visibility: 'PRIVATE', guardianIds: { array_contains: [viewerId] } },
+    ],
+    creator: { status: 'ACTIVE' },
+    status: filter === 'realized' ? 'REALIZED' : { in: ['PUBLISHED', 'REALIZED'] },
+    ...(filter === 'supported' ? { supports: { some: { userId: viewerId } } } : {}),
+    ...(filter === 'mine' ? { creatorId: viewerId } : {}),
+  };
+  const orderBy = filter === 'popular'
+    ? [{ supportCount: 'desc' as const }, { createdAt: 'desc' as const }, { id: 'desc' as const }]
+    : [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
+  const rows = await prisma.intent.findMany({ where, orderBy, take: safeLimit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: publicIntentSelection });
+  const page = rows.slice(0, safeLimit);
+  const ids = page.map((intent) => intent.id);
+  const [groups, reactions, supports, comments] = ids.length ? await Promise.all([
+    prisma.intentReaction.groupBy({ by: ['intentId', 'type'], where: { intentId: { in: ids } }, _count: { _all: true } }),
+    prisma.intentReaction.findMany({ where: { userId: viewerId, intentId: { in: ids } }, select: { intentId: true, type: true } }),
+    prisma.support.findMany({ where: { userId: viewerId, intentId: { in: ids } }, select: { intentId: true } }),
+    prisma.intentComment.findMany({ where: { intentId: { in: ids }, author: { status: 'ACTIVE' } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: safeLimit * 3, select: socialFeedCommentSelection }),
+  ]) : [[], [], [], []];
+  const counts = new Map<string, { LIKE: number; LOVE: number; CELEBRATE: number; total: number }>();
+  for (const group of groups) { const count = counts.get(group.intentId) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 }; count[group.type] = group._count._all; count.total += group._count._all; counts.set(group.intentId, count); }
+  const reactionByIntent = new Map(reactions.map((item) => [item.intentId, item.type]));
+  const supportedIds = new Set(supports.map((item) => item.intentId));
+  const commentsByIntent = new Map<string, typeof comments>();
+  for (const comment of comments) { const items = commentsByIntent.get(comment.intentId) ?? []; if (items.length < 2) items.push(comment); commentsByIntent.set(comment.intentId, items); }
+  return { items: page.map((intent) => ({ ...intent, reactionCounts: counts.get(intent.id) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 }, viewerReaction: reactionByIntent.get(intent.id) ?? null, viewerSupported: supportedIds.has(intent.id), viewerHasSupported: supportedIds.has(intent.id), recentComments: (commentsByIntent.get(intent.id) ?? []).map(({ id, body, createdAt, updatedAt, author }) => ({ id, body, createdAt, updatedAt, author })) })), nextCursor: rows.length > safeLimit ? page.at(-1)?.id ?? null : null };
 }
 
 export async function getIntent(intentId: string, viewerId?: string) {
