@@ -37,7 +37,7 @@ existentes. Sem dump sobrevivente, não é possível prometer recuperação dos 
    Redis 7), arquitetura, volumes corretos, políticas de reinício e health checks.
    Não atualizar versões de dados durante a recuperação. Não publicar portas.
 6. Restaurar `/opt/intent/.env`, o runtime com a chave original e o JSON Firebase;
-   aplicar as permissões da [arquitetura](arquitetura-mvp.md). A credencial deve
+   aplicar as permissões da [arquitetura](../arquitetura/arquitetura-mvp.md). A credencial deve
    pertencer a `intent-86155`; preservar identidades e configuração desse projeto.
    Se precisar reemitir a credencial, fazê-lo pelo procedimento administrativo
    autorizado, mantendo privilégios mínimos.
