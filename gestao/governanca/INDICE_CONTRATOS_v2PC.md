@@ -1,10 +1,10 @@
 # Índice de contratos — v2PC
 
-**Escopo:** navegação da branch de reorganização. Este índice substitui referências de navegação à antiga pasta raiz `contratos/`, sem alterar o conteúdo dos contratos preservados.
+**Escopo:** navegação da branch de reorganização `chore/auditoria-gestao-v1-20260918`. A `main` não recebeu esta reorganização.
 
 ## Fonte dos contratos
 
-Todos os oito arquivos originais estão copiados com os mesmos blobs em `gestao/governanca/contratos/`. Para leitura, utilize:
+Os oito documentos originais foram transferidos para `gestao/governanca/contratos/`; alguns já receberam correções de caminhos e, portanto, seus blobs não são mais idênticos aos originais. Para leitura, utilize:
 
 1. [Contrato do agente sênior](contratos/CONTRATO_AGENTE_SENIOR_CHATGPT.md)
 2. [Interface dos executores](contratos/INTERFACE_EXECUTORES.md)
@@ -15,6 +15,6 @@ Todos os oito arquivos originais estão copiados com os mesmos blobs em `gestao/
 7. [Contrato de continuidade](../comunicacao/ai-handoff/continuidade/CONTRATO_CONTINUIDADE_INTENT.md)
 8. [Estado atual registrado](../comunicacao/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md)
 
-**Caminhos operacionais:** scripts executáveis permanecem em `scripts/executores/` na raiz do repositório; links a partir desta pasta: [executores](../../scripts/executores/). Os registros de arquitetura a serem mantidos são `gestao/governanca/contratos/ARQUITETURA_ATUAL_PC.md` e `gestao/governanca/contratos/ARQUITETURA_ATUAL_VM.md`. A mudança de localização de documentos não é evidência de atualização do estado técnico.
+**Caminhos operacionais:** scripts executáveis permanecem em `scripts/executores/` na raiz do repositório; [acesse os executores](../../scripts/executores/). Os registros de arquitetura a manter são `gestao/governanca/contratos/ARQUITETURA_ATUAL_PC.md` e `gestao/governanca/contratos/ARQUITETURA_ATUAL_VM.md`. Mudança de localização não comprova atualização do estado técnico.
 
-**Nota de consistência:** o `README.md` copiado dentro de `contratos/` ainda menciona caminhos antigos. Este índice oferece navegação corrigida, mas não elimina a necessidade de verificar referências textuais em cada documento antes da remoção da origem. Não executar instaladores ou alterar VM por causa desta organização.
+**Consistência e bloqueio:** a antiga pasta raiz `contratos/` já foi retirada desta branch, e o README transferido foi corrigido. Entretanto, a função 9 dos executores PC e VM ainda consulta `contratos/` e `docs/ai-handoff/continuidade/`, caminhos inexistentes nesta branch. A preparação de release do PC depende dessa função. Consulte [bloqueios dos executores](../auditoria/BLOQUEIOS_EXECUTORES_POS_MIGRACAO.md). A integração continua bloqueada até corrigir os consumidores e validar referências em todo o repositório. Não executar instaladores, fazer merge ou alterar PC/VM durante a reorganização.
