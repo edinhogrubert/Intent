@@ -13,7 +13,9 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY tests ./tests
 RUN npm run build
-RUN npm test
+# These two tests exercise root frontend modules. The CI job runs them with
+# the complete repository; this backend-only image keeps its own test scope.
+RUN npm test -- --exclude tests/public-activity-pagination.test.ts --exclude tests/share-link.test.ts
 RUN npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
