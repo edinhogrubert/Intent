@@ -1,6 +1,6 @@
 # Intent — Estado Atual Oficial
 
-Atualizado em: 2026-09-18 00:13 BRT
+Atualizado em: 2026-09-19 BRT
 
 ## 1. Projeto
 
@@ -10,36 +10,31 @@ Atualizado em: 2026-09-18 00:13 BRT
 - Laboratório: `intentNew`
 - VM oficial: existe, mas não deve ser alterada sem autorização explícita.
 
-## 2. Release oficial vigente
+## 2. Estado operacional vigente
 
-- Release operacional vigente antes do Bloco 25: `mvp-1.0.23`
+- Última tag criada: `mvp-1.0.23`.
 - Próxima release planejada: `mvp-1.0.24`
 - Release `mvp-1.0.24` ainda NÃO foi criada.
-- Deploy do Bloco 25 na VM ainda NÃO foi feito.
+- `main` no GitHub, nos dois clones locais e na VM: `cc132fb5005d924a9e2fe387807fac5623bdbe0d`.
+- Frontend e API em execução foram comparados com imagens temporárias construídas a partir dessa `main`; os artefatos de runtime correspondem.
+- A Home horizontal do PR #31 está implantada. Não houve alteração de banco, Prisma, Firebase ou tag/release nesta atualização.
 
 ## 3. Estado da codificação
 
-- Codificação: TRAVADA.
-- Novo bloco: PROIBIDO iniciar agora.
-- Bloco 26: apenas proposta, NÃO iniciado.
+- Bloco 25 e as correções operacionais posteriores estão integrados e implantados.
+- Bloco 26 permanece apenas como proposta, sem implementação oficial.
 
 Permitido neste momento:
 
-1. Fechamento operacional do Bloco 25.
-2. Tag/release `mvp-1.0.24`, quando autorizado.
-3. Deploy na VM, quando autorizado.
-4. Validação pós-deploy.
-5. Correção mínima apenas se surgir erro crítico de release/deploy/produção.
+1. Criar tag/release `mvp-1.0.24`, quando autorizado.
+2. Correção mínima apenas se surgir erro crítico de release/deploy/produção.
 
 Proibido neste momento:
 
-- criar funcionalidade nova;
-- iniciar Bloco 26;
-- alterar frontend por melhoria visual;
-- alterar backend por melhoria opcional;
+- iniciar Bloco 26 antes de uma nova autorização;
 - criar migration sem necessidade crítica comprovada;
 - mudar contrato de API sem necessidade crítica comprovada;
-- refatorar código sem relação direta com release/deploy.
+- refatorar código sem relação direta com uma entrega autorizada.
 
 ## 4. Bloco 25
 
@@ -62,7 +57,7 @@ Partes entregues:
 - Merge commit na `main`: `ac3fb24828607940d611a4704c09dc08b0401acf`
 - Estado: MERGED
 - Merged at: `2026-09-18T03:30:06Z`
-- Deploy: NÃO realizado
+- Deploy: realizado como parte da sincronização da `main` atual na VM; artefatos frontend/API comparados com build reprodutível em 2026-09-19 BRT.
 - Release/tag: NÃO criadas
 
 ## 6. Validações reportadas antes do merge
@@ -99,22 +94,23 @@ Validação funcional:
 - Race condition de troca de filtro foi corrigida.
 - Regressão coberta no harness do componente real.
 
-## 7. Pendências atuais
+## 7. Fechamento operacional em 2026-09-19
 
-Pendências de fechamento:
+Integrações adicionais após o Bloco 25:
 
-1. Criar tag/release `mvp-1.0.24`, quando autorizado.
-2. Fazer deploy do Bloco 25 na VM, quando autorizado.
-3. Validar produção.
-4. Atualizar este estado após release/deploy.
+- PR #31 — Home horizontal: merge `f340cb757241c03766239327219427fc5d644e35`; CI aprovada; frontend implantado.
+- PR #32 — isolamento das funções 8 e 13: merge `9313ade2ee294d29c364098e34bae923e4ae14cc`; CI aprovada.
+- PR #33 — sincronização VM sem colisão de tags: merge `cc132fb5005d924a9e2fe387807fac5623bdbe0d`; CI aprovada.
+- Função VM 7 sincronizada com `fetch --no-tags --prune`; função 13 validada sem registrar a função 8.
+- Backup PostgreSQL local validado pela função VM 5 e cópia externa local validada por SHA-256.
 
-Pendências funcionais não bloqueantes registradas:
+Pendência de governança:
 
-- Verificação visual autenticada ainda pendente porque a sessão local não estava autenticada.
+- Criar tag/release `mvp-1.0.24` somente mediante autorização específica.
 
 ## 8. Próximo bloco planejado
 
-Após fechar release/deploy do Bloco 25:
+Após uma nova autorização de desenvolvimento:
 
 - Bloco 26 proposto: Descoberta Social e Busca.
 
@@ -129,4 +125,4 @@ Estado do Bloco 26:
 - Proposta apenas.
 - Ainda não iniciado.
 - Não existe implementação oficial.
-- Não iniciar enquanto release/deploy/validação do Bloco 25 não forem encerrados.
+- Não iniciar sem autorização específica.
