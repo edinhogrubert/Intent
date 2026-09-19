@@ -93,3 +93,31 @@ jobs:
 
       - name: Validar sintaxe Bash
         run: bash -n deploy/oracle/*.sh
+
+      - name: Validar sintaxe e interface dos executores PC e VM
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in scripts/executores/intent-executor-PC.sh scripts/executores/intent-executor-VM.sh; do
+            bash -n "$script"
+            for id in $(seq 1 15); do
+              grep -Eq "^task_${id}\\(\\)\\{" "$script" || { echo "Função $id ausente em $script"; exit 1; }
+            done
+          done
+
+      - name: Validar destinos da continuidade após reorganização
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in \
+            gestao/governanca/contratos/README.md \
+            gestao/governanca/contratos/INTERFACE_EXECUTORES.md \
+            gestao/governanca/contratos/ARQUITETURA_ATUAL_VM.md \
+            gestao/comunicacao/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md \
+            gestao/comunicacao/ai-handoff/continuidade/PROMPT_RETOMADA_CHATGPT.md; do
+            test -f "$path" || { echo "Documento ausente: $path"; exit 1; }
+          done
+          if grep -En 'local files=\((contratos/|docs/ai-handoff/)' scripts/executores/intent-executor-PC.sh scripts/executores/intent-executor-VM.sh; then
+            echo 'Função 9 ainda aponta para caminhos anteriores à reorganização.'
+            exit 1
+          fi
