@@ -537,12 +537,21 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
             )}
             {!searching && searchResults && (
               <div className="mt-4 space-y-5 border-t border-[#e4e2de] pt-4">
+                {searchKind === 'all' && (
+                  <div className="flex flex-col gap-3 rounded-xl bg-[#f5f3ef] p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs leading-relaxed text-[#555]">Prévia dos resultados. Abra uma aba para explorar mais resultados.</p>
+                    <div className="flex shrink-0 gap-2">
+                      <button type="button" onClick={() => changeSearch('intents')} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#000666] shadow-xs hover:bg-[#e0e0ff]">Ver acontecimentos</button>
+                      <button type="button" onClick={() => changeSearch('users')} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#000666] shadow-xs hover:bg-[#e0e0ff]">Ver pessoas</button>
+                    </div>
+                  </div>
+                )}
                 {searchResults.intents.length === 0 && searchResults.users.length === 0 && (
                   <p className="py-4 text-center text-sm font-bold text-[#666]">Nenhum resultado encontrado.</p>
                 )}
                 {searchResults.intents.length > 0 && (
                   <div>
-                    <h2 className="mb-2 text-sm font-black text-[#1b1c1a]">Acontecimentos</h2>
+                    <h2 className="mb-2 text-sm font-black text-[#1b1c1a]">{searchKind === 'all' ? 'Prévia de acontecimentos' : 'Acontecimentos'}</h2>
                     <div className="space-y-2">
                       {searchResults.intents.map((intent) => (
                         <button
@@ -565,7 +574,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
                 )}
                 {searchResults.users.length > 0 && (
                   <div>
-                    <h2 className="mb-2 text-sm font-black text-[#1b1c1a]">Pessoas</h2>
+                    <h2 className="mb-2 text-sm font-black text-[#1b1c1a]">{searchKind === 'all' ? 'Prévia de pessoas' : 'Pessoas'}</h2>
                     <div className="space-y-2">
                       {searchResults.users.map((user) => (
                         <button
