@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, Calendar, Check, CheckCircle2, Globe2, Heart, LockKeyhole, Plus, RefreshCw, Search, Share2, Sparkles, Tag, ThumbsUp, TrendingUp, UserRound, Users, Vote, X } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { getSocialProfile, IntentApiError, listSocialFeed, searchIntentsAndUsers, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type SocialFeedFilter } from '../services/intentApi';
+import { getSocialProfile, IntentApiError, listSocialFeed, searchIntentsAndUsers, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type SearchKind, type SearchPeriod, type SearchStatus, type SocialFeedFilter } from '../services/intentApi';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import { APP_VERSION_CONTEXT, APP_VERSION_LABEL } from '../appVersion';
 
@@ -273,8 +273,14 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ApiSearchResults | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchingMore, setSearchingMore] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [searchKind, setSearchKind] = useState<SearchKind>('all');
+  const [searchStatus, setSearchStatus] = useState<'all' | SearchStatus>('all');
+  const [searchPeriod, setSearchPeriod] = useState<SearchPeriod>('all');
+  const [searchNextCursor, setSearchNextCursor] = useState<string | null>(null);
   const loadGeneration = useRef(0);
+  const searchGeneration = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -318,29 +324,57 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     return () => { loadGeneration.current += 1; };
   }, [scope, currentUser.id]);
 
-  async function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function runSearch(kind: SearchKind, status: 'all' | SearchStatus, period: SearchPeriod, cursor?: string) {
     const query = searchQuery.trim();
     if (query.length < 2) {
       setSearchError('Digite pelo menos 2 caracteres para buscar.');
       return;
     }
-    setSearching(true);
+    const generation = cursor ? searchGeneration.current : ++searchGeneration.current;
+    cursor ? setSearchingMore(true) : setSearching(true);
     setSearchError('');
-    setSearchResults(null);
     try {
-      setSearchResults(await searchIntentsAndUsers(query));
+      const page = await searchIntentsAndUsers(query, { kind, status: status === 'all' ? undefined : status, period, cursor });
+      if (generation !== searchGeneration.current) return;
+      setSearchResults((current) => {
+        if (!cursor || !current) return page;
+        return kind === 'intents'
+          ? { ...page, intents: [...current.intents, ...page.intents] }
+          : { ...page, users: [...current.users, ...page.users] };
+      });
+      setSearchNextCursor(page.nextCursor);
     } catch (caught) {
-      setSearchError(caught instanceof IntentApiError ? caught.message : 'Não foi possível realizar a busca.');
+      if (generation === searchGeneration.current) setSearchError(caught instanceof IntentApiError ? caught.message : 'Não foi possível realizar a busca.');
     } finally {
-      setSearching(false);
+      if (generation === searchGeneration.current) {
+        setSearching(false);
+        setSearchingMore(false);
+      }
     }
   }
 
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearchResults(null);
+    setSearchNextCursor(null);
+    void runSearch(searchKind, searchStatus, searchPeriod);
+  }
+
+  function changeSearch(kind: SearchKind, status = searchStatus, period = searchPeriod) {
+    setSearchKind(kind);
+    setSearchStatus(status);
+    setSearchPeriod(period);
+    setSearchResults(null);
+    setSearchNextCursor(null);
+    if (searchQuery.trim().length >= 2) void runSearch(kind, status, period);
+  }
+
   function clearSearch() {
+    searchGeneration.current += 1;
     setSearchQuery('');
     setSearchResults(null);
     setSearchError('');
+    setSearchNextCursor(null);
   }
 
   const isFollowingFeed = scope === 'supported';
@@ -475,6 +509,23 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
               </button>
             </form>
 
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Tipo de resultado">
+              {([['all', 'Tudo'], ['intents', 'Acontecimentos'], ['users', 'Pessoas']] as Array<[SearchKind, string]>).map(([kind, label]) => (
+                <button key={kind} type="button" onClick={() => changeSearch(kind)} aria-pressed={searchKind === kind}
+                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${searchKind === kind ? 'bg-[#000666] text-white' : 'bg-[#f5f3ef] text-[#555] hover:bg-[#e0e0ff]'}`}>{label}</button>
+              ))}
+              {searchKind !== 'users' && <>
+                <label className="sr-only" htmlFor="search-status">Status</label>
+                <select id="search-status" value={searchStatus} onChange={(event) => changeSearch(searchKind, event.target.value as 'all' | SearchStatus)} className="rounded-full border border-[#d8d6d2] bg-white px-3 py-1.5 text-xs font-bold text-[#555]">
+                  <option value="all">Todos os estados</option><option value="PUBLISHED">Em andamento</option><option value="REALIZED">Realizadas</option>
+                </select>
+                <label className="sr-only" htmlFor="search-period">Período</label>
+                <select id="search-period" value={searchPeriod} onChange={(event) => changeSearch(searchKind, searchStatus, event.target.value as SearchPeriod)} className="rounded-full border border-[#d8d6d2] bg-white px-3 py-1.5 text-xs font-bold text-[#555]">
+                  <option value="all">Todo período</option><option value="week">Última semana</option><option value="month">Último mês</option>
+                </select>
+              </>}
+            </div>
+
             {searchError && (
               <div role="alert" className="mt-3 flex gap-2 rounded-xl bg-[#ffdad6] p-3 text-sm text-[#8c1d18]">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>
@@ -538,6 +589,11 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
                       ))}
                     </div>
                   </div>
+                )}
+                {searchNextCursor && searchKind !== 'all' && (
+                  <button type="button" disabled={searchingMore} onClick={() => void runSearch(searchKind, searchStatus, searchPeriod, searchNextCursor)} className="w-full rounded-xl border border-[#c6c5d4] py-2.5 text-sm font-bold text-[#000666] hover:bg-[#f5f3ef] disabled:opacity-60">
+                    {searchingMore ? 'Carregando mais...' : 'Carregar mais resultados'}
+                  </button>
                 )}
               </div>
             )}

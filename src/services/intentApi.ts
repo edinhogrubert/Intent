@@ -169,7 +169,13 @@ export interface ApiUserSearchResult {
 export interface ApiSearchResults {
   intents: ApiIntent[];
   users: Array<ApiUserSearchResult & { bio: string | null }>;
+  nextCursor: string | null;
 }
+
+export type SearchKind = 'all' | 'intents' | 'users';
+export type SearchStatus = 'PUBLISHED' | 'REALIZED';
+export type SearchPeriod = 'all' | 'week' | 'month';
+export interface SearchOptions { kind?: SearchKind; status?: SearchStatus; period?: SearchPeriod; cursor?: string; limit?: number; }
 
 export interface SupportIntentResult {
   intentId: string;
@@ -361,8 +367,10 @@ export async function searchUsers(query: string): Promise<ApiUserSearchResult[]>
   return result.data.items;
 }
 
-export async function searchIntentsAndUsers(query: string): Promise<ApiSearchResults> {
-  const search = new URLSearchParams({ q: query, limit: '10' });
+export async function searchIntentsAndUsers(query: string, options: SearchOptions = {}): Promise<ApiSearchResults> {
+  const search = new URLSearchParams({ q: query, limit: String(options.limit ?? 10), kind: options.kind ?? 'all', period: options.period ?? 'all' });
+  if (options.status) search.set('status', options.status);
+  if (options.cursor) search.set('cursor', options.cursor);
   const result = await authenticatedRequest<ApiEnvelope<ApiSearchResults>>(
     `/v1/search?${search.toString()}`,
   );
