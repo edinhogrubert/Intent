@@ -68,8 +68,10 @@ export interface ApiIntent {
   viewerHasSupported?: boolean;
   viewerIsGuardian?: boolean;
   viewerHasApprovedAsGuardian?: boolean;
+  viewerSupported?: boolean;
   reactionCounts?: ReactionCounts;
   viewerReaction?: ReactionType | null;
+  recentComments?: ApiIntentComment[];
 }
 
 export type ReactionType = 'LIKE' | 'LOVE' | 'CELEBRATE';
@@ -389,6 +391,7 @@ export async function listGuardianRequests(): Promise<{ items: ApiIntent[]; next
 }
 
 export type FeedScope = 'public' | 'following' | 'all';
+export type SocialFeedFilter = 'recent' | 'realized' | 'supported' | 'mine' | 'popular';
 
 export async function listPublicIntents(
   scope: FeedScope = 'public',
@@ -400,6 +403,12 @@ export async function listPublicIntents(
   const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>(
     `/v1/intents/feed?${query.toString()}`,
   );
+  return result.data;
+}
+
+export async function listSocialFeed(filter: SocialFeedFilter = 'recent', cursor?: string): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ filter, limit: '20' }); if (cursor) query.set('cursor', cursor);
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>(`/v1/intents/social-feed?${query.toString()}`);
   return result.data;
 }
 

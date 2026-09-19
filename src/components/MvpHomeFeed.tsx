@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, Calendar, Check, CheckCircle2, Globe2, Heart, LockKeyhole, Plus, RefreshCw, Search, Share2, Sparkles, Tag, ThumbsUp, TrendingUp, UserRound, Users, Vote, X } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { getSocialProfile, IntentApiError, listPublicIntents, searchIntentsAndUsers, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type FeedScope, type IntentCategory } from '../services/intentApi';
+import { getSocialProfile, IntentApiError, listSocialFeed, searchIntentsAndUsers, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type SocialFeedFilter } from '../services/intentApi';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import { APP_VERSION_CONTEXT, APP_VERSION_LABEL } from '../appVersion';
 
@@ -149,6 +149,13 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
         <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[#454652]">
           {intent.story}
         </p>
+        {intent.recentComments && intent.recentComments.length > 0 && (
+          <div className="mt-3 space-y-1 border-t border-[#e4e2de] pt-3 text-sm text-[#454652]">
+            {intent.recentComments.map((comment) => (
+              <p key={comment.id}><span className="font-semibold text-[#1b1c1a]">{comment.author.displayName}</span> {comment.body}</p>
+            ))}
+          </div>
+        )}
       </button>
 
       {/* Caixa de Condição e Progresso */}
@@ -254,7 +261,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
 }
 
 export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectProfile }: MvpHomeFeedProps) {
-  const [scope, setScope] = useState<FeedScope>('public');
+  const [scope, setScope] = useState<SocialFeedFilter>('recent');
   const [intents, setIntents] = useState<ApiIntent[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -285,7 +292,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     cursor ? setLoadingMore(true) : setLoading(true);
     setError('');
     try {
-      const page = await listPublicIntents(scope, cursor);
+      const page = await listSocialFeed(scope, cursor);
       if (generation !== loadGeneration.current) return;
       setIntents((current) => cursor ? [...current, ...page.items] : page.items);
       setNextCursor(page.nextCursor);
@@ -293,11 +300,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
       if (generation === loadGeneration.current) {
         if (caught instanceof IntentApiError) {
           setError(caught.message);
-        } else if (scope === 'following') {
-          setError('Não foi possível carregar os acontecimentos da sua rede agora.');
-        } else {
-          setError('Não foi possível carregar os acontecimentos.');
-        }
+        } else setError('Não foi possível carregar os acontecimentos. Verifique sua conexão e tente novamente.');
       }
     } finally {
       if (generation === loadGeneration.current) {
@@ -340,7 +343,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     setSearchError('');
   }
 
-  const isFollowingFeed = scope === 'following';
+  const isFollowingFeed = scope === 'supported';
   const visibleIntents = selectedCategory ? intents.filter((intent) => intent.category === selectedCategory) : intents;
   const highlightedIntents = [...intents].sort((left, right) => right.supportCount - left.supportCount).slice(0, 3);
   const profileValue = (value: number | undefined) => profileLoading ? '…' : value ?? '—';
@@ -542,29 +545,8 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
 
           {/* Abas de Navegação do Feed */}
           <section className="flex items-center gap-2 rounded-2xl border border-[#e4e2de] bg-white p-1.5 shadow-xs">
-            <div className="grid flex-1 grid-cols-2 gap-1" role="tablist" aria-label="Escolher feed">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={scope === 'public'}
-                onClick={() => setScope('public')}
-                className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
-                  scope === 'public' ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={scope === 'following'}
-                onClick={() => setScope('following')}
-                className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${
-                  scope === 'following' ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'
-                }`}
-              >
-                Seguindo
-              </button>
+            <div className="flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Filtrar acontecimentos">
+              {([['recent', 'Recentes'], ['popular', 'Populares'], ['realized', 'Realizadas'], ['supported', 'Apoiadas'], ['mine', 'Minhas']] as Array<[SocialFeedFilter, string]>).map(([filter, label]) => <button key={filter} type="button" role="tab" aria-selected={scope === filter} onClick={() => setScope(filter)} className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${scope === filter ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'}`}>{label}</button>)}
             </div>
             <button
               type="button"
@@ -619,7 +601,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
               {isFollowingFeed ? (
                 <button
                   type="button"
-                  onClick={() => setScope('public')}
+                  onClick={() => setScope('recent')}
                   className="mt-5 rounded-xl bg-[#000666] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#000444] transition-colors"
                 >
                   Ver todos os acontecimentos
