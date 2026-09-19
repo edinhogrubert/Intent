@@ -99,7 +99,7 @@ task_7(){
   need_repo || { fail 7 'repo inválido'; return 1; }
   [[ -z "$(git -C "$REPO" status --porcelain)" ]] || { fail 7 'árvore suja; sincronização bloqueada'; return 1; }
   branch="$(git -C "$REPO" branch --show-current || true)"
-  git -C "$REPO" fetch origin --tags --prune || { fail 7 'fetch falhou'; return 1; }
+  git -C "$REPO" fetch origin --no-tags --prune || { fail 7 'fetch falhou'; return 1; }
   if [[ -n "$branch" ]]; then
     git -C "$REPO" pull --ff-only origin "$branch" || { fail 7 "pull --ff-only falhou para $branch"; return 1; }
   else
