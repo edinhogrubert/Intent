@@ -6,7 +6,8 @@ Base conferida no GitHub em 2026-09-06: `main` no commit
 `62e78cc040afc08e13c44e2fd943134643e05231`, marcado pela tag anotada `mvp-1.0.0`.
 VM informada: `intent-app-01`, região `us-ashburn-1`, Ubuntu 24.04 ARM64.
 Esta documentação descreve o código e os dados confirmados; não representa uma
-nova inspeção nem um teste executado na VM.
+nova inspeção nem um teste executado na VM. Os detalhes técnicos abaixo referem-se
+à base histórica indicada; não substituir a inspeção da versão vigente.
 
 ## Componentes e tráfego
 
@@ -33,11 +34,11 @@ Não abrir 3000, 8080, PostgreSQL ou Redis no firewall/NSG da Oracle.
 
 ## Persistência, migrações e criptografia
 
-O [schema Prisma](../backend/prisma/schema.prisma) define `users`, `intents`,
+O [schema Prisma](../../backend/prisma/schema.prisma) define `users`, `intents`,
 `supports`, `follows` e `domain_events`. As migrações versionadas são a inicial,
 a categoria da Intent e os vínculos sociais, na ordem dos diretórios em
-[prisma/migrations](../backend/prisma/migrations).
-O [entrypoint](../backend/docker-entrypoint.sh) executa `prisma migrate deploy`
+[prisma/migrations](../../backend/prisma/migrations).
+O [entrypoint](../../backend/docker-entrypoint.sh) executa `prisma migrate deploy`
 antes de iniciar a API, com até 12 tentativas. Reiniciar uma imagem pode aplicar
 migrações pendentes: preservar banco e versão antes de subir a API.
 Não usar `migrate dev`, `migrate reset` ou `db push` em produção.
@@ -68,16 +69,18 @@ os runbooks nem colocar segredos em variáveis incluídas no bundle do navegador
 
 ## Fontes e continuidade
 
-Fontes executáveis: [Compose da API](../backend/compose.yaml),
-[Compose do frontend](../deploy/oracle/frontend.compose.yaml),
-[Nginx](../deploy/oracle/frontend.nginx.conf) e
-[cliente da API](../src/services/intentApi.ts).
-O [estado histórico](../ProximasFuncionalidades.md) registra PostgreSQL 16,
+Fontes executáveis: [Compose da API](../../backend/compose.yaml),
+[Compose do frontend](../../deploy/oracle/frontend.compose.yaml),
+[Nginx](../../deploy/oracle/frontend.nginx.conf) e
+[cliente da API](../../src/services/intentApi.ts).
+O [estado histórico](../produto/ProximasFuncionalidades.md) registra PostgreSQL 16,
 Redis 7 e backup diário às 03:15 com retenção de sete dias. Conferir versões,
 fuso e agendamento na VM: não há manifestos dos serviços de dados no Git.
 O README antigo do backend descreve uma fatia anterior e não cobre a integração
-social atual. `archive/intentV1/` é somente histórico, nunca fonte de rollback.
+social atual. `archive/intentV1/` é somente histórico e objeto de estudo, nunca
+fonte operacional ou de rollback. O material de `gestao/historico/triagem-nova-pasta/`
+também é exclusivamente referência de estudo, não código ativo.
 
-Próximos procedimentos: [implantação](implantacao-oracle.md),
-[recuperação completa](recuperacao-completa.md),
-[backups e rollback](backups-e-rollback.md) e [fluxo Git/VM](fluxo-git-vm.md).
+Próximos procedimentos: [implantação](../operacao/implantacao-oracle.md),
+[recuperação completa](../operacao/recuperacao-completa.md),
+[backups e rollback](../operacao/backups-e-rollback.md) e [fluxo Git/VM](../operacao/fluxo-git-vm.md).
