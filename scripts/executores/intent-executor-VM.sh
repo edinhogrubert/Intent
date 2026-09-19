@@ -149,7 +149,11 @@ task_13(){
     bash -n "$VERIFICADOR_SCRIPT" || { fail 13 'sintaxe inválida no verificador operacional'; return 1; }
     sudo -n bash "$VERIFICADOR_SCRIPT" || { fail 13 'verificador operacional falhou'; return 1; }
   else
-    task_8 || { fail 13 'smoke básico falhou'; return 1; }
+    echo 'Validação direta da aplicação:'
+    docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || { fail 13 'docker ps falhou'; return 1; }
+    curl --fail --silent --show-error http://127.0.0.1:8080/health >/dev/null 2>&1 || { fail 13 'health da API falhou'; return 1; }
+    curl --fail --silent --show-error http://127.0.0.1:8080/health/ready >/dev/null 2>&1 || { fail 13 'readiness da API falhou'; return 1; }
+    curl --fail --silent --show-error http://127.0.0.1:3000/healthz >/dev/null 2>&1 || { fail 13 'health do frontend falhou'; return 1; }
   fi
   ok 13 'aplicação validada em execução'
 }
@@ -170,7 +174,7 @@ task_15(){
 }
 
 run(){ case "$1" in 1)task_1;;2)task_2;;3)task_3;;4)task_4;;5)task_5;;6)task_6;;7)task_7;;8)task_8;;9)task_9;;10)task_10;;11)task_11;;12)task_12;;13)task_13;;14)task_14;;15)task_15;;*) echo "função desconhecida: $1"; return 1;; esac; }
-summary(){ echo '==== RESUMO VM ===='; for i in "${IDS[@]}"; do [[ -n "${STATUS[$i]:-}" ]] && printf '%2s %-4s %s\n' "$i" "${STATUS[$i]}" "${DETAIL[$i]}"; done; }
+summary(){ echo '==== RESUMO VM ===='; for i in "${IDS[@]}"; do [[ -n "${STATUS[$i]:-}" ]] && printf '%2s %-4s %s\n' "$i" "${STATUS[$i]}" "${DETAIL[$i]}"; done; return 0; }
 
 [[ "${1:-}" == list ]] && { list; exit 0; }
 [[ $# -gt 0 ]] || { list; exit 1; }
