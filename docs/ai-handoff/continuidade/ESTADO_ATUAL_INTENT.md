@@ -13,16 +13,14 @@ Atualizado em: 2026-09-19 BRT
 ## 2. Estado operacional vigente
 
 - Última tag criada: `mvp-1.0.23`.
-- Próxima release planejada: `mvp-1.0.24`
 - Release `mvp-1.0.24` ainda NÃO foi criada.
-- `main` no GitHub, nos dois clones locais e na VM: `cc132fb5005d924a9e2fe387807fac5623bdbe0d`.
-- Frontend e API em execução foram comparados com imagens temporárias construídas a partir dessa `main`; os artefatos de runtime correspondem.
-- A Home horizontal do PR #31 está implantada. Não houve alteração de banco, Prisma, Firebase ou tag/release nesta atualização.
+- A referência operacional não deve ser fixada em um hash histórico: antes de qualquer ação, comparar `HEAD` com `origin/main` nos dois clones e na VM.
+- Em 2026-09-19 BRT, os Blocos 30–32 foram implantados a partir de `2d55ae472350a4fabd6b444012092a6131702a5c`. API e frontend foram reconstruídos pelo executor VM; PostgreSQL e Redis foram preservados.
+- A Home horizontal do PR #31, a busca social e a operação explícita de deploy frontend estão implantadas. Não houve alteração de banco, Prisma, Firebase ou tag/release nesta atualização.
 
 ## 3. Estado da codificação
 
-- Bloco 25 e as correções operacionais posteriores estão integrados e implantados.
-- Bloco 26 permanece apenas como proposta, sem implementação oficial.
+- Bloco 25, os Blocos 30–32 e as correções operacionais posteriores estão integrados e implantados.
 
 Permitido neste momento:
 
@@ -108,21 +106,12 @@ Pendência de governança:
 
 - Criar tag/release `mvp-1.0.24` somente mediante autorização específica.
 
-## 8. Próximo bloco planejado
+## 8. Blocos 30–32
 
-Após uma nova autorização de desenvolvimento:
-
-- Bloco 26 proposto: Descoberta Social e Busca.
-
-Ideia inicial:
-
-- 26A — Busca global.
-- 26B — Tela Explorar/Descobrir.
-- 26C — Sugestões sociais simples.
-
-Estado do Bloco 26:
-
-- Proposta apenas.
+- PR #35 — busca e descoberta social: merge `91e8e794377af4dd088e9d0a28ab80038b2329c4`; CI aprovada.
+- PR #36 — deploy explícito do frontend no executor VM: merge `2d55ae472350a4fabd6b444012092a6131702a5c`; CI aprovada.
+- A busca autenticada apresenta prévia em “Tudo”, filtros de estado e período, abas paginadas para acontecimentos e pessoas e projeções públicas.
+- Seguidores e seguindo reutilizam a implementação existente com unicidade e idempotência.
 - Ainda não iniciado.
 - Não existe implementação oficial.
 - Não iniciar sem autorização específica.
