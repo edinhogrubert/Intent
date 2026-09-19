@@ -404,9 +404,27 @@ describe('busca HTTP autenticada', () => {
   it('retorna as duas coleções para o usuário autenticado', async () => {
     const response = await get('/v1/search?q=teste', 'Bearer synthetic-test-token');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ data: { intents: [], users: [] } });
+    expect(await response.json()).toEqual({ data: { intents: [], users: [], nextCursor: null } });
     expect(db.intent.findMany).toHaveBeenCalledOnce();
     expect(db.user.findMany).toHaveBeenCalledOnce();
+  });
+
+  it('aplica filtros e paginação de acontecimentos no backend sem consultar pessoas', async () => {
+    const response = await get('/v1/search?q=teste&kind=intents&status=REALIZED&period=week&limit=1', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: { intents: [], users: [], nextCursor: null } });
+    expect(db.user.findMany).not.toHaveBeenCalled();
+    expect(db.intent.findMany.mock.calls[0]![0]).toMatchObject({
+      take: 2,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      where: { status: 'REALIZED' },
+    });
+  });
+
+  it('rejeita cursor em busca combinada para evitar paginação ambígua', async () => {
+    const response = await get('/v1/search?q=teste&cursor=cursor-antigo', 'Bearer synthetic-test-token');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: 'INVALID_CURSOR' } });
   });
 });
 
