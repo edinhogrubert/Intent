@@ -1,6 +1,6 @@
 # Prompt de Retomada — ChatGPT
 
-Retome o projeto Intent usando este pacote como fonte de verdade.
+Retome o projeto Intent usando este pacote como referência documental, **não como comprovação automática do estado atual**. Antes de declarar o estado oficial, consulte a branch, o commit, os PRs e os registros operacionais vigentes.
 
 ## Regras obrigatórias
 
@@ -27,24 +27,25 @@ Retome o projeto Intent usando este pacote como fonte de verdade.
    - commit atual;
    - bloqueios;
    - próxima ação segura.
+   Se não houver verificação atual, marque cada item como não confirmado.
 
-## Estado resumido atual
+## Registro histórico — snapshot do bloco 25 (não é estado vigente verificado)
+
+Os dados abaixo foram preservados do documento anterior à reorganização. Não reutilize seus campos como estado oficial atual sem consulta independente.
 
 - Projeto: Intent
 - Oficial: `edinhogrubert/Intent`
-- Branch oficial: `main`
-- PR atual: `#26`
-- Branch do PR: `feat/shareable-links`
-- Último commit de código conhecido com bloqueio: `a02beb970e42eddd8b44edff0960f24ea87d857e`
-- Bloco atual: 25
-- Conteúdo do PR: 25A + 25B + 25C
-- Estado: BLOQUEADO
-- Motivo: race condition no 25C em `PublicUserActivity.tsx`, onde resposta pendente de “Carregar mais” pode ser aplicada após troca de filtro.
-- Não fazer merge.
-- Não criar release.
-- Não fazer deploy.
-- Próxima ação: corrigir isolamento de requisições/cursor/lista no filtro de atividade pública.
+- Branch oficial registrada: `main`
+- PR então registrado: `#26`
+- Branch do PR então registrada: `feat/shareable-links`
+- Último commit de código então conhecido com bloqueio: `a02beb970e42eddd8b44edff0960f24ea87d857e`
+- Bloco então registrado: 25
+- Conteúdo então registrado do PR: 25A + 25B + 25C
+- Estado à época: BLOQUEADO
+- Motivo registrado: race condition no 25C em `PublicUserActivity.tsx`, onde resposta pendente de “Carregar mais” pode ser aplicada após troca de filtro.
+- Restrições à época: não fazer merge, criar release ou fazer deploy.
+- Próxima ação então registrada: corrigir isolamento de requisições/cursor/lista no filtro de atividade pública.
 
 ## Frase de abertura recomendada no novo chat
 
-“Retome o projeto Intent. Use os arquivos de continuidade em `docs/ai-handoff/continuidade/` como fonte de verdade. Primeiro me diga o estado confirmado, o bloqueio atual e o próximo passo seguro.”
+“Retome o projeto Intent. Use os arquivos de continuidade em `gestao/comunicacao/ai-handoff/continuidade/` como referência histórica e contratual. Verifique o estado vigente no repositório e nos registros operacionais antes de informar o bloqueio atual e o próximo passo seguro.”
