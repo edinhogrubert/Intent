@@ -23,8 +23,8 @@ Ele deve:
 
 Antes de agir no projeto Intent, o ChatGPT deve respeitar esta ordem:
 
-1. Contratos em `contratos/`.
-2. Continuidade em `docs/ai-handoff/continuidade/`.
+1. Contratos em `gestao/governanca/contratos/`.
+2. Continuidade em `gestao/comunicacao/ai-handoff/continuidade/`.
 3. Relatórios retornados pelos agentes.
 4. Relatórios retornados pelos executores PC/VM.
 5. Conversa atual.
