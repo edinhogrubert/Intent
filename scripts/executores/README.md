@@ -49,11 +49,11 @@ PC e VM usam a mesma numeração. Quando uma função não se aplica ao ambiente
 
 ## Scripts auxiliares que não devem ser chamados diretamente
 
-Estes scripts podem existir no PC ou na VM, mas devem ser chamados apenas por uma função numerada:
+Estes scripts podem existir no PC ou na VM, mas devem ser chamados apenas por uma função numerada quando integrados ao executor. O backup Git do PC é criado internamente pela função 6; o script legado de backup não é chamado por ela.
 
 | Script auxiliar | Ambiente | Função que chama |
 |---|---|---:|
-| `/home/grubert/intent-automacao/intent-backup-git-PC.sh` | PC | 6 |
+| `/home/grubert/intent-automacao/intent-backup-git-PC.sh` | PC | Nenhuma; legado, não chamado pela função 6 |
 | `/home/grubert/intent-automacao/intent-retomada-PC.sh` | PC | 14 |
 | `/opt/intent/scripts/executar-backup-postgres.sh` | VM | 6 e 12 |
 | `/opt/intent/source/deploy/oracle/08-deploy-backend.sh` | VM | 12 |
