@@ -1,0 +1,168 @@
+BACKUP=/home/ubuntu/intent-backup-regressao-VFj9rrC3
+ANTES=cd90957e16ad1b04913b64879753d7ec2199c30d
+/home/ubuntu/intent-backup-regressao-VFj9rrC3/source.bundle is okay
+The bundle contains these 6 refs:
+62e78cc040afc08e13c44e2fd943134643e05231 refs/heads/main
+cd90957e16ad1b04913b64879753d7ec2199c30d refs/remotes/origin/HEAD
+3f8668b8799e895fc0cbd6b87f5144bd59af4000 refs/remotes/origin/codex/mvp-backend-base
+cd90957e16ad1b04913b64879753d7ec2199c30d refs/remotes/origin/main
+93d8980a7f6523d4b87238b5aefe06d4c6fee499 refs/tags/mvp-1.0.0
+cd90957e16ad1b04913b64879753d7ec2199c30d HEAD
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+source.bundle: OK
+postgres.dump: OK
+BACKUP VALIDADO (checksum e catálogo; restauração não executada)
+From github-intent:edinhogrubert/Intent
+ * branch            main       -> FETCH_HEAD
+   cd90957..b014fc9  main       -> origin/main
+ESCOPO CONFIRMADO: somente dois arquivos novos de testes.
+ backend/tests/social-http.test.ts       | 145 ++++++++++++++++++++
+ backend/tests/social-regression.test.ts | 232 ++++++++++++++++++++++++++++++++
+ 2 files changed, 377 insertions(+)
+Previous HEAD position was cd90957 docs: registrar operação e recuperação do MVP
+HEAD is now at b014fc9 test: cobrir regressao social do MVP
+INICIANDO BACKEND: container temporário, sem rede ou volumes de produção
+(1/3) Upgrading libcrypto3 (3.5.7-r0 -> 3.5.8-r0)
+(2/3) Upgrading libssl3 (3.5.7-r0 -> 3.5.8-r0)
+(3/3) Installing openssl (3.5.8-r0)
+Executing busybox-1.37.0-r31.trigger
+OK: 11.8 MiB in 19 packages
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 350 packages in 18s
+npm notice
+npm notice New major version of npm available! 10.9.8 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+
+> @intent/api@0.1.0 prisma:generate
+> prisma generate
+
+Prisma schema loaded from prisma/schema.prisma
+┌─────────────────────────────────────────────────────────┐
+│  Update available 6.19.0 -> 8.0.0-rc.13                 │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+
+✔ Generated Prisma Client (v6.19.0) to ./node_modules/@prisma/client in 253ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+
+
+> @intent/api@0.1.0 lint
+> tsc --noEmit
+
+
+> @intent/api@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.4 /workspace
+
+ ✓ tests/social-regression.test.ts (23 tests) 82ms
+ ✓ tests/social-http.test.ts (11 tests) 212ms
+ ✓ tests/intent-schemas.test.ts (3 tests) 11ms
+ ✓ tests/reveal-crypto.test.ts (2 tests) 50ms
+ ✓ tests/support-condition.test.ts (4 tests) 9ms
+ ✓ tests/social-stats.test.ts (3 tests) 5ms
+
+ Test Files  6 passed (6)
+      Tests  46 passed (46)
+   Start at  12:33:08
+   Duration  3.99s (transform 729ms, setup 0ms, collect 1.24s, tests 370ms, environment 2ms, prepare 928ms)
+
+
+> @intent/api@0.1.0 build
+> tsc -p tsconfig.json
+
+BACKEND APROVADO
+INICIANDO FRONTEND: container temporário, sem rede ou volumes de produção
+Unable to find image 'oven/bun:1.4.0-alpine' locally
+1.4.0-alpine: Pulling from oven/bun
+Digest: sha256:07235578f79ef8c6f97d94aee7938e76f5cdba5f21ae5dbfdd3d3d38058437eb
+Status: Downloaded newer image for oven/bun:1.4.0-alpine
+bun install v1.4.0 (34cbb9a40)
+
++ @tailwindcss/vite@4.3.3
++ @types/node@22.20.1
++ @types/react@19.2.18
++ @types/react-dom@19.2.5
++ @vitejs/plugin-react@5.2.0
++ tailwindcss@4.3.3
++ typescript@5.8.3
++ vite@6.4.3
++ firebase@12.17.1
++ lucide-react@0.546.0
++ react@19.2.8
++ react-dom@19.2.8
+
+170 packages installed [3.65s]
+$ tsc --noEmit
+$ vite build
+vite v6.4.3 building for production...
+transforming...
+✓ 1702 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                         2.12 kB │ gzip:  0.79 kB
+dist/assets/index-vxsJGTsA.css                         94.04 kB │ gzip: 15.12 kB
+dist/assets/component-errorboundary-ZvXDbM21.js         1.75 kB │ gzip:  0.87 kB
+dist/assets/component-mvpconnectionslist-BDWn9sqS.js    4.01 kB │ gzip:  1.55 kB
+dist/assets/component-mvpintentdetail-D_dyGSp2.js       5.17 kB │ gzip:  1.97 kB
+dist/assets/index-DfvpdPFv.js                           5.94 kB │ gzip:  2.32 kB
+dist/assets/component-myintentsdashboard-D7jzDXck.js    5.96 kB │ gzip:  2.04 kB
+dist/assets/component-mvpsocialprofile-CamPCcAD.js      6.51 kB │ gzip:  2.30 kB
+dist/assets/component-mvphomefeed-BrHL4gbg.js           7.22 kB │ gzip:  2.65 kB
+dist/assets/component-creationwizard-BINvEgwj.js       10.49 kB │ gzip:  3.19 kB
+dist/assets/component-authgate-h48z93_Q.js             11.13 kB │ gzip:  4.33 kB
+dist/assets/icons-BstIOKaT.js                          11.23 kB │ gzip:  2.53 kB
+dist/assets/firebase-app-BnvMeM1t.js                   44.26 kB │ gzip: 10.27 kB
+dist/assets/firebase-auth-ConMEYUb.js                 127.61 kB │ gzip: 26.17 kB
+dist/assets/react-DGj8QgOs.js                         193.69 kB │ gzip: 61.16 kB
+dist/assets/firebase-core-Bfm6DmT7.js                 328.90 kB │ gzip: 92.50 kB
+✓ built in 10.32s
+FRONTEND APROVADO
+intent-postgres: healthy
+intent-redis: healthy
+intent-api: healthy
+intent-frontend: healthy
+/var/run/postgresql:5432 - accepting connections
+ENDPOINT http://127.0.0.1:8080/health/ready
+{"status":"ready","database":"ok"}
+ENDPOINT http://127.0.0.1:3000/healthz
+ok
+
+ENDPOINT http://127.0.0.1:3000/api/health/ready
+{"status":"ready","database":"ok"}
+intent-api: {'8080/tcp': [('127.0.0.1', '8080')]}
+intent-frontend: {'8080/tcp': [('127.0.0.1', '3000')]}
+intent-postgres: {}
+intent-redis: {}
+CONFIGURAÇÕES PROTEGIDAS: conteúdo inalterado
+CONTAINERS PRODUÇÃO: mesmos IDs, imagens, início e contagem de reinícios
+=== RESULTADO FINAL ===
+BACKUP=/home/ubuntu/intent-backup-regressao-VFj9rrC3
+b014fc92c045331b30e9af7d6feb9c69ba374e04
+HEAD detached at b014fc9
+nothing to commit, working tree clean
+b014fc9 test: cobrir regressao social do MVP
+cd90957 docs: registrar operação e recuperação do MVP
+62e78cc perf(frontend): separar chunks internos do Firebase Auth
+NAMES             STATUS                  PORTS
+intent-frontend   Up 18 hours (healthy)   80/tcp, 127.0.0.1:3000->8080/tcp
+intent-api        Up 37 hours (healthy)   127.0.0.1:8080->8080/tcp
+intent-postgres   Up 4 days (healthy)     5432/tcp
+intent-redis      Up 4 days (healthy)     6379/tcp
+ALINHAMENTO E VALIDAÇÕES CONCLUÍDOS
