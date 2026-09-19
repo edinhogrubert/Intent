@@ -1,1 +1,0 @@
-./src/services/intentApi.ts:  const result = await authenticatedRequest<ApiEnvelope<ApiUser>>('/v1/users/me/sync', { method: 'POST' }, firebaseUser);
