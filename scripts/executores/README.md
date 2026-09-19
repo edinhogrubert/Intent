@@ -20,10 +20,12 @@ Esse bootstrap:
 1. valida que está rodando no PC esperado;
 2. busca os instaladores no GitHub;
 3. instala/atualiza o executor do PC;
-4. tenta acessar a VM por SSH;
-5. se o SSH estiver disponível, instala/atualiza o executor da VM;
+4. exige acesso à VM por SSH: se a conexão falhar, encerra com erro após a etapa do PC, sem concluir a atualização da VM;
+5. com SSH funcional, instala/atualiza o executor da VM;
 6. lista as funções instaladas;
 7. grava relatório em `~/Downloads/intent-relatorios/`.
+
+**Atenção:** o bootstrap altera executores instalados no PC e na VM; não executá-lo para testar a reorganização documental. A referência selecionada é a primeira acessível entre `INTENT_EXECUTOR_REF` (quando definida), `main` e a branch histórica `docs/contratos-agentes`. Confirmar a referência efetiva antes de qualquer instalação autorizada. Uma falha após a instalação no PC pode deixar os ambientes em versões diferentes.
 
 ## Interface única
 
@@ -74,16 +76,16 @@ Arquivos de instalação:
 
 Agentes não devem instruir o usuário a executar `git`, `npm`, `ssh`, `docker`, `pg_dump`, `pg_restore` ou scripts auxiliares diretamente quando uma função numerada cobre a operação.
 
-O formato correto de resposta é:
+A notação humana `função PC(...)` ou `função VM(...)` descreve uma solicitação, **não é comando de terminal**. Quando houver autorização para executar, informar o comando com caminho absoluto, conforme `gestao/governanca/contratos/INTERFACE_EXECUTORES.md`, por exemplo:
 
-```text
-Execute função PC(1,2,3,4,5,6,7,8,9,10,14)
+```bash
+bash /home/grubert/intent-automacao/intent-executor-PC.sh 1
 ```
 
-ou:
+ou, no terminal da VM:
 
-```text
-Execute função VM(1,2,3,4,5,6,7,8,12,13,14)
+```bash
+bash /home/ubuntu/intent-executor-VM.sh 1
 ```
 
-O usuário executa o executor, cola o relatório, e o próximo passo é decidido a partir do relatório.
+Esses exemplos são apenas ilustrativos: não executá-los como parte da reorganização. O usuário executa somente a operação autorizada, cola o relatório, e o próximo passo é decidido a partir do resultado.
