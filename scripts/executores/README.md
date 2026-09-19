@@ -57,6 +57,7 @@ Estes scripts podem existir no PC ou na VM, mas devem ser chamados apenas por um
 | `/home/grubert/intent-automacao/intent-retomada-PC.sh` | PC | 14 |
 | `/opt/intent/scripts/executar-backup-postgres.sh` | VM | 6 e 12 |
 | `/opt/intent/source/deploy/oracle/08-deploy-backend.sh` | VM | 12 |
+| `/opt/intent/source/deploy/oracle/09-deploy-frontend.sh` | VM | 12 |
 | `/home/ubuntu/intent-retomada-VM.sh` | VM | 14 |
 | `deploy/oracle/21-verificar-intent-completo.sh`, se existir | VM | 13 |
 

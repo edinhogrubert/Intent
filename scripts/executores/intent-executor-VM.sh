@@ -8,6 +8,7 @@ POSTGRES_BACKUP_SCRIPT=/opt/intent/scripts/executar-backup-postgres.sh
 POSTGRES_BACKUP_DIR=/opt/intent/backups/postgres
 RETOMADA_SCRIPT=/home/ubuntu/intent-retomada-VM.sh
 DEPLOY_BACKEND_SCRIPT=/opt/intent/source/deploy/oracle/08-deploy-backend.sh
+DEPLOY_FRONTEND_SCRIPT=/opt/intent/source/deploy/oracle/09-deploy-frontend.sh
 VERIFICADOR_SCRIPT=/opt/intent/source/deploy/oracle/21-verificar-intent-completo.sh
 LOCK="$BASE/executor-VM.lock"
 IDS=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
@@ -136,12 +137,23 @@ task_11(){
 }
 
 task_12(){
+  local component="${INTENT_DEPLOY_COMPONENT:-}"
+  [[ "$component" == api || "$component" == frontend || "$component" == all ]] || { fail 12 'defina INTENT_DEPLOY_COMPONENT como api, frontend ou all'; return 1; }
   task_2 || { fail 12 'git da VM não está pronto'; return 1; }
+  git -C "$REPO" fetch origin --no-tags --prune || { fail 12 'fetch pré-deploy falhou'; return 1; }
+  [[ "$(git -C "$REPO" rev-parse HEAD)" == "$(git -C "$REPO" rev-parse origin/main)" ]] || { fail 12 'HEAD da VM não está alinhado a origin/main'; return 1; }
   task_6 || { fail 12 'backup PostgreSQL pré-deploy falhou'; return 1; }
-  [[ -f "$DEPLOY_BACKEND_SCRIPT" ]] || { fail 12 "script de deploy ausente: $DEPLOY_BACKEND_SCRIPT"; return 1; }
-  bash -n "$DEPLOY_BACKEND_SCRIPT" || { fail 12 'sintaxe inválida no deploy backend'; return 1; }
-  sudo -n bash "$DEPLOY_BACKEND_SCRIPT" || { fail 12 'deploy backend falhou'; return 1; }
-  ok 12 'deploy controlado executado via função'
+  if [[ "$component" == api || "$component" == all ]]; then
+    [[ -f "$DEPLOY_BACKEND_SCRIPT" ]] || { fail 12 "script de deploy ausente: $DEPLOY_BACKEND_SCRIPT"; return 1; }
+    bash -n "$DEPLOY_BACKEND_SCRIPT" || { fail 12 'sintaxe inválida no deploy backend'; return 1; }
+    sudo -n bash "$DEPLOY_BACKEND_SCRIPT" || { fail 12 'deploy backend falhou'; return 1; }
+  fi
+  if [[ "$component" == frontend || "$component" == all ]]; then
+    [[ -f "$DEPLOY_FRONTEND_SCRIPT" ]] || { fail 12 "script de deploy ausente: $DEPLOY_FRONTEND_SCRIPT"; return 1; }
+    bash -n "$DEPLOY_FRONTEND_SCRIPT" || { fail 12 'sintaxe inválida no deploy frontend'; return 1; }
+    sudo -n bash "$DEPLOY_FRONTEND_SCRIPT" || { fail 12 'deploy frontend falhou'; return 1; }
+  fi
+  ok 12 "deploy controlado executado: $component"
 }
 
 task_13(){
