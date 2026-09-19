@@ -158,4 +158,39 @@ describe('busca simples de Intents e pessoas', () => {
       expect(result.intents[0]!.creator).not.toHaveProperty(field);
     }
   });
+
+  it('pagina Intents de modo estável, aplica estado e período no banco', async () => {
+    db.intent.findMany.mockResolvedValue([intent, { ...intent, id: '20000000-0000-4000-8000-000000000003' }]);
+    const result = await searchIntentsAndUsers(viewerId, 'Intent', { kind: 'intents', status: 'PUBLISHED', period: 'week', limit: 1 });
+    expect(result.intents).toHaveLength(1);
+    expect(result.users).toEqual([]);
+    expect(result.nextCursor).toEqual(expect.any(String));
+    expect(intentQuery()).toMatchObject({ take: 2, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], where: { status: 'PUBLISHED' } });
+    expect(intentQuery().where.AND).toContainEqual(expect.objectContaining({ createdAt: { gte: expect.any(Date) } }));
+  });
+
+  it('usa cursor de Intents sem alterar as regras de privacidade', async () => {
+    const cursor = Buffer.from(JSON.stringify({ kind: 'intents', createdAt: '2026-09-01T00:00:00.000Z', id: intent.id })).toString('base64url');
+    await searchIntentsAndUsers(viewerId, 'Intent', { kind: 'intents', cursor });
+    expect(intentQuery().where.AND).toContainEqual({ OR: [
+      { createdAt: { lt: new Date('2026-09-01T00:00:00.000Z') } },
+      { createdAt: new Date('2026-09-01T00:00:00.000Z'), id: { lt: intent.id } },
+    ] });
+    expect(intentQuery().where.AND[1].OR).toContainEqual({ visibility: 'PRIVATE', conditionType: 'GUARDIANS', guardianIds: { array_contains: [viewerId] } });
+  });
+
+  it('pagina pessoas ativas sem incluir campos privados', async () => {
+    db.user.findMany.mockResolvedValue([user, { ...user, id: viewerId, username: 'visitante' }]);
+    const result = await searchIntentsAndUsers(viewerId, 'Criador', { kind: 'users', limit: 1 });
+    expect(result.intents).toEqual([]);
+    expect(result.users).toHaveLength(1);
+    expect(result.nextCursor).toEqual(expect.any(String));
+    expect(db.user.findMany.mock.calls[0]![0]).toMatchObject({ take: 2, orderBy: [{ displayName: 'asc' }, { id: 'asc' }], where: { status: 'ACTIVE' } });
+    expect(result.users[0]).not.toHaveProperty('email');
+  });
+
+  it('rejeita cursor incompatível com a aba selecionada', async () => {
+    const cursor = Buffer.from(JSON.stringify({ kind: 'users', displayName: 'Criador', id: creatorId })).toString('base64url');
+    await expect(searchIntentsAndUsers(viewerId, 'Criador', { kind: 'intents', cursor })).rejects.toMatchObject({ code: 'INVALID_CURSOR' });
+  });
 });
