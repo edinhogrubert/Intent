@@ -1,5 +1,7 @@
 # Fluxo entre GitHub e VM
 
+> **Registro histórico e procedimento de referência.** Este documento foi escrito em etapas anteriores (`mvp-1.0.0`, `mvp-1.0.5` e branch `docs/operacao-recuperacao-mvp`). Os commits, a tag, o estado de alinhamento e as expressões "main atual" abaixo são registros daquela época, **não** uma comprovação do estado vigente em 2026-09-19. Os comandos são exemplos de operação sujeitos a autorização explícita: verificar previamente branch, commit aprovado, estado da VM, contratos vigentes e backups. Não executar nenhum deles para testar a reorganização da branch `chore/auditoria-gestao-v1-20260918`.
+
 ## Fonte e branches
 
 Repositório: `edinhogrubert/Intent`. A base consolidada é a `main` no commit
