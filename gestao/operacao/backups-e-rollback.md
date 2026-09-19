@@ -2,7 +2,7 @@
 
 ## Política e pré-condições
 
-O [registro existente](../ProximasFuncionalidades.md) informa backup local diário
+O [registro existente](../produto/ProximasFuncionalidades.md) informa backup local diário
 às 03:15, retenção de sete dias e backup externo pendente. Confirmar na VM o
 agendador, seu fuso e execuções recentes. O script externo não está no Git.
 Dump no mesmo disco não protege contra perda da VM. Preservar uma cópia protegida
