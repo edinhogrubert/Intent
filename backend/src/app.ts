@@ -13,6 +13,7 @@ import { intentsRouter } from './routes/intents.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { searchRouter } from './routes/search.js';
 import { usersRouter } from './routes/users.js';
+import { personalContactListsRouter } from './routes/personal-contact-lists.js';
 
 export function createApp() {
   const app = express();
@@ -49,6 +50,7 @@ export function createApp() {
   });
   app.use('/health', healthRouter);
   app.use('/v1/users', usersRouter);
+  app.use('/v1/personal-lists', personalContactListsRouter);
   app.use('/v1/intents', intentsRouter);
   app.use('/v1/notifications', notificationsRouter);
   app.use('/v1/search', searchRouter);

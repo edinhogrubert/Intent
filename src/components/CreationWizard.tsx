@@ -32,6 +32,7 @@ import {
   type ApiUserSearchResult,
   type IntentCategory,
 } from '../services/intentApi';
+import { PersonalContactListsPanel } from './PersonalContactListsPanel';
 
 interface CreationWizardProps {
   currentUser: UserAccount;
@@ -330,6 +331,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
                 {selectedGuardians.length === 0 ? <p className="text-sm text-[#666] bg-[#f5f3ef] border border-dashed border-[#c6c5d4] rounded-xl p-4">Nenhum guardiao selecionado.</p> : <div className="space-y-2">{selectedGuardians.map((guardian) => <div key={guardian.id} className="flex items-center justify-between gap-3 bg-[#f5f3ef] border border-[#e4e2de] rounded-xl p-3"><div className="min-w-0"><p className="text-sm font-bold truncate">{guardian.displayName}</p><p className="text-xs text-[#666] truncate">@{guardian.username.replace(/^@+/, '')}</p></div><button type="button" onClick={() => removeGuardian(guardian.id)} className="text-xs font-bold text-[#8c1d18]">Remover</button></div>)}</div>}
                 <span className="block text-xs text-[#666] mt-2">{guardianIds.length} guardiao(oes) selecionado(s).</span>
               </div>
+              <PersonalContactListsPanel selectedUsers={selectedGuardians} onSelectionChange={setSelectedGuardians} />
               <label className="block"><span className="block text-xs font-bold mb-2">Quantos precisam aprovar?</span><input type="number" inputMode="numeric" min={1} max={Math.max(guardianIds.length, 1)} value={guardianApprovalGoal} onChange={(event) => setGuardianApprovalGoal(Number(event.target.value))} className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666]" /></label>
             </div>}
             <label className="block"><span className="flex justify-between text-xs font-bold mb-2"><span className="flex items-center gap-2"><Lock className="w-4 h-4" />O que sera revelado?</span><span className="text-[#888]">{revealContent.length}/10000</span></span><textarea value={revealContent} maxLength={10000} onChange={(event) => setRevealContent(event.target.value)} rows={4} placeholder="Este conteudo fica protegido ate a condicao ser cumprida." className="w-full bg-[#fbf9f5] border border-[#c6c5d4] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#000666] resize-none" /></label>

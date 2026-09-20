@@ -172,6 +172,16 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
   );
 
   return runIntentMutation(creatorId, 'CREATE_INTENT', idempotencyKey, command, async (transaction) => {
+    if (command.conditionType === 'GUARDIANS') {
+      const guardianIds = command.guardianIds ?? [];
+      const activeGuardians = await transaction.user.findMany({
+        where: { id: { in: guardianIds }, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (activeGuardians.length !== guardianIds.length || guardianIds.includes(creatorId)) {
+        throw new AppError(400, 'INVALID_GUARDIANS', 'Todos os guardiões precisam ser pessoas ativas e diferentes do criador.');
+      }
+    }
     const intent = await transaction.intent.create({
       data: {
         id: intentId,
