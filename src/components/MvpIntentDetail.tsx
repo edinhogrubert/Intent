@@ -76,6 +76,7 @@ function ConditionStatus({ intent }: { intent: ApiIntent }) {
     );
   }
   const progress = Math.min(100, Math.round((intent.supportCount * 100) / intent.supportGoal));
+  const remaining = Math.max(0, intent.supportGoal - intent.supportCount);
   return (
     <div className="mt-6 bg-[#f9f8f6] rounded-2xl p-4 border border-[#e4e2de]">
       <div className="flex justify-between items-center text-sm font-bold text-[#1a1a1a]">
@@ -85,6 +86,9 @@ function ConditionStatus({ intent }: { intent: ApiIntent }) {
       <div className="h-3 bg-[#E0F2F1] rounded-full overflow-hidden mt-2">
         <div className="h-full bg-[#006a62] transition-all duration-300" style={{ width: `${progress}%` }}/>
       </div>
+      <p className="mt-3 text-xs text-[#006a62]">
+        {remaining === 0 ? 'Meta atingida; a realização é confirmada pelo backend.' : `Faltam ${remaining} apoio(s) para realizar esta Intent.`}
+      </p>
     </div>
   );
 }
@@ -326,6 +330,16 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
             )}
 
             <div className="mt-6 pt-5 border-t border-[#e4e2de]">
+              {!isMine && intent.status === 'PUBLISHED' && (
+                <p className="mb-3 rounded-xl bg-[#f5f3ef] px-3 py-2 text-xs leading-relaxed text-[#555]">
+                  <strong>Reagir</strong> é uma manifestação social e não conta para a meta.{' '}
+                  {intent.conditionType === 'SUPPORT'
+                    ? <><strong>Apoiar</strong> registra sua contribuição e é a ação que avança esta meta.</>
+                    : intent.conditionType === 'GUARDIANS'
+                      ? <><strong>Participação</strong> nesta Intent é a aprovação de um guardião autorizado.</>
+                      : 'Esta Intent é realizada automaticamente na data definida.'}
+                </p>
+              )}
               {isMine && <p className="text-sm text-[#666] text-center">Esta Intent é sua. Você acompanha a realização por aqui.</p>}
               {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'SUPPORT' && (
                 <button
