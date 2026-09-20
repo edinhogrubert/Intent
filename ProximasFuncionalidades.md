@@ -4,7 +4,7 @@
 >
 > **Manutenção:** atualizar este arquivo diretamente na `main` quando houver novo acordo de produto. Quando uma funcionalidade for integralmente implementada e validada, retirar sua proposta concluída daqui, preservando os registros técnicos no histórico do Git e nos documentos operacionais. Se apenas parte estiver pronta, conservar somente a parte pendente e descrever exatamente o limite.
 >
-> **Identidade:** Intent é uma rede social de acontecimentos. O acontecimento, suas regras, a mobilização e a revelação são o centro do produto; não transformar listas de pessoas em comunidades nem confundir apoio, reação, aprovação e acompanhamento.
+> **Identidade:** Intent é uma rede social de acontecimentos. O acontecimento, suas regras, a mobilização e a realização são o centro do produto; não transformar listas de pessoas em comunidades nem confundir apoio, reação, aprovação e acompanhamento. **A seção 2.13 é um princípio permanente de identidade e linguagem, não uma funcionalidade descartável: jamais removê-la na limpeza rotineira do backlog, mesmo após sua aplicação. Qualquer alteração exige decisão explícita do proprietário.**
 
 ---
 
@@ -58,7 +58,7 @@ Além do comportamento básico já existente — seguidores atuais podem acessar
 
 Separar **quem aprova** de **quem pode receber/ver** o conteúdo; prever observador autorizado quando necessário. Exemplos: testamento digital, documento aprovado por parte de três pessoas, conteúdo aberto em data para destinatários específicos ou aprovado por guardiões mas entregue a terceiro. Reaproveitar o quórum N de M e os guardiões já existentes; a evolução pendente é a separação de papéis e a combinação segura de regras.
 
-Exigir versão da regra, proteção contra alteração insegura após publicação, resumo prévio de aprovadores/destinatários/prazo, auditoria de aprovação, revelação e acesso, autorização no backend e bloqueio de acesso direto indevido. Combinação de data e aprovação relaciona-se à seção 2.12.
+Exigir versão da regra, proteção contra alteração insegura após publicação, resumo prévio de aprovadores/destinatários/prazo, auditoria de aprovação, disponibilização de conteúdo e acesso, autorização no backend e bloqueio de acesso direto indevido. Combinação de data e aprovação relaciona-se à seção 2.12.
 
 ## 2.9 Intent por localização
 
@@ -72,17 +72,17 @@ Reavaliar, com base no manifesto operacional atualizado, publicação por domín
 
 ## 2.11 Grupos pessoais reutilizáveis — seleção, não comunidade (acordo de 20/09/2026)
 
-**Proposta futura; não implementada.** Grupo é uma lista pessoal reutilizável de pessoas (Futsal, Vôlei, Dança, Família, Trabalho, Escola) para preencher seleções existentes na criação de uma Intent comum. Não possui feed, perfil público, publicação, regra, contador de aprovação ou vida social própria. Criador seleciona nomes ou importa grupos, revisa, adiciona/remove indivíduos e elimina duplicidades. A lista final de aprovadores/destinatários é registrada **na Intent**: alterações posteriores no grupo não modificam Intents anteriores automaticamente. Permissões e validações permanecem no backend e nas regras da Intent; selecionar grupo não concede apoio, aprovação nem participação.
+**A seleção de listas pessoais como atalhos para guardiões foi implementada na PR #45; os demais papéis dependem de funcionalidade própria.** Grupo é uma lista pessoal reutilizável de pessoas (Futsal, Vôlei, Dança, Família, Trabalho, Escola) para preencher seleções existentes na criação de uma Intent comum. Não possui feed, perfil público, publicação, regra, contador de aprovação ou vida social própria. Criador seleciona nomes ou importa grupos, revisa, adiciona/remove indivíduos e elimina duplicidades. A lista final de aprovadores/destinatários é registrada **na Intent**: alterações posteriores no grupo não modificam Intents anteriores automaticamente. Permissões e validações permanecem no backend e nas regras da Intent; selecionar grupo não concede apoio, aprovação nem participação.
 
 Exemplo: grupo Futsal com 20 pessoas selecionado como aprovadores; a Intent exige 12 de 20 confirmações. Gestão compartilhada da lista seria evolução opcional somente se necessária, sem transformá-la em comunidade.
 
 ## 2.12 Políticas de encerramento, prazo e mensagem alternativa (acordo de 20/09/2026)
 
-**Proposta futura; não implementada.** Separar **meta atingida**, **encerramento da participação** e **realização/revelação definitiva**. Criador escolhe política e prazo. Não confundir apoio `SUPPORT` com aprovação `GUARDIANS` e não alterar retroativamente condições existentes.
+**Proposta futura; não implementada.** Separar **meta atingida**, **encerramento da participação** e **realização definitiva da Intent**. Criador escolhe política e prazo. Não confundir apoio `SUPPORT` com aprovação `GUARDIANS` e não alterar retroativamente condições existentes.
 
 ### A — Encerrar apenas no prazo: futsal
 
-20 aprovadores; mínimo 12; quinta às 18h. Aprovações podem oscilar até o limite, conforme regras explícitas de desistência e reposição. Atingir 12 na quarta é **provisório e não revela**. No prazo, congelar pessoas e contagem válidas, avaliar atomicamente; 12 ou mais realiza e revela; menos de 12 encerra **sem revelar o cofre** e exibe mensagem alternativa do criador («Não vai sair jogo»). Ações tardias não alteram resultado. «Confirmou, pagou» é uma condição informada pelo organizador, não prova de pagamento verificada pela plataforma.
+20 aprovadores; mínimo 12; quinta às 18h. Aprovações podem oscilar até o limite, conforme regras explícitas de desistência e reposição. Atingir 12 na quarta é **provisório e não realiza a Intent**. No prazo, congelar pessoas e contagem válidas, avaliar atomicamente; 12 ou mais realiza a Intent e disponibiliza o conteúdo previsto, quando houver; menos de 12 encerra **sem disponibilizar o conteúdo condicionado ao sucesso** e exibe mensagem alternativa do criador («Não vai sair jogo»). Ações tardias não alteram resultado. «Confirmou, pagou» é uma condição informada pelo organizador, não prova de pagamento verificada pela plataforma.
 
 ### B — Encerrar imediatamente pela meta: salão de beleza
 
@@ -91,6 +91,26 @@ Primeiros 20 apoios elegíveis reservam 20 brindes até terça. O 20º apoio fec
 ### Regras comuns pendentes de especificação
 
 Se prazo termina sem cumprir meta: apenas **mensagem alternativa de insucesso**, jamais conteúdo cifrado original, e estado não realizado. Diferenciar meta provisória, inscrições encerradas, realizado e encerrado sem realização. Definir estados, transições, versão imutável da regra após publicar, compatibilidade legada, auditoria, autorização, fuso/UTC, instante de corte e atrasos do agendador. Determinar quem pode confirmar, retirar confirmação, substituir participantes e visualizar dados. Não presumir pagamento, presença ou entrega sem evento verificável.
+
+## 2.13 IDENTIDADE PERMANENTE — Linguagem própria da Intent (acordo expresso do proprietário em 20/09/2026)
+
+> **PROTEGER ESTE ACORDO. NÃO APAGAR.** Esta seção é uma diretriz permanente de identidade do produto, guardada aqui por solicitação expressa do proprietário mesmo não sendo uma funcionalidade. Não remover quando a terminologia for aplicada nem durante limpezas de backlog, reorganizações ou encerramentos de blocos. Alterar ou excluir somente mediante nova decisão explícita do proprietário. Preservar seu conteúdo no histórico Git e comunicar esta regra a futuros agentes.
+
+**Princípio central:** Intent não é só o nome do aplicativo ou de uma publicação: é o nome que as pessoas devem reconhecer e repetir quando interagem com o produto. A Intent é protagonista, e o vocabulário deve reforçar sua identidade sem sacrificar a compreensão. Pergunta central: **«O que você quer fazer acontecer?»**
+
+**Expressões de ação:** criar uma Intent; participar de uma Intent; apoiar uma Intent; aprovar uma Intent (ação própria do papel de guardião); acompanhar uma Intent; compartilhar uma Intent. Dar preferência ao nome Intent explicitamente nos títulos, mensagens, notificações e conquistas. Botões curtos podem usar só o verbo quando o contexto for evidente.
+
+**Expressões de progresso:** «Minha Intent está avançando.»; «Faltam duas aprovações para realizar esta Intent.»; «A Intent atingiu a meta.»; «Esta Intent aguarda aprovação.» A Intent é o sujeito da história.
+
+**Expressões de resultado:** «Intent realizada» é o estado central; «Você realizou sua primeira Intent.»; «Esta Intent foi realizada com a participação de 20 pessoas.»; «Sua Intent atingiu a meta.»; «O conteúdo desta Intent foi liberado.» Atingir uma meta pode ser provisório e não equivale automaticamente a realizar a Intent: a regra do acontecimento decide.
+
+**Expressões candidatas, sem impor significado artificial:** «conquistar uma Intent» pode ser apropriado para conquistas e reputação, mas não é sinônimo universal de realização; «viver uma Intent» pode representar experiência e participação, desde que receba significado funcional claro antes do uso.
+
+**Assinatura verbal proposta:** **«Crie. Participe. Realize.»** e **«Tudo começa com uma Intent.»** Preservar também a pergunta central do produto; esta assinatura não determina automaticamente substituição do lema vigente.
+
+**Distinções inegociáveis:** apoio, aprovação, participação, acompanhamento, realização, meta e disponibilização de conteúdo são conceitos diferentes. A Intent é maior do que liberar conteúdo: nem toda Intent precisa produzir conteúdo. Evitar em toda linguagem de produto e de interface o termo anteriormente usado para descoberta de conteúdo e suas flexões, por decisão expressa do proprietário; preferir «realização da Intent», «liberar conteúdo» ou «disponibilizar conteúdo» quando cada um corresponder ao fato. Nomes técnicos legados de API, persistência e criptografia requerem auditoria e migração segura de compatibilidade, nunca substituição textual indiscriminada.
+
+**Aplicação futura:** revisar textos de interface, criação guiada, status, timeline, notificações e conquistas conforme seu sentido real, sem presumir que a mudança já esteja implementada. Esta diretriz continua no repositório permanentemente mesmo depois de aplicada.
 
 ---
 
