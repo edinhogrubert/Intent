@@ -28,6 +28,7 @@ model User {
   notificationActions Notification[] @relation("NotificationActor")
   authoredComments IntentComment[]
   reactions      IntentReaction[]
+  intentWatches  IntentWatch[]
 
   @@map("users")
 }
@@ -76,6 +77,7 @@ model Intent {
   notifications      Notification[]
   comments           IntentComment[]
   reactions          IntentReaction[]
+  watches            IntentWatch[]
 
   @@index([status, visibility, createdAt(sort: Desc)])
   @@index([conditionType, revealAt])
@@ -190,4 +192,17 @@ model IntentReaction {
   @@index([intentId, type])
   @@index([userId, createdAt(sort: Desc)])
   @@map("intent_reactions")
+}
+
+model IntentWatch {
+  id        String   @id @default(uuid()) @db.Uuid
+  intentId  String   @map("intent_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  intent    Intent   @relation(fields: [intentId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([intentId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("intent_watches")
 }

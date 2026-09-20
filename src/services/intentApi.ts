@@ -69,6 +69,7 @@ export interface ApiIntent {
   viewerIsGuardian?: boolean;
   viewerHasApprovedAsGuardian?: boolean;
   viewerSupported?: boolean;
+  viewerWatching?: boolean;
   reactionCounts?: ReactionCounts;
   viewerReaction?: ReactionType | null;
   recentComments?: ApiIntentComment[];
@@ -185,6 +186,11 @@ export interface SupportIntentResult {
   removed?: boolean;
   realized: boolean;
   realizedNow: boolean;
+}
+
+export interface IntentWatchResult {
+  intentId: string;
+  watching: boolean;
 }
 
 export interface CreateSupportIntentInput {
@@ -453,6 +459,30 @@ export async function removeIntentSupport(intentId: string): Promise<SupportInte
     `/v1/intents/${encodeURIComponent(intentId)}/supports`,
     { method: 'DELETE' },
   );
+  return result.data;
+}
+
+export async function watchIntent(intentId: string): Promise<IntentWatchResult> {
+  const result = await authenticatedRequest<ApiEnvelope<IntentWatchResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/watch`,
+    { method: 'POST' },
+  );
+  return result.data;
+}
+
+export async function unwatchIntent(intentId: string): Promise<IntentWatchResult> {
+  const result = await authenticatedRequest<ApiEnvelope<IntentWatchResult>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/watch`,
+    { method: 'DELETE' },
+  );
+  return result.data;
+}
+
+export async function listWatchedIntents(cursor?: string): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  const suffix = params.size ? `?${params.toString()}` : '';
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>(`/v1/intents/watched${suffix}`);
   return result.data;
 }
 

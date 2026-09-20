@@ -358,16 +358,18 @@ export async function listSocialFeed(viewerId: string, filter: SocialFeedFilter 
   const rows = await prisma.intent.findMany({ where, orderBy, take: safeLimit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: socialFeedIntentSelection });
   const page = rows.slice(0, safeLimit);
   const ids = page.map((intent) => intent.id);
-  const [groups, reactions, supports, comments] = ids.length ? await Promise.all([
+  const [groups, reactions, supports, comments, watches] = ids.length ? await Promise.all([
     prisma.intentReaction.groupBy({ by: ['intentId', 'type'], where: { intentId: { in: ids } }, _count: { _all: true } }),
     prisma.intentReaction.findMany({ where: { userId: viewerId, intentId: { in: ids } }, select: { intentId: true, type: true } }),
     prisma.support.findMany({ where: { userId: viewerId, intentId: { in: ids } }, select: { intentId: true } }),
     prisma.intentComment.findMany({ where: { intentId: { in: ids }, author: { status: 'ACTIVE' } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: safeLimit * 3, select: socialFeedCommentSelection }),
-  ]) : [[], [], [], []];
+    prisma.intentWatch?.findMany({ where: { userId: viewerId, intentId: { in: ids } }, select: { intentId: true } }) ?? Promise.resolve([]),
+  ]) : [[], [], [], [], []];
   const counts = new Map<string, { LIKE: number; LOVE: number; CELEBRATE: number; total: number }>();
   for (const group of groups) { const count = counts.get(group.intentId) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 }; count[group.type] = group._count._all; count.total += group._count._all; counts.set(group.intentId, count); }
   const reactionByIntent = new Map(reactions.map((item) => [item.intentId, item.type]));
   const supportedIds = new Set(supports.map((item) => item.intentId));
+  const watchedIds = new Set(watches.map((item) => item.intentId));
   const commentsByIntent = new Map<string, typeof comments>();
   for (const comment of comments) { const items = commentsByIntent.get(comment.intentId) ?? []; if (items.length < 2) items.push(comment); commentsByIntent.set(comment.intentId, items); }
   return {
@@ -384,6 +386,7 @@ export async function listSocialFeed(viewerId: string, filter: SocialFeedFilter 
         viewerReaction: reactionByIntent.get(intent.id) ?? null,
         viewerSupported: supportedIds.has(intent.id),
         viewerHasSupported: supportedIds.has(intent.id),
+        viewerWatching: watchedIds.has(intent.id),
         recentComments: (commentsByIntent.get(intent.id) ?? [])
           .map(({ id, body, createdAt, updatedAt, author }) => ({ id, body, createdAt, updatedAt, author })),
       };
@@ -408,6 +411,12 @@ export async function getIntent(intentId: string, viewerId?: string) {
 
   const viewerSupport = viewerId
     ? await prisma.support.findUnique({
+        where: { intentId_userId: { intentId, userId: viewerId } },
+        select: { id: true },
+      })
+    : null;
+  const viewerWatch = viewerId
+    ? await prisma.intentWatch?.findUnique({
         where: { intentId_userId: { intentId, userId: viewerId } },
         select: { id: true },
       })
@@ -478,6 +487,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
     viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
     revealContent,
     viewerHasSupported: Boolean(viewerSupport),
+    viewerWatching: Boolean(viewerWatch),
     reactionCounts,
     viewerReaction,
   };
