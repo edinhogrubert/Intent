@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, Calendar, Check, CheckCircle2, Globe2, Heart, LockKeyhole, Plus, RefreshCw, Search, Share2, Sparkles, Tag, ThumbsUp, TrendingUp, UserRound, Users, Vote, X } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { getSocialProfile, IntentApiError, listSocialFeed, removeIntentReaction, removeIntentSupport, searchIntentsAndUsers, setIntentReaction, supportIntent, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type ReactionType, type SearchKind, type SearchPeriod, type SearchStatus, type SocialFeedFilter } from '../services/intentApi';
+import { getSocialProfile, IntentApiError, listSocialFeed, listWatchedIntents, removeIntentReaction, removeIntentSupport, searchIntentsAndUsers, setIntentReaction, supportIntent, unwatchIntent, watchIntent, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type ReactionType, type SearchKind, type SearchPeriod, type SearchStatus, type SocialFeedFilter } from '../services/intentApi';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import { APP_VERSION_CONTEXT, APP_VERSION_LABEL } from '../appVersion';
 
@@ -50,6 +50,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
   const [socialIntent, setSocialIntent] = useState(intent);
   const [actionPending, setActionPending] = useState(false);
   const [actionFeedback, setActionFeedback] = useState('');
+  const [watchPending, setWatchPending] = useState(false);
   useEffect(() => {
     setCopied(false); setCopyError('');
   }, [intent.id]);
@@ -106,6 +107,23 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
       setActionFeedback(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar o apoio.');
     } finally {
       setActionPending(false);
+    }
+  }
+
+  async function handleWatch() {
+    if (watchPending) return;
+    setWatchPending(true);
+    setActionFeedback('');
+    try {
+      const result = socialIntent.viewerWatching
+        ? await unwatchIntent(socialIntent.id)
+        : await watchIntent(socialIntent.id);
+      setSocialIntent((current) => ({ ...current, viewerWatching: result.watching }));
+      setActionFeedback(result.watching ? 'Você está acompanhando esta Intent.' : 'Você deixou de acompanhar esta Intent.');
+    } catch (caught) {
+      setActionFeedback(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar o acompanhamento.');
+    } finally {
+      setWatchPending(false);
     }
   }
 
@@ -293,6 +311,9 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
                 <Users className="mr-1 inline h-3.5 w-3.5"/>{socialIntent.viewerHasSupported ? 'Apoiado' : 'Apoiar a meta'}
               </button>
             )}
+            <button type="button" disabled={watchPending} onClick={() => void handleWatch()} aria-pressed={Boolean(socialIntent.viewerWatching)} className={`rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-60 ${socialIntent.viewerWatching ? 'border-[#006a62] bg-[#e0f2f1] text-[#006a62]' : 'border-[#e4e2de] text-[#555] hover:border-[#006a62] hover:text-[#006a62]'}`}>
+              {socialIntent.viewerWatching ? 'Acompanhando' : 'Acompanhar'}
+            </button>
           </div>
         )}
 
@@ -330,6 +351,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
 
 export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectProfile }: MvpHomeFeedProps) {
   const [scope, setScope] = useState<SocialFeedFilter>('recent');
+  const [showWatched, setShowWatched] = useState(false);
   const [intents, setIntents] = useState<ApiIntent[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -366,7 +388,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     cursor ? setLoadingMore(true) : setLoading(true);
     setError('');
     try {
-      const page = await listSocialFeed(scope, cursor);
+      const page = showWatched ? await listWatchedIntents(cursor) : await listSocialFeed(scope, cursor);
       if (generation !== loadGeneration.current) return;
       setIntents((current) => cursor ? [...current, ...page.items] : page.items);
       setNextCursor(page.nextCursor);
@@ -390,7 +412,7 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
     setSelectedCategory(null);
     void loadFeed();
     return () => { loadGeneration.current += 1; };
-  }, [scope, currentUser.id]);
+  }, [scope, currentUser.id, showWatched]);
 
   async function runSearch(kind: SearchKind, status: 'all' | SearchStatus, period: SearchPeriod, cursor?: string) {
     const query = searchQuery.trim();
@@ -679,7 +701,8 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
           {/* Abas de Navegação do Feed */}
           <section className="flex items-center gap-2 rounded-2xl border border-[#e4e2de] bg-white p-1.5 shadow-xs">
             <div className="flex flex-1 gap-1 overflow-x-auto" role="tablist" aria-label="Filtrar acontecimentos">
-              {([['recent', 'Recentes'], ['popular', 'Populares'], ['realized', 'Realizadas'], ['supported', 'Apoiadas'], ['mine', 'Minhas']] as Array<[SocialFeedFilter, string]>).map(([filter, label]) => <button key={filter} type="button" role="tab" aria-selected={scope === filter} onClick={() => setScope(filter)} className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${scope === filter ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'}`}>{label}</button>)}
+              {([['recent', 'Recentes'], ['popular', 'Populares'], ['realized', 'Realizadas'], ['supported', 'Apoiadas'], ['mine', 'Minhas']] as Array<[SocialFeedFilter, string]>).map(([filter, label]) => <button key={filter} type="button" role="tab" aria-selected={!showWatched && scope === filter} onClick={() => { setShowWatched(false); setScope(filter); }} className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${!showWatched && scope === filter ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'}`}>{label}</button>)}
+              <button type="button" role="tab" aria-selected={showWatched} onClick={() => setShowWatched(true)} className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-bold transition-colors ${showWatched ? 'bg-[#000666] text-white' : 'text-[#666] hover:bg-[#f5f3ef]'}`}>Acompanhadas</button>
             </div>
             <button
               type="button"
@@ -700,6 +723,8 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
               </button>
             </div>
           )}
+
+          {showWatched && !loading && <p className="text-sm font-bold text-[#454652]">Minhas acompanhadas</p>}
 
           {loading && (
             <div className="rounded-2xl border border-[#e4e2de] bg-white p-10 text-center text-sm text-[#666]">
@@ -724,14 +749,16 @@ export function MvpHomeFeed({ currentUser, onCreate, onSelectIntent, onSelectPro
             <div className="rounded-2xl border-2 border-dashed border-[#c6c5d4] bg-white p-8 sm:p-12 text-center">
               <Users className="mx-auto h-8 w-8 text-[#777]"/>
               <h3 className="mt-3 text-base font-black text-[#1b1c1a]">
-                {isFollowingFeed ? 'Você ainda não tem acontecimentos de pessoas que segue.' : 'Nenhum acontecimento por aqui ainda'}
+                {showWatched ? 'Você ainda não acompanha nenhuma Intent.' : isFollowingFeed ? 'Você ainda não tem acontecimentos de pessoas que segue.' : 'Nenhum acontecimento por aqui ainda'}
               </h3>
               <p className="mt-2 text-sm text-[#666] max-w-md mx-auto leading-relaxed">
-                {isFollowingFeed
+                {showWatched ? 'Acompanhe uma Intent no feed para encontrá-la aqui.' : isFollowingFeed
                   ? 'Siga perfis para acompanhar o que eles estão fazendo acontecer.'
                   : 'Crie uma nova Intent para definir um acontecimento real com revelação protegida.'}
               </p>
-              {isFollowingFeed ? (
+              {showWatched ? (
+                <button type="button" onClick={() => setShowWatched(false)} className="mt-5 rounded-xl bg-[#000666] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#000444] transition-colors">Ver feed</button>
+              ) : isFollowingFeed ? (
                 <button
                   type="button"
                   onClick={() => setScope('recent')}

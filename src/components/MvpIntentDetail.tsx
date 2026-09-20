@@ -12,6 +12,8 @@ import {
   removeIntentSupport,
   setIntentReaction,
   supportIntent,
+  unwatchIntent,
+  watchIntent,
   type ApiIntent,
   type ApiIntentComment,
   type IntentCategory,
@@ -112,6 +114,7 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [reactionNotice, setReactionNotice] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [copyError, setCopyError] = useState('');
+  const [watchPending, setWatchPending] = useState(false);
 
   async function handleCopyIntentLink() {
     const ok = await copyToClipboard(getIntentShareUrl(intentId));
@@ -241,6 +244,22 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     }
   }
 
+  async function handleWatch() {
+    if (!intent || watchPending) return;
+    setWatchPending(true);
+    setNotice('');
+    setError('');
+    try {
+      const result = intent.viewerWatching ? await unwatchIntent(intent.id) : await watchIntent(intent.id);
+      setIntent((current) => current ? { ...current, viewerWatching: result.watching } : current);
+      setNotice(result.watching ? 'Você está acompanhando esta Intent.' : 'Você deixou de acompanhar esta Intent.');
+    } catch (caught) {
+      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar o acompanhamento.');
+    } finally {
+      setWatchPending(false);
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto w-full px-4 py-6 sm:py-8">
       <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-[#000666] mb-5 hover:underline">
@@ -330,6 +349,11 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
             )}
 
             <div className="mt-6 pt-5 border-t border-[#e4e2de]">
+              {!isMine && (
+                <button type="button" onClick={() => void handleWatch()} disabled={watchPending} aria-pressed={Boolean(intent.viewerWatching)} className={`mb-3 w-full rounded-xl border py-3 text-sm font-bold disabled:opacity-60 ${intent.viewerWatching ? 'border-[#006a62] bg-[#e0f2f1] text-[#006a62]' : 'border-[#c6c5d4] text-[#000666] hover:bg-[#f5f3ef]'}`}>
+                  {watchPending ? 'Atualizando...' : intent.viewerWatching ? 'Acompanhando — clicar para deixar' : 'Acompanhar esta Intent'}
+                </button>
+              )}
               {!isMine && intent.status === 'PUBLISHED' && (
                 <p className="mb-3 rounded-xl bg-[#f5f3ef] px-3 py-2 text-xs leading-relaxed text-[#555]">
                   <strong>Reagir</strong> é uma manifestação social e não conta para a meta.{' '}
