@@ -112,6 +112,10 @@ Pendência de governança:
 - PR #36 — deploy explícito do frontend no executor VM: merge `2d55ae472350a4fabd6b444012092a6131702a5c`; CI aprovada.
 - A busca autenticada apresenta prévia em “Tudo”, filtros de estado e período, abas paginadas para acontecimentos e pessoas e projeções públicas.
 - Seguidores e seguindo reutilizam a implementação existente com unicidade e idempotência.
-- Ainda não iniciado.
-- Não existe implementação oficial.
-- Não iniciar sem autorização específica.
+
+## 9. Bloco 33 — Participação nos acontecimentos
+
+- PR #38 — participação nos acontecimentos: merge `98bdebbefd07fd4addcd9bb0e4bb80cfe36ed055`; CI aprovada; frontend implantado.
+- Reações continuam sendo sinais sociais independentes. Apoios são a contribuição que avança somente Intents com condição `SUPPORT`; para condições de guardiões, a operação aplicável é a aprovação autorizada.
+- A Home e o detalhe mostram progresso e quantidade restante apenas quando a meta oficial de apoios existe. Não há contador ou entidade paralela de participação.
+- Não houve alteração de backend, API, Prisma, Firebase, migrations, PostgreSQL ou Redis.
