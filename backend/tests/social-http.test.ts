@@ -8,7 +8,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
     user: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
     intent: { count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
-    domainEvent: { create: vi.fn() },
+    domainEvent: { create: vi.fn(), findMany: vi.fn() },
     follow: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn().mockResolvedValue(0), createManyAndReturn: vi.fn().mockResolvedValue([]), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     support: { findMany: vi.fn(), count: vi.fn(), findUnique: vi.fn() },
     notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
@@ -86,6 +86,7 @@ beforeEach(() => {
   db.intentReaction.count.mockResolvedValue(0);
   db.intentReaction.groupBy.mockResolvedValue([]);
   db.intentReaction.findUnique.mockResolvedValue(null);
+  db.domainEvent.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation(async (operation) => operation(db));
 });
 
@@ -622,6 +623,36 @@ describe('edição HTTP do próprio perfil', () => {
     for (const field of ['passwordHash', 'firebaseUid', 'email', 'tokens', 'credentials', 'status']) {
       expect(body.data).not.toHaveProperty(field);
     }
+  });
+});
+
+describe('história HTTP da Intent', () => {
+  it('exige autenticação e não consulta eventos', async () => {
+    const response = await get(`/v1/intents/${intentId}/history`);
+    expect(response.status).toBe(401);
+    expect(db.domainEvent.findMany).not.toHaveBeenCalled();
+  });
+
+  it('retorna projeção segura dos eventos persistidos para quem pode visualizar', async () => {
+    db.intent.findUnique.mockResolvedValue({ creatorId, visibility: 'PUBLIC', status: 'PUBLISHED', guardianIds: [], creator: { status: 'ACTIVE' } });
+    db.domainEvent.findMany.mockResolvedValue([{
+      id: '30000000-0000-4000-8000-000000000001', type: 'SUPPORT_RECEIVED', occurredAt: new Date('2026-09-21T12:00:00.000Z'),
+      payload: { supportId: 'private', secret: 'never-return' }, actor: { email: 'never-return' },
+    }]);
+
+    const response = await get(`/v1/intents/${intentId}/history?limit=1`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ data: {
+      items: [{ id: '30000000-0000-4000-8000-000000000001', type: 'SUPPORT_RECEIVED', occurredAt: '2026-09-21T12:00:00.000Z' }],
+      nextCursor: null,
+    } });
+  });
+
+  it('não lista eventos de uma Intent de seguidores depois da perda de vínculo', async () => {
+    db.intent.findUnique.mockResolvedValue({ creatorId, visibility: 'FOLLOWERS', status: 'PUBLISHED', guardianIds: [], creator: { status: 'ACTIVE' } });
+    const response = await get(`/v1/intents/${intentId}/history`, 'Bearer synthetic-test-token');
+    expect(response.status).toBe(403);
+    expect(db.domainEvent.findMany).not.toHaveBeenCalled();
   });
 });
 

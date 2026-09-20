@@ -147,6 +147,19 @@ export interface ApiNotification {
   intent: { id: string; title: string } | null;
 }
 
+export type IntentHistoryEventType =
+  | 'INTENT_CREATED'
+  | 'SUPPORT_RECEIVED'
+  | 'SUPPORT_REMOVED'
+  | 'GUARDIAN_APPROVED'
+  | 'INTENT_REALIZED';
+
+export interface ApiIntentHistoryEvent {
+  id: string;
+  type: IntentHistoryEventType;
+  occurredAt: string;
+}
+
 export interface ApiIntentComment {
   id: string;
   body: string;
@@ -429,6 +442,15 @@ export async function listSocialFeed(filter: SocialFeedFilter = 'recent', cursor
 
 export async function getIntent(intentId: string): Promise<ApiIntent> {
   const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>(`/v1/intents/${encodeURIComponent(intentId)}`);
+  return result.data;
+}
+
+export async function listIntentHistory(intentId: string, cursor?: string): Promise<{ items: ApiIntentHistoryEvent[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ limit: '20' });
+  if (cursor) query.set('cursor', cursor);
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntentHistoryEvent[]; nextCursor: string | null }>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/history?${query.toString()}`,
+  );
   return result.data;
 }
 

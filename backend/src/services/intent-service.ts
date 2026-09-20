@@ -439,6 +439,15 @@ export async function getIntent(intentId: string, viewerId?: string) {
         data: { status: 'REALIZED', realizedAt: new Date() },
       });
       if (update.count === 1) {
+        await transaction.domainEvent.create({
+          data: {
+            intentId,
+            actorId: realizedIntent.creatorId,
+            type: 'INTENT_REALIZED',
+            idempotencyKey: `intent-realized:${intentId}:v${realizedIntent.revealVersion}`,
+            payload: { conditionType: realizedIntent.conditionType, revealVersion: realizedIntent.revealVersion },
+          },
+        });
         await notifyIntentWatchersOfRealization(transaction, {
           intentId,
           actorId: realizedIntent.creatorId,

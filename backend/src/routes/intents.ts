@@ -20,6 +20,7 @@ import {
 import { createIntentComment, listIntentComments } from '../services/comment-service.js';
 import { removeIntentReaction, setIntentReaction } from '../services/reaction-service.js';
 import { listWatchedIntents, unwatchIntent, watchIntent } from '../services/intent-watch-service.js';
+import { listIntentHistory } from '../services/intent-history-service.js';
 
 export const intentsRouter = Router();
 
@@ -30,6 +31,10 @@ const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 const socialFeedQuerySchema = z.object({ filter: z.enum(['recent', 'realized', 'supported', 'mine', 'popular']).default('recent'), cursor: z.string().uuid().optional(), limit: z.coerce.number().int().min(1).max(50).default(20) });
+const historyQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+}).strict();
 intentsRouter.get('/social-feed', requireAuthenticatedUser, async (request, response, next) => {
   try { const query = socialFeedQuerySchema.parse(request.query); response.json({ data: await listSocialFeed(request.appUser!.id, query.filter, query.cursor, query.limit) }); } catch (error) { next(error); }
 });
@@ -80,6 +85,16 @@ intentsRouter.get('/guardian-requests', requireAuthenticatedUser, async (request
       Number.isFinite(limit) ? limit : 20,
     );
     response.json({ data: intents });
+  } catch (error) {
+    next(error);
+  }
+});
+
+intentsRouter.get('/:id/history', requireAuthenticatedUser, async (request, response, next) => {
+  try {
+    const intentId = identifierSchema.parse(request.params.id);
+    const query = historyQuerySchema.parse(request.query);
+    response.json({ data: await listIntentHistory(intentId, request.appUser!.id, query.cursor, query.limit) });
   } catch (error) {
     next(error);
   }
