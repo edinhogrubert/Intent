@@ -11,6 +11,7 @@ const { db, verifyIdToken } = vi.hoisted(() => ({
       updateMany: vi.fn(),
       findFirst: vi.fn(),
     },
+    intent: { findMany: vi.fn() },
     $transaction: vi.fn(async (callback) => callback(db)),
   },
   verifyIdToken: vi.fn(),
@@ -81,6 +82,7 @@ beforeEach(() => {
   verifyIdToken.mockResolvedValue({ uid: userA.firebaseUid });
   db.user.findUnique.mockResolvedValue(userA);
   db.user.update.mockResolvedValue(userA);
+  db.intent.findMany.mockResolvedValue([{ id: mockNotification.intent.id }]);
 });
 
 describe('Notification HTTP Endpoints', () => {
@@ -95,6 +97,19 @@ describe('Notification HTTP Endpoints', () => {
     expect(res.status).toBe(200);
     expect(json.data.items).toHaveLength(1);
     expect(json.data.items[0].id).toBe(mockNotification.id);
+  });
+
+  it('does not expose an Intent title after the recipient loses access', async () => {
+    db.notification.findMany.mockResolvedValue([mockNotification]);
+    db.intent.findMany.mockResolvedValue([]);
+
+    const res = await fetch(`${baseUrl}/v1/notifications`, {
+      headers: { Authorization: 'Bearer token-a' },
+    });
+    const json = await res.json() as any;
+
+    expect(res.status).toBe(200);
+    expect(json.data.items[0].intent).toBeNull();
   });
 
   it('GET /v1/notifications/unread-count returns unread count', async () => {
