@@ -38,6 +38,7 @@ function notificationText(notification: ApiNotification): string {
     case 'USER_FOLLOWED':
     case 'FOLLOW_RECEIVED': return `${actor} começou a seguir você.`;
     case 'INTENT_REALIZED': return `Sua Intent${intentTitle} foi realizada com sucesso!`;
+    case 'INTENT_WATCHED_REALIZED': return `A Intent que você acompanha${intentTitle} foi realizada!`;
     case 'GUARDIAN_ACTION':
     case 'GUARDIAN_APPROVAL_RECEIVED': return `${actor} aprovou sua Intent${intentTitle}.`;
     case 'SUPPORT_RECEIVED': return `${actor} apoiou sua Intent${intentTitle}.`;
@@ -52,6 +53,7 @@ function NotificationTypeIcon({ type }: { type: string }) {
     case 'USER_FOLLOWED':
     case 'FOLLOW_RECEIVED': return <UserPlus className="w-3.5 h-3.5 text-[#006e1c]"/>;
     case 'INTENT_REALIZED': return <Sparkles className="w-3.5 h-3.5 text-[#8f4e00]"/>;
+    case 'INTENT_WATCHED_REALIZED': return <Sparkles className="w-3.5 h-3.5 text-[#8f4e00]"/>;
     case 'GUARDIAN_ACTION':
     case 'GUARDIAN_APPROVAL_RECEIVED': return <ShieldCheck className="w-3.5 h-3.5 text-[#4e58a9]"/>;
     default: return <Bell className="w-3.5 h-3.5 text-[#000666]"/>;

@@ -7,7 +7,7 @@ import { openReveal, revealAssociatedData, sealReveal } from '../domain/reveal-c
 import { isSupportConditionSatisfied } from '../domain/support-condition.js';
 import { createIntentSchema } from '../domain/intent-schemas.js';
 import { runIntentMutation } from './intent-mutation.js';
-import { createNotification } from './notification-service.js';
+import { createNotification, notifyIntentWatchersOfRealization } from './notification-service.js';
 import { getIntentReactionSummary } from './reaction-service.js';
 
 const publicIntentSelection = {
@@ -432,9 +432,22 @@ export async function getIntent(intentId: string, viewerId?: string) {
   } = intent;
 
   if (intent.status === 'PUBLISHED' && isRevealConditionSatisfied(intent)) {
-    const result = await prisma.intent.updateMany({
-      where: { id: intentId, status: 'PUBLISHED' },
-      data: { status: 'REALIZED', realizedAt: new Date() },
+    const realizedIntent = intent;
+    const result = await prisma.$transaction(async (transaction) => {
+      const update = await transaction.intent.updateMany({
+        where: { id: intentId, status: 'PUBLISHED' },
+        data: { status: 'REALIZED', realizedAt: new Date() },
+      });
+      if (update.count === 1) {
+        await notifyIntentWatchersOfRealization(transaction, {
+          intentId,
+          actorId: realizedIntent.creatorId,
+          creatorId: realizedIntent.creatorId,
+          visibility: realizedIntent.visibility,
+          guardianIds: realizedIntent.guardianIds,
+        });
+      }
+      return update;
     });
     if (result.count === 1) {
       intent = await prisma.intent.findUniqueOrThrow({
@@ -611,6 +624,13 @@ export async function supportIntent(intentId: string, supporterId: string, idemp
             },
           },
         });
+        await notifyIntentWatchersOfRealization(transaction, {
+          intentId,
+          actorId: supporterId,
+          creatorId: existing.creatorId,
+          visibility: updated.visibility,
+          guardianIds: updated.guardianIds,
+        });
       }
     }
 
@@ -701,6 +721,13 @@ export async function approveGuardianIntent(intentId: string, guardianId: string
               revealVersion: updated.revealVersion,
             },
           },
+        });
+        await notifyIntentWatchersOfRealization(transaction, {
+          intentId,
+          actorId: guardianId,
+          creatorId: intent.creatorId,
+          visibility: updated.visibility,
+          guardianIds: updated.guardianIds,
         });
       }
     }

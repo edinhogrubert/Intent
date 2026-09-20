@@ -12,6 +12,7 @@ const { db, key } = vi.hoisted(() => ({
     follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     support: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
     intentReaction: { findMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
+    intentWatch: { findMany: vi.fn(), findUnique: vi.fn() },
     domainEvent: { create: vi.fn() },
     notification: { createMany: vi.fn() },
   },
@@ -48,6 +49,8 @@ beforeEach(() => {
   db.notification.createMany.mockResolvedValue({ count: 1 });
   db.intentReaction.groupBy.mockResolvedValue([]);
   db.intentReaction.findUnique.mockResolvedValue(null);
+  db.intentWatch.findMany.mockResolvedValue([]);
+  db.intentWatch.findUnique.mockResolvedValue(null);
 });
 
 describe('criação e acesso às Intents', () => {
@@ -278,6 +281,30 @@ describe('apoio alternável', () => {
     db.intent.findUnique.mockResolvedValue({ ...intent, status: 'REALIZED', supportCount: 3 });
     await expect(removeSupport(intentId, viewerId)).rejects.toMatchObject({ code: 'SUPPORT_LOCKED_AFTER_REVEAL' });
     expect(db.support.delete).not.toHaveBeenCalled();
+  });
+
+  it('notifica somente acompanhantes elegíveis quando a Intent é realizada', async () => {
+    db.support.create.mockResolvedValue({ id: 'last-support' });
+    db.intent.update.mockResolvedValue({ ...intent, supportCount: 3 });
+    db.intent.updateMany.mockResolvedValue({ count: 1 });
+    db.intentWatch.findMany.mockResolvedValue([{ userId: '10000000-0000-4000-8000-000000000003' }]);
+
+    await supportIntent(intentId, viewerId);
+
+    expect(db.intentWatch.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      intentId,
+      userId: { notIn: [viewerId, creatorId] },
+    }) }));
+    expect(db.notification.createMany).toHaveBeenLastCalledWith({
+      data: [{
+        userId: '10000000-0000-4000-8000-000000000003',
+        actorId: viewerId,
+        type: 'INTENT_WATCHED_REALIZED',
+        intentId,
+        deduplicationKey: `intent-watch-realized:${intentId}:10000000-0000-4000-8000-000000000003`,
+      }],
+      skipDuplicates: true,
+    });
   });
 });
 
