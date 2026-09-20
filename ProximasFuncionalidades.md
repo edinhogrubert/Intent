@@ -1,10 +1,11 @@
 # Intent — Estado das Funcionalidades e Próximos Passos
 
 > **Objetivo:** oferecer uma visão simples e confiável do que já funciona, do que está sendo validado e do que ainda será desenvolvido.  
-> **Última atualização:** 06 de setembro de 2026  
-> **Versão implantada na Oracle:** `09add9f0e257b2df5a877b37eb4a59ae76b80709`  
-> **Branch de desenvolvimento:** `codex/mvp-backend-base`  
-> **Pull Request:** `#2` para a `main`
+> **Última atualização geral do inventário:** 06 de setembro de 2026. **Novas propostas registradas:** 20 de setembro de 2026.  
+> **Atenção:** os estados das seções 1–3 e 6 abaixo são um retrato histórico de 06/09 e não representam necessariamente o estado vigente. Para estado oficial de implantação, consulte `docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md`. O registro das propostas das seções 4.11–4.12 não significa implementação.
+> **Versão implantada na Oracle em 06/09 (histórico):** `09add9f0e257b2df5a877b37eb4a59ae76b80709`  
+> **Branch de desenvolvimento em 06/09 (histórico):** `codex/mvp-backend-base`  
+> **Pull Request de referência em 06/09 (histórico):** `#2` para a `main`
 
 ## Como interpretar este documento
 
@@ -32,6 +33,8 @@ Uma funcionalidade só muda para **✅ Implantado e validado** quando o código 
 ---
 
 # 1. Estado atual do MVP
+
+> **Registro histórico de 06/09/2026; verificar o manifesto operacional antes de interpretar os estados como atuais.**
 
 ## 1.1 Infraestrutura e implantação
 
@@ -176,6 +179,8 @@ O fluxo social básico foi aprovado manualmente com três contas reais:
 ---
 
 # 3. Próximas prioridades recomendadas
+
+> **Priorização histórica de 06/09, não a sequência operacional vigente.**
 
 ## Prioridade 1 — concluir a fatia social básica
 
@@ -488,6 +493,35 @@ Essa condição amplia o Intent para acontecimentos físicos: estar em um lugar 
 - políticas de retenção;
 - aplicação mobile futura.
 
+## 4.11 Grupos pessoais reutilizáveis — seleção, não comunidade (proposta de 20/09/2026)
+
+**Status: funcionalidade futura, não implementada.** Grupo é somente uma lista pessoal reutilizável de pessoas (Futsal, Vôlei, Dança, Família, Trabalho, Escola) para preencher seleções existentes na criação de uma Intent comum. Não é comunidade: não tem feed, perfil público, publicação, regra, contador de aprovações ou vida própria. O criador seleciona pessoas uma a uma ou importa um ou mais grupos, revisa a seleção, inclui/exclui indivíduos e elimina duplicidades antes de confirmar. O conjunto final de aprovadores ou destinatários é registrado **na própria Intent**: alterações posteriores do grupo não modificam automaticamente Intents antigas. Acesso e autorização continuam no backend e na regra da Intent. Criar ou selecionar grupo não concede apoio ou aprovação.
+
+Exemplo: reutilizar grupo de 20 jogadores para preencher os 20 aprovadores; 12 de 20 confirmações são exigidas pela regra específica da Intent. Gestão compartilhada de uma lista seria evolução opcional e somente se necessária; não converter em rede de comunidades.
+
+## 4.12 Políticas de encerramento, prazo e mensagem alternativa (proposta de 20/09/2026)
+
+**Status: funcionalidade futura, não implementada; não alterar as regras existentes nem os Blocos 35–39 sem autorização.** Preservar a distinção entre **meta atingida**, **encerramento da participação** e **realização/revelação definitiva**. O criador deve escolher quando a meta se torna definitiva e, no insucesso, a mensagem alternativa. Uma condição de apoio não deve ser confundida com aprovação de guardião.
+
+### A. Encerramento apenas no prazo — futsal
+
+Exemplo: 20 aprovadores, mínimo de 12, encerramento quinta-feira às 18h. A contagem pode oscilar até o prazo: 12 confirmam na quarta, alguém desiste, outro entra. A 12ª aprovação **não** encerra nem revela antecipadamente. No instante final, o backend congela a seleção válida e avalia o quórum de maneira atômica. Com pelo menos 12, realiza e revela o conteúdo protegido. Com menos de 12, encerra **sem revelar o cofre** e mostra a mensagem alternativa do criador (por exemplo, «Não vai sair jogo»). Aprovações/retiradas posteriores não modificam retroativamente o resultado. Definir antecipadamente as possibilidades de desistência, reposição e compromisso; «confirmou, pagou» não significa pagamento comprovado pelo sistema.
+
+### B. Encerramento imediato pela meta — salão de beleza
+
+Exemplo: os primeiros 20 apoios elegíveis reservam 20 brindes, prazo máximo terça-feira. O 20º apoio válido encerra imediatamente novas entradas e fixa a lista de beneficiários; desistência ou não comparecimento posterior não transfere automaticamente o brinde. Distinguir reserva de entrega efetiva; explicar previamente condições, validade, comparecimento e desfecho se a meta não for atingida até o prazo. As operações concorrentes devem respeitar o limite de vagas, ser atômicas e idempotentes.
+
+### Regras comuns e pontos a especificar
+
+- Se o prazo terminar sem cumprir a meta, **mostrar somente a mensagem alternativa de insucesso**, nunca o conteúdo cifrado original; a Intent não é realizada.
+- Diferenciar estados de meta provisoriamente atingida, inscrições encerradas, realizado e encerrado sem realização.
+- Definir estados/transições, regras e versões imutáveis após publicação, compatibilidade de Intents antigas, auditoria e autorização.
+- Definir fuso/UTC, instante de corte, avaliação confiável e tratamento de atrasos do agendador.
+- Definir quem pode confirmar, retirar confirmação, entrar/substituir e ver dados dos demais.
+- Proteger a revelação, garantir operações atômicas e não presumir pagamento, presença ou entrega sem prova verificável.
+
+**Somente acordo de produto. Implementação mediante autorização explícita do proprietário.**
+
 ---
 
 # 5. Fora do escopo imediato
@@ -510,6 +544,8 @@ Não implementar agora:
 ---
 
 # 6. Próxima decisão do projeto
+
+> **Registro histórico datado de 06/09/2026; não executar como instrução vigente.**
 
 O teste humano do feed **Seguindo** foi aprovado em 06 de setembro de 2026.
 
