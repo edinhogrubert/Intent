@@ -181,6 +181,14 @@ export interface ApiUserSearchResult {
   avatarUrl: string | null;
 }
 
+export interface ApiPersonalContactList {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  members: ApiUserSearchResult[];
+}
+
 export interface ApiSearchResults {
   intents: ApiIntent[];
   users: Array<ApiUserSearchResult & { bio: string | null }>;
@@ -385,6 +393,35 @@ export async function searchUsers(query: string): Promise<ApiUserSearchResult[]>
     `/v1/users/search?${search.toString()}`,
   );
   return result.data.items;
+}
+
+export async function listPersonalContactLists(): Promise<ApiPersonalContactList[]> {
+  const result = await authenticatedRequest<ApiEnvelope<{ items: ApiPersonalContactList[] }>>('/v1/personal-lists');
+  return result.data.items;
+}
+
+export async function createPersonalContactList(name: string): Promise<ApiPersonalContactList> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiPersonalContactList>>('/v1/personal-lists', { method: 'POST', body: JSON.stringify({ name }) });
+  return result.data;
+}
+
+export async function renamePersonalContactList(id: string, name: string): Promise<ApiPersonalContactList> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiPersonalContactList>>(`/v1/personal-lists/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+  return result.data;
+}
+
+export async function deletePersonalContactList(id: string): Promise<void> {
+  await authenticatedRequest<ApiEnvelope<{ deleted: boolean }>>(`/v1/personal-lists/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function addPersonalContactListMember(listId: string, userId: string): Promise<ApiPersonalContactList> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiPersonalContactList>>(`/v1/personal-lists/${encodeURIComponent(listId)}/members`, { method: 'POST', body: JSON.stringify({ userId }) });
+  return result.data;
+}
+
+export async function removePersonalContactListMember(listId: string, userId: string): Promise<ApiPersonalContactList> {
+  const result = await authenticatedRequest<ApiEnvelope<ApiPersonalContactList>>(`/v1/personal-lists/${encodeURIComponent(listId)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+  return result.data;
 }
 
 export async function searchIntentsAndUsers(query: string, options: SearchOptions = {}): Promise<ApiSearchResults> {
