@@ -116,6 +116,10 @@ Se prazo termina sem cumprir meta: apenas **mensagem alternativa de insucesso**,
 
 # 3. Outras possibilidades ainda não concluídas
 
+## 3.1 Correção pendente — acompanhar Intent não aparece marcado no detalhe (relato do proprietário em 20/09/2026)
+
+**Relato ainda não reproduzido nem diagnosticado:** ao acompanhar uma Intent em outra superfície e depois abrir seu detalhe, a opção interna «Acompanhar Intent» aparece desmarcada, como se o vínculo não existisse. Investigar se há descompasso entre estado persistido no backend, resposta da API, carregamento inicial ou estado local dos componentes. O botão no detalhe deve refletir o vínculo real do usuário autenticado ao abrir, navegar, atualizar a página e após acompanhar/deixar de acompanhar em qualquer superfície. Não criar acompanhamento duplicado nem confundir acompanhar Intent com seguir perfil, apoiar, reagir ou aprovar. Cobrir regressões e estados de carregamento/erro; preservar as regras de acesso e o comportamento das notificações do Bloco 35. **Status: pendente de reprodução, diagnóstico, implementação e testes; não declarar causa nem correção antes de verificar.**
+
 Avaliar conforme necessidade e sem iniciar automaticamente: recuperação de senha e verificação de e-mail (conferir estado atual antes de declarar lacuna); notificações avançadas além do Bloco 35; compartilhamento por link; mensagens privadas e compartilhamento em conversas; moderação/denúncias e bloqueio; palpite protegido; classificação por assunto/categoria e métricas de reputação ainda não entregues; campanhas ou conteúdos adicionais dependentes de suporte real no backend.
 
 Não confundir **acompanhar uma Intent**, **seguir um perfil**, **curtir/reagir**, **apoiar** e **aprovar**. Funcionalidades já implementadas não devem reaparecer aqui como novas tarefas.
