@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, Calendar, Check, CheckCircle2, Globe2, Heart, LockKeyhole, Plus, RefreshCw, Search, Share2, Sparkles, Tag, ThumbsUp, TrendingUp, UserRound, Users, Vote, X } from 'lucide-react';
 import type { UserAccount } from '../types';
-import { getSocialProfile, IntentApiError, listSocialFeed, searchIntentsAndUsers, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type SearchKind, type SearchPeriod, type SearchStatus, type SocialFeedFilter } from '../services/intentApi';
+import { getSocialProfile, IntentApiError, listSocialFeed, removeIntentReaction, removeIntentSupport, searchIntentsAndUsers, setIntentReaction, supportIntent, type ApiIntent, type ApiSearchResults, type ApiSocialProfile, type IntentCategory, type ReactionType, type SearchKind, type SearchPeriod, type SearchStatus, type SocialFeedFilter } from '../services/intentApi';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import { APP_VERSION_CONTEXT, APP_VERSION_LABEL } from '../appVersion';
 
@@ -47,18 +47,25 @@ function conditionDetails(intent: ApiIntent) {
 function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { intent: ApiIntent; currentUser: UserAccount; onSelectIntent: (id: string) => void; onSelectProfile: (id: string) => void }) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
+  const [socialIntent, setSocialIntent] = useState(intent);
+  const [actionPending, setActionPending] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState('');
   useEffect(() => {
     setCopied(false); setCopyError('');
   }, [intent.id]);
+  useEffect(() => {
+    setSocialIntent(intent);
+    setActionFeedback('');
+  }, [intent]);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), 3000);
     return () => window.clearTimeout(timer);
   }, [copied]);
-  const condition = conditionDetails(intent);
+  const condition = conditionDetails(socialIntent);
   const ConditionIcon = condition.icon;
-  const isMine = intent.creator.id === currentUser.id;
-  const isRealized = intent.status === 'REALIZED';
+  const isMine = socialIntent.creator.id === currentUser.id;
+  const isRealized = socialIntent.status === 'REALIZED';
 
   async function handleCopyLink(e: React.MouseEvent) {
     e.stopPropagation();
@@ -68,24 +75,58 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
     setCopyError(success ? '' : 'Não foi possível copiar o link.');
   }
 
-  const visibility = intent.visibility === 'PUBLIC'
+  async function handleReaction(type: ReactionType) {
+    if (actionPending) return;
+    setActionPending(true);
+    setActionFeedback('');
+    try {
+      const result = socialIntent.viewerReaction === type
+        ? await removeIntentReaction(socialIntent.id)
+        : await setIntentReaction(socialIntent.id, type);
+      setSocialIntent((current) => ({ ...current, viewerReaction: result.viewerReaction, reactionCounts: result.reactionCounts }));
+      setActionFeedback(result.viewerReaction ? 'Reação registrada. Ela não altera a meta de apoios.' : 'Reação removida.');
+    } catch (caught) {
+      setActionFeedback(caught instanceof IntentApiError ? caught.message : 'Não foi possível atualizar sua reação.');
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function handleSupport() {
+    if (actionPending) return;
+    setActionPending(true);
+    setActionFeedback('');
+    try {
+      const result = socialIntent.viewerHasSupported
+        ? await removeIntentSupport(socialIntent.id)
+        : await supportIntent(socialIntent.id);
+      setSocialIntent((current) => ({ ...current, supportCount: result.supportCount, viewerHasSupported: result.supported, viewerSupported: result.supported, status: result.realized ? 'REALIZED' : current.status }));
+      setActionFeedback(result.realizedNow ? 'Seu apoio realizou esta Intent!' : result.supported ? 'Apoio registrado: ele contribui para a meta.' : 'Apoio retirado.');
+    } catch (caught) {
+      setActionFeedback(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar o apoio.');
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  const visibility = socialIntent.visibility === 'PUBLIC'
     ? { label: 'Pública', className: 'bg-[#e0e0ff] text-[#000666]', icon: Globe2 }
-    : intent.visibility === 'FOLLOWERS'
+    : socialIntent.visibility === 'FOLLOWERS'
       ? { label: 'Seguidores', className: 'bg-[#e8f5e9] text-[#28642f]', icon: Users }
       : { label: 'Privada', className: 'bg-[#fff3e0] text-[#8a4b08]', icon: LockKeyhole };
   const VisibilityIcon = visibility.icon;
 
-  const totalReactions = intent.reactionCounts?.total ?? (
-    (intent.reactionCounts?.LIKE ?? 0) +
-    (intent.reactionCounts?.LOVE ?? 0) +
-    (intent.reactionCounts?.CELEBRATE ?? 0)
+  const totalReactions = socialIntent.reactionCounts?.total ?? (
+    (socialIntent.reactionCounts?.LIKE ?? 0) +
+    (socialIntent.reactionCounts?.LOVE ?? 0) +
+    (socialIntent.reactionCounts?.CELEBRATE ?? 0)
   );
 
-  const viewerReactionLabel = intent.viewerReaction === 'LIKE'
+  const viewerReactionLabel = socialIntent.viewerReaction === 'LIKE'
     ? '👍 Você curtiu'
-    : intent.viewerReaction === 'LOVE'
+    : socialIntent.viewerReaction === 'LOVE'
       ? '❤️ Você amou'
-      : intent.viewerReaction === 'CELEBRATE'
+      : socialIntent.viewerReaction === 'CELEBRATE'
         ? '🎉 Você celebrou'
         : null;
 
@@ -97,23 +138,23 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
-          onClick={() => onSelectProfile(intent.creator.id)}
+          onClick={() => onSelectProfile(socialIntent.creator.id)}
           className="flex min-w-0 items-center gap-3 rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-[#000666]"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#c6c5d4] bg-[#e0e0ff] font-black text-[#000666]">
-            {intent.creator.avatarUrl ? (
-              <img src={intent.creator.avatarUrl} alt="" className="h-full w-full object-cover"/>
+            {socialIntent.creator.avatarUrl ? (
+              <img src={socialIntent.creator.avatarUrl} alt="" className="h-full w-full object-cover"/>
             ) : (
-              intent.creator.displayName.charAt(0).toUpperCase()
+              socialIntent.creator.displayName.charAt(0).toUpperCase()
             )}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-black text-[#1b1c1a]">
-              {intent.creator.displayName}
+              {socialIntent.creator.displayName}
               {isMine && <span className="ml-2 rounded-full bg-[#e0e0ff] px-2 py-0.5 text-[10px] text-[#000666]">Você</span>}
             </p>
             <p className="truncate text-xs text-[#666]">
-              @{intent.creator.username.replace(/^@+/, '')} · {formatDate(intent.createdAt)}
+              @{socialIntent.creator.username.replace(/^@+/, '')} · {formatDate(socialIntent.createdAt)}
             </p>
           </div>
         </button>
@@ -129,7 +170,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
             </span>
           )}
           <span className="rounded-full bg-[#f0efff] px-2.5 py-1 text-[11px] font-bold text-[#000666]">
-            {categoryLabels[intent.category]}
+            {categoryLabels[socialIntent.category]}
           </span>
           <span className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${visibility.className}`}>
             <VisibilityIcon className="h-3 w-3"/>{visibility.label}
@@ -140,18 +181,18 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
       {/* Título e História */}
       <button
         type="button"
-        onClick={() => onSelectIntent(intent.id)}
+        onClick={() => onSelectIntent(socialIntent.id)}
         className="group mt-4 block w-full text-left focus:outline-none"
       >
         <h3 className="text-lg font-black text-[#1b1c1a] transition-colors group-hover:text-[#000666]">
-          {intent.title}
+          {socialIntent.title}
         </h3>
         <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[#454652]">
-          {intent.story}
+          {socialIntent.story}
         </p>
-        {intent.recentComments && intent.recentComments.length > 0 && (
+        {socialIntent.recentComments && socialIntent.recentComments.length > 0 && (
           <div className="mt-3 space-y-1 border-t border-[#e4e2de] pt-3 text-sm text-[#454652]">
-            {intent.recentComments.map((comment) => (
+            {socialIntent.recentComments.map((comment) => (
               <p key={comment.id}><span className="font-semibold text-[#1b1c1a]">{comment.author.displayName}</span> {comment.body}</p>
             ))}
           </div>
@@ -178,6 +219,13 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
             style={{ width: `${condition.progress}%` }}
           />
         </div>
+        {!isRealized && socialIntent.conditionType === 'SUPPORT' && (
+          <p className="mt-2 text-[11px] font-medium text-[#006a62]">
+            {Math.max(0, socialIntent.supportGoal - socialIntent.supportCount) === 0
+              ? 'Meta atingida; a realização será confirmada pelo backend.'
+              : `Faltam ${socialIntent.supportGoal - socialIntent.supportCount} apoio(s) para a meta.`}
+          </p>
+        )}
         {!isRealized && (
           <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[#666]">
             <LockKeyhole className="h-3.5 w-3.5 text-[#777]"/>Conteúdo protegido no cofre até a condição ser cumprida.
@@ -191,22 +239,22 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
           {totalReactions > 0 ? (
             <div className="flex items-center gap-1.5 rounded-lg bg-[#f5f3ef] px-2.5 py-1 text-xs font-bold text-[#454652]">
               <div className="flex items-center gap-1.5">
-                {(intent.reactionCounts?.LIKE ?? 0) > 0 && (
-                  <span className="flex items-center gap-0.5 text-[#000666]" title={`${intent.reactionCounts?.LIKE} curtidas`}>
+                {(socialIntent.reactionCounts?.LIKE ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5 text-[#000666]" title={`${socialIntent.reactionCounts?.LIKE} curtidas`}>
                     <ThumbsUp className="h-3 w-3"/>
-                    <span>{intent.reactionCounts?.LIKE}</span>
+                    <span>{socialIntent.reactionCounts?.LIKE}</span>
                   </span>
                 )}
-                {(intent.reactionCounts?.LOVE ?? 0) > 0 && (
-                  <span className="flex items-center gap-0.5 text-[#c62828]" title={`${intent.reactionCounts?.LOVE} corações`}>
+                {(socialIntent.reactionCounts?.LOVE ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5 text-[#c62828]" title={`${socialIntent.reactionCounts?.LOVE} corações`}>
                     <Heart className="h-3 w-3 fill-[#c62828]"/>
-                    <span>{intent.reactionCounts?.LOVE}</span>
+                    <span>{socialIntent.reactionCounts?.LOVE}</span>
                   </span>
                 )}
-                {(intent.reactionCounts?.CELEBRATE ?? 0) > 0 && (
-                  <span className="flex items-center gap-0.5 text-[#e65100]" title={`${intent.reactionCounts?.CELEBRATE} celebrações`}>
+                {(socialIntent.reactionCounts?.CELEBRATE ?? 0) > 0 && (
+                  <span className="flex items-center gap-0.5 text-[#e65100]" title={`${socialIntent.reactionCounts?.CELEBRATE} celebrações`}>
                     <Sparkles className="h-3 w-3"/>
-                    <span>{intent.reactionCounts?.CELEBRATE}</span>
+                    <span>{socialIntent.reactionCounts?.CELEBRATE}</span>
                   </span>
                 )}
               </div>
@@ -222,12 +270,31 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
             </span>
           )}
 
-          {intent.viewerHasSupported && (
+          {socialIntent.viewerHasSupported && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f5e9] px-2 py-0.5 text-[10px] font-bold text-[#2e7d32]">
               <CheckCircle2 className="h-2.5 w-2.5"/>Você apoiou
             </span>
           )}
         </div>
+
+        {!isMine && !isRealized && (
+          <div className="flex flex-wrap items-center gap-2" aria-label="Participar desta Intent">
+            {socialIntent.viewerReaction && socialIntent.viewerReaction !== 'LIKE' ? (
+              <button type="button" onClick={() => onSelectIntent(socialIntent.id)} className="rounded-xl border border-[#e4e2de] px-3 py-2 text-xs font-bold text-[#555] hover:border-[#000666] hover:text-[#000666]">
+                Ver reação
+              </button>
+            ) : (
+              <button type="button" disabled={actionPending} onClick={() => void handleReaction('LIKE')} aria-pressed={socialIntent.viewerReaction === 'LIKE'} className="rounded-xl border border-[#e4e2de] px-3 py-2 text-xs font-bold text-[#555] hover:border-[#000666] hover:text-[#000666] disabled:opacity-60">
+                <ThumbsUp className="mr-1 inline h-3.5 w-3.5"/>{socialIntent.viewerReaction === 'LIKE' ? 'Remover curtida' : 'Curtir'}
+              </button>
+            )}
+            {socialIntent.conditionType === 'SUPPORT' && (
+              <button type="button" disabled={actionPending} onClick={() => void handleSupport()} aria-pressed={Boolean(socialIntent.viewerHasSupported)} className={`rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-60 ${socialIntent.viewerHasSupported ? 'border border-[#2e7d32] bg-[#e8f5e9] text-[#28642f]' : 'bg-[#000666] text-white hover:bg-[#000444]'}`}>
+                <Users className="mr-1 inline h-3.5 w-3.5"/>{socialIntent.viewerHasSupported ? 'Apoiado' : 'Apoiar a meta'}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <button
@@ -248,7 +315,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
 
           <button
             type="button"
-            onClick={() => onSelectIntent(intent.id)}
+            onClick={() => onSelectIntent(socialIntent.id)}
             className="flex items-center gap-1.5 rounded-xl bg-[#000666] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#000444]"
           >
             <span>Ver Intent</span>
@@ -256,6 +323,7 @@ function IntentCard({ intent, currentUser, onSelectIntent, onSelectProfile }: { 
           </button>
         </div>
       </div>
+      {actionFeedback && <p role="status" className="mt-3 text-xs font-medium text-[#28642f]">{actionFeedback}</p>}
     </article>
   );
 }
