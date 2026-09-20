@@ -8,7 +8,7 @@ const { db, key } = vi.hoisted(() => ({
   db: {
     $transaction: vi.fn(),
     user: { findUnique: vi.fn() },
-    intent: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
+    intent: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     support: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
     intentReaction: { findMany: vi.fn(), groupBy: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn(), deleteMany: vi.fn() },
@@ -98,6 +98,26 @@ describe('criação e acesso às Intents', () => {
   it('bloqueia não seguidor mesmo após realização, antes de tentar decifrar', async () => {
     db.intent.findUnique.mockResolvedValue({ ...intent, visibility: 'FOLLOWERS', status: 'REALIZED' });
     await expect(getIntent(intentId, viewerId)).rejects.toMatchObject({ code: 'INTENT_FORBIDDEN' });
+  });
+
+  it('registra a realização por data quando a transição ocorre durante a leitura', async () => {
+    const sealed = sealReveal('conteúdo por data', key, revealAssociatedData(intentId, 1));
+    const dateIntent = {
+      ...intent,
+      conditionType: 'DATE',
+      revealAt: new Date(Date.now() - 60_000),
+      revealCiphertext: sealed.ciphertext,
+      revealIv: sealed.iv,
+      revealAuthTag: sealed.authTag,
+    };
+    db.intent.findUnique.mockResolvedValue(dateIntent);
+    db.intent.updateMany.mockResolvedValue({ count: 1 });
+    db.intent.findUniqueOrThrow.mockResolvedValue({ ...dateIntent, status: 'REALIZED', realizedAt: new Date() });
+
+    await expect(getIntent(intentId, creatorId)).resolves.toMatchObject({ status: 'REALIZED', revealContent: 'conteúdo por data' });
+    expect(db.domainEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      type: 'INTENT_REALIZED', idempotencyKey: `intent-realized:${intentId}:v1`,
+    }) }));
   });
 });
 

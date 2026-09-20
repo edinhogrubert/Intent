@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ArrowLeft, Calendar, Check, CheckCircle2, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Share2, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Calendar, Check, CheckCircle2, Clock3, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Share2, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import type { UserAccount } from '../types';
 import {
@@ -8,6 +8,7 @@ import {
   getIntent,
   IntentApiError,
   listIntentComments,
+  listIntentHistory,
   removeIntentReaction,
   removeIntentSupport,
   setIntentReaction,
@@ -16,6 +17,7 @@ import {
   watchIntent,
   type ApiIntent,
   type ApiIntentComment,
+  type ApiIntentHistoryEvent,
   type IntentCategory,
   type ReactionType,
 } from '../services/intentApi';
@@ -37,6 +39,16 @@ const categoryLabels: Record<IntentCategory, string> = {
   PERSONAL_LIFE: 'Vida pessoal',
   OTHER: 'Outros',
 };
+
+function historyText(type: ApiIntentHistoryEvent['type']) {
+  switch (type) {
+    case 'INTENT_CREATED': return 'A Intent foi criada.';
+    case 'SUPPORT_RECEIVED': return 'Um apoio foi registrado.';
+    case 'SUPPORT_REMOVED': return 'Um apoio foi retirado.';
+    case 'GUARDIAN_APPROVED': return 'Uma aprovação de guardião foi registrada.';
+    case 'INTENT_REALIZED': return 'A Intent foi realizada.';
+  }
+}
 
 function VisibilityBadge({ visibility }: { visibility: ApiIntent['visibility'] }) {
   if (visibility === 'PRIVATE') {
@@ -115,6 +127,11 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [copySuccess, setCopySuccess] = useState(false);
   const [copyError, setCopyError] = useState('');
   const [watchPending, setWatchPending] = useState(false);
+  const [history, setHistory] = useState<ApiIntentHistoryEvent[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   async function handleCopyIntentLink() {
     const ok = await copyToClipboard(getIntentShareUrl(intentId));
@@ -155,9 +172,39 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     }
   }
 
+  async function loadHistory() {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const page = await listIntentHistory(intentId);
+      setHistory(page.items);
+      setHistoryCursor(page.nextCursor);
+    } catch (caught) {
+      setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar a história desta Intent.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function loadMoreHistory() {
+    if (!historyCursor || historyLoadingMore) return;
+    setHistoryLoadingMore(true);
+    setHistoryError('');
+    try {
+      const page = await listIntentHistory(intentId, historyCursor);
+      setHistory((current) => [...current, ...page.items]);
+      setHistoryCursor(page.nextCursor);
+    } catch (caught) {
+      setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar mais acontecimentos.');
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  }
+
   useEffect(() => {
     void load();
     void loadComments();
+    void loadHistory();
   }, [intentId]);
 
   async function handleComment() {
@@ -347,6 +394,26 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
                 </div>
               </div>
             )}
+
+            <section className="mt-6 pt-6 border-t border-[#e4e2de]" aria-labelledby="history-title">
+              <h2 id="history-title" className="font-black text-lg text-[#1a1a1a] flex items-center gap-2">
+                <Clock3 className="w-5 h-5 text-[#000666]"/>História da Intent
+              </h2>
+              <p className="mt-1 text-xs text-[#666]">Acontecimentos reais registrados pelo backend.</p>
+              {historyLoading && <div className="py-7 text-center text-sm text-[#666]"><LoaderCircle className="w-5 h-5 animate-spin mx-auto mb-2"/>Carregando história...</div>}
+              {!historyLoading && historyError && <p role="alert" className="mt-4 rounded-xl bg-[#ffdad6] p-3 text-sm text-[#8c1d18]">{historyError}</p>}
+              {!historyLoading && !historyError && history.length === 0 && <p className="mt-4 rounded-xl bg-[#f5f3ef] p-4 text-sm text-[#666]">Nenhum acontecimento registrado ainda.</p>}
+              {!historyLoading && history.length > 0 && <ol className="mt-5 space-y-4 border-l-2 border-[#e0e0ff] pl-5">
+                {history.map((event) => <li key={event.id} className="relative">
+                  <span className="absolute -left-[29px] top-1 w-3 h-3 rounded-full bg-[#000666] border-2 border-white"/>
+                  <p className="text-sm font-bold text-[#1a1a1a]">{historyText(event.type)}</p>
+                  <time className="text-xs text-[#666]">{new Date(event.occurredAt).toLocaleString('pt-BR')}</time>
+                </li>)}
+              </ol>}
+              {historyCursor && <button type="button" onClick={() => void loadMoreHistory()} disabled={historyLoadingMore} className="mt-5 w-full rounded-xl border border-[#c6c5d4] py-2.5 text-sm font-bold text-[#000666] disabled:opacity-60">
+                {historyLoadingMore ? 'Carregando...' : 'Carregar mais'}
+              </button>}
+            </section>
 
             <div className="mt-6 pt-5 border-t border-[#e4e2de]">
               {!isMine && (
