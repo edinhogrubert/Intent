@@ -119,3 +119,9 @@ Pendência de governança:
 - Reações continuam sendo sinais sociais independentes. Apoios são a contribuição que avança somente Intents com condição `SUPPORT`; para condições de guardiões, a operação aplicável é a aprovação autorizada.
 - A Home e o detalhe mostram progresso e quantidade restante apenas quando a meta oficial de apoios existe. Não há contador ou entidade paralela de participação.
 - Não houve alteração de backend, API, Prisma, Firebase, migrations, PostgreSQL ou Redis.
+
+## 10. Bloco 34 — Acompanhamento de Intents
+
+- PR #40 — acompanhamento persistido: merge `9eecea23743971cc423b3c1920e5d7da8751b3bb`; CI aprovada; API e frontend implantados.
+- A relation `intent_watches` é única por usuário e Intent, idempotente e independente de reações, apoios e realização.
+- A migration `20260920000100_add_intent_watches` está aplicada; PostgreSQL e Redis foram preservados durante a implantação.
