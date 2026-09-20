@@ -1,555 +1,110 @@
-# Intent — Estado das Funcionalidades e Próximos Passos
+# Intent — Próximas funcionalidades e acordos futuros
 
-> **Objetivo:** oferecer uma visão simples e confiável do que já funciona, do que está sendo validado e do que ainda será desenvolvido.  
-> **Última atualização geral do inventário:** 06 de setembro de 2026. **Novas propostas registradas:** 20 de setembro de 2026.  
-> **Atenção:** os estados das seções 1–3 e 6 abaixo são um retrato histórico de 06/09 e não representam necessariamente o estado vigente. Para estado oficial de implantação, consulte `docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md`. O registro das propostas das seções 4.11–4.12 não significa implementação.
-> **Versão implantada na Oracle em 06/09 (histórico):** `09add9f0e257b2df5a877b37eb4a59ae76b80709`  
-> **Branch de desenvolvimento em 06/09 (histórico):** `codex/mvp-backend-base`  
-> **Pull Request de referência em 06/09 (histórico):** `#2` para a `main`
-
-## Como interpretar este documento
-
-| Estado | Significado |
-|---|---|
-| ✅ Implantado e validado | Está no GitHub, implantado na Oracle e passou pelos testes registrados |
-| 🧪 Implantado, falta validação humana | Está tecnicamente ativo, mas o fluxo completo ainda precisa ser testado por usuários |
-| 🟡 Próxima prioridade | Deve ser uma das próximas entregas do MVP |
-| ⏳ Planejado | Faz parte do produto, mas ainda não será implementado |
-| 🔧 No GitHub, aguardando implantação | Implementado na branch, mas ainda não está ativo na Oracle |
-| 🚫 Fora do MVP atual | Foi conscientemente adiado para evitar complexidade prematura |
-
-## Regra de manutenção
-
-Este arquivo deve ser atualizado sempre que uma funcionalidade:
-
-1. for adicionada ao GitHub;
-2. for implantada na VM Oracle;
-3. passar ou falhar nos testes;
-4. mudar de prioridade ou escopo;
-5. for retirada do MVP.
-
-Uma funcionalidade só muda para **✅ Implantado e validado** quando o código ativo no servidor corresponder ao commit registrado e os testes técnicos e funcionais tiverem sido concluídos.
+> **Atualização editorial:** 20 de setembro de 2026. Este arquivo é exclusivamente o backlog de funcionalidades ainda não concluídas e decisões futuras. Não é manifesto de estado operacional, não atesta deploy e não autoriza implementação. O estado oficial, SHA ativo, testes e implantação devem ser consultados no manifesto de continuidade e no GitHub antes de qualquer execução.
+>
+> **Manutenção:** atualizar este arquivo diretamente na `main` quando houver novo acordo de produto. Quando uma funcionalidade for integralmente implementada e validada, retirar sua proposta concluída daqui, preservando os registros técnicos no histórico do Git e nos documentos operacionais. Se apenas parte estiver pronta, conservar somente a parte pendente e descrever exatamente o limite.
+>
+> **Identidade:** Intent é uma rede social de acontecimentos. O acontecimento, suas regras, a mobilização e a revelação são o centro do produto; não transformar listas de pessoas em comunidades nem confundir apoio, reação, aprovação e acompanhamento.
 
 ---
 
-# 1. Estado atual do MVP
+# 1. Próximas entregas previstas — verificar estado antes de executar
 
-> **Registro histórico de 06/09/2026; verificar o manifesto operacional antes de interpretar os estados como atuais.**
+O Bloco 34, acompanhamento persistente de Intents, foi concluído anteriormente: não é uma funcionalidade futura e foi retirado deste backlog. Os Blocos 30–33 também não devem ser tratados aqui como tarefas abertas.
 
-## 1.1 Infraestrutura e implantação
+- **Bloco 35 — Notificações de acontecimentos:** consolidar entrega para usuários que acompanham Intents, deduplicação, destinatários, privacidade e consistência do contador. A base de notificações, modal, leitura e contador já existia; trabalhar apenas nas lacunas reais. **Não declarar concluído sem relatório, merge e validação.**
+- **Bloco 36 — Timeline:** definir e implementar o histórico social de acontecimentos sem inventar eventos.
+- **Bloco 37 — Conquistas e reputação:** definir métricas explicáveis, origem verificável, amostra mínima e critérios versionados. Preservar métricas básicas de perfil já existentes; não duplicá-las.
+- **Bloco 38 — Tendências e destaques:** período, categoria e indicadores objetivos; não criar ranking absoluto arbitrário nem números fictícios.
+- **Bloco 39 — Criação guiada:** simplificar escolhas de condições e participantes sem alterar silenciosamente a semântica do motor.
 
-| Funcionalidade | Estado | Observação |
-|---|---|---|
-| VM Oracle Cloud ARM64 | ✅ Implantado e validado | Ubuntu 24.04, 2 OCPUs, 12 GB RAM e disco de 50 GB |
-| Docker e Docker Compose | ✅ Implantado e validado | Backend, frontend, PostgreSQL e Redis em contêineres |
-| PostgreSQL 16 | ✅ Implantado e validado | Persistência real; porta não exposta publicamente |
-| Redis 7 | ✅ Implantado e validado | Provisionado e saudável; uso funcional avançado ainda será definido |
-| Backup local do PostgreSQL | ✅ Implantado e validado | Diário às 03:15, retenção de 7 dias |
-| Repositório GitHub na VM | ✅ Implantado e validado | Deploy Key somente leitura |
-| Implantação por commit exato | ✅ Implantado e validado | Scripts interrompem quando a branch não corresponde ao commit aprovado |
-| Rollback de imagens Docker | ✅ Implantado e validado | Imagens anteriores são preservadas nas implantações recentes |
-| Health checks | ✅ Implantado e validado | API, frontend, PostgreSQL e Redis |
-| Portas da aplicação privadas | ✅ Implantado e validado | Frontend em `127.0.0.1:3000` e API em `127.0.0.1:8080` |
-| Acesso por túnel SSH | ✅ Implantado e validado | Nenhuma porta pública da aplicação nesta etapa |
-| HTTPS e domínio público | ⏳ Planejado | Será realizado somente quando houver decisão de publicação externa |
-| Backup externo no Object Storage | ⏳ Planejado | Banco possui apenas backup local neste momento |
-| Monitoramento e alertas externos | ⏳ Planejado | Ainda não configurados |
-
-## 1.2 Autenticação e conta
-
-| Funcionalidade | Estado | Observação |
-|---|---|---|
-| Firebase Authentication | ✅ Implantado e validado | Projeto ativo: `intent-86155` |
-| Login com Google | ✅ Implantado e validado | Cancelamento do popup devolve o controle à tela de login |
-| Login com e-mail e senha | ✅ Implantado e validado | Continua disponível após cancelamento do Google |
-| Validação do token no backend | ✅ Implantado e validado | Assinatura, emissor, audiência e validade confirmados pelo Firebase |
-| Revogação imediata de sessão | ✅ Implantado e validado | Conta dedicada `intent-auth-verifier` com papel `Firebase Authentication Viewer`; credencial somente na Oracle e teste com perfis diferentes aprovado |
-| Perfil interno no PostgreSQL | ✅ Implantado e validado | Usuário Firebase é sincronizado com a conta do Intent |
-| Nome de usuário simples | ✅ Implantado e validado | Padrão `@nome_sobrenome`; colisões recebem número incremental |
-| CORS para túneis locais | ✅ Implantado e validado | `localhost:3000` e `localhost:3100` preservados |
-| Cabeçalho compatível com popup OAuth | ✅ Implantado e validado | `same-origin-allow-popups` |
-| Recuperação de senha | 🟡 Próxima prioridade | O Firebase suporta, mas o fluxo amigável ainda precisa ser integrado |
-| Verificação de e-mail | ⏳ Planejado | Avaliar depois do fluxo principal estar estável |
-| MFA, telefone, SMS, SAML e OIDC | 🚫 Fora do MVP atual | Complexidade e custo desnecessários neste momento |
-
-## 1.3 Telas ativas do MVP limpo
-
-| Tela | Estado | Fonte dos dados |
-|---|---|---|
-| Login e cadastro | ✅ Implantado e validado | Firebase Authentication |
-| Início | ✅ Implantado e validado | API e PostgreSQL |
-| Criar Intent | ✅ Implantado e validado | API e PostgreSQL |
-| Minhas Intents | ✅ Implantado e validado | API e PostgreSQL |
-| Detalhe da Intent | ✅ Implantado e validado | API e PostgreSQL |
-| Perfil próprio e perfil social | ✅ Implantado e validado | API e PostgreSQL |
-| Lista de seguidores | ✅ Implantado e validado | API e PostgreSQL |
-| Lista de pessoas seguidas | ✅ Implantado e validado | API e PostgreSQL |
-| Feed “Para você” | ✅ Implantado e validado | Somente Intents públicas reais |
-| Feed “Seguindo” | ✅ Implantado e validado | Testado com três contas e diferentes combinações de seguir, não seguir e deixar de seguir |
-| Telas antigas com dados fictícios | ✅ Removidas do fluxo ativo | Não fazem parte da navegação nem do bundle ativo |
-
-## 1.4 Intents e revelação
-
-| Funcionalidade | Estado | Observação |
-|---|---|---|
-| Criar Intent por meta de apoios | ✅ Implantado e validado | Meta aceita quantidade exata, sem incremento obrigatório de 5 |
-| Categorias essenciais | ✅ Implantado e validado | Inclui Esportes e outras categorias do MVP |
-| Persistência real | ✅ Implantado e validado | Intents gravadas no PostgreSQL |
-| Conteúdo de revelação protegido | ✅ Implantado e validado | Texto cifrado no backend com AES-256-GCM |
-| Apoio único por usuário | ✅ Implantado e validado | Restrição no banco |
-| Apoiar e retirar apoio | ✅ Implantado e validado | Primeiro clique apoia; segundo clique retira |
-| Bloqueio de retirada após realização | ✅ Implantado e validado | Histórico permanece consistente após revelar |
-| Realização automática ao atingir a meta | ✅ Implantado e validado | Condição avaliada pelo backend |
-| Revelação após a realização | ✅ Implantado e validado | Conteúdo somente é aberto depois da condição |
-| Histórico de eventos essenciais | ✅ Implantado e validado | Criação, apoio, retirada e realização registrados |
-| Visibilidade pública | ✅ Implantado e validado | Aparece no feed geral |
-| Visibilidade para seguidores | ✅ Implantado e validado | Seletor “Somente seguidores”, autorização no backend e testes de inclusão, exclusão e direção do vínculo aprovados |
-| Visibilidade privada completa | ⏳ Planejado | Regras de destinatários ainda não fazem parte do MVP limpo |
-| Condição por data | 🟡 Próxima prioridade | Deve impedir datas retroativas e respeitar timezone |
-| Condição por aprovadores/guardiões | 🟡 Próxima prioridade | Exigirá escolha explícita dos aprovadores e regra N de M |
-| Palpite protegido | ⏳ Planejado | Encerramento e responsável pela revelação precisam ser definidos |
-| Arquivos, imagens e links protegidos | ⏳ Planejado | O MVP ativo protege texto; mídia dependerá de Object Storage |
-| Condições combinadas | 🚫 Fora do MVP atual | Fase posterior do motor de regras |
-
-## 1.5 Base social real
-
-| Funcionalidade | Estado | Observação |
-|---|---|---|
-| Seguir perfil | ✅ Implantado e validado | Contador real |
-| Deixar de seguir | ✅ Implantado e validado | Ação explícita e reversível |
-| Voltar a seguir | ✅ Implantado e validado | Testado com atualização correta do contador |
-| Seguidores e seguindo | ✅ Implantado e validado | Listas reais, contas inativas ocultadas |
-| Paginação das conexões | ✅ Implantado e validado | 20 pessoas por página |
-| Perfil público | ✅ Implantado e validado | Dados reais do PostgreSQL |
-| Intents criadas e realizadas | ✅ Implantado e validado | Métricas reais |
-| Apoios dados e recebidos | ✅ Implantado e validado | Métricas reais |
-| Taxa de realização | ✅ Implantado e validado | Percentual simples e explicável |
-| Feed de pessoas seguidas | ✅ Implantado e validado | Inclui Intents públicas e exclusivas para seguidores; validado com três contas |
-| Confiabilidade | ⏳ Planejado | Não será exibida com nota artificial |
-| Mobilização por pessoas únicas | ⏳ Planejado | Fórmula ainda precisa ser especificada e versionada |
-| Frequência e participação histórica | ⏳ Planejado | Métricas futuras |
-| Níveis e reconhecimento | ⏳ Planejado | Não devem confundir popularidade com confiança |
-
-## 1.6 Segurança e integridade
-
-| Controle | Estado | Observação |
-|---|---|---|
-| Segredos fora do Git | ✅ Implantado e validado | Configuração protegida na VM |
-| Credencial Firebase Admin | ✅ Implantado e validado | Conta mínima dedicada; JSON externo ao Git e à imagem, montado somente para leitura na Oracle |
-| Banco e Redis sem exposição pública | ✅ Implantado e validado | Somente redes Docker internas |
-| API e frontend restritos ao localhost | ✅ Implantado e validado | Acesso atual por túnel SSH |
-| Firewall com entrada negada por padrão | ✅ Implantado e validado | SSH restrito à faixa autorizada |
-| Validação de entrada com schema | ✅ Implantado e validado | Zod no backend |
-| Contadores controlados pelo backend | ✅ Implantado e validado | Frontend não define quantidade de apoios |
-| Transações nas ações críticas | ✅ Implantado e validado | Apoio, retirada, realização e eventos |
-| Eventos com chave de idempotência | ✅ Implantado e validado | Eventos essenciais evitam duplicação |
-| Logs estruturados | ✅ Implantado e validado | API com identificação de requisição |
-| Rate limiting | 🟡 Próxima prioridade | Necessário antes da abertura pública |
-| Auditoria de restauração de backup | ⏳ Planejado | Backup é criado; restauração periódica ainda deve ser ensaiada |
-| Varredura automatizada de vulnerabilidades | ⏳ Planejado | Antes da exposição pública |
+Estes nomes são planejamento, não prova de que o código atual careça de todos os elementos. Validar no repositório o escopo residual antes de iniciar cada bloco.
 
 ---
 
-# 2. Validações já realizadas
+# 2. Funcionalidades futuras preservadas
 
-- Build TypeScript e build de produção aprovados nas implantações anteriores.
-- Login com Google e e-mail/senha testados.
-- Cancelamento do popup Google testado.
-- Criação e realização de Intents testadas com três usuários.
-- Apoio, retirada e novo apoio testados.
-- Fluxos anteriores com um e dois aprovadores foram experimentados no protótipo, mas **a aprovação ainda não pertence ao MVP limpo ativo**.
-- Seguir, deixar de seguir e voltar a seguir testados.
-- Listas de seguidores e seguindo testadas.
-- Verificação técnica do commit `a859de7`: 26 verificações aprovadas e nenhuma falha.
-- PostgreSQL, Redis, API, frontend, Firebase, CORS, portas e backup validados.
+## 2.1 Intent de Escolha
 
-## Validação humana concluída em 06 de setembro de 2026
+A pergunta «O que você quer fazer acontecer?» poderá apresentar dois caminhos: **Eu já decidi**, em que outras pessoas ajudam uma decisão definida a acontecer, e **Quero que escolham**, em que outras pessoas determinam o resultado. Não será enquete comum: exigirá compromisso, prazo, participação mínima, voto único, desempate, resultado e impacto na reputação devidamente especificados.
 
-O fluxo social básico foi aprovado manualmente com três contas reais:
+## 2.2 Intents como guardiãs de outras Intents
 
-1. Intents públicas permaneceram visíveis no feed geral.
-2. Intents com visibilidade **Seguidores** foram exibidas somente para contas que seguiam o criador.
-3. Contas sem vínculo não visualizaram nem abriram a Intent exclusiva.
-4. Deixar de seguir removeu o acesso à Intent exclusiva.
-5. Foram testadas combinações mútuas e assimétricas de seguir, não seguir e deixar de seguir.
-6. Intents em grupo e validações por participantes continuaram funcionando.
-7. Login, sincronização do perfil e feed foram testados com perfis diferentes.
+Uma Intent poderá depender do estado ou realização de outra. Exemplo: uma liberação institucional exige auditoria técnica concluída e apoio mínimo. Requisitos: grafo acíclico, detecção de dependências circulares, propagação de eventos, reavaliação idempotente, árvore de dependências inteligível e proteção contra cascatas infinitas.
 
-**Comportamento atual aprovado:** ao começar a seguir um criador, a pessoa também pode visualizar as Intents anteriores que foram publicadas para seguidores. O controle temporal desse acesso está preservado como funcionalidade futura.
----
+## 2.3 Motor universal e condições avançadas
 
-# 3. Próximas prioridades recomendadas
+Compor AND, OR, NOT, N de M, sequência, janela de tempo e múltiplas etapas; considerar fontes manuais e externas, simulador e editor progressivo que não exponha a DSL ao usuário comum. **Não listar novamente as condições individuais por data, apoio ou guardiões como se ainda não existissem**: a lacuna é a composição e suas políticas adicionais, conforme seção 2.12.
 
-> **Priorização histórica de 06/09, não a sequência operacional vigente.**
+## 2.4 Integrações externas
 
-## Prioridade 1 — concluir a fatia social básica
+Preservar as fontes conceituais `UPLOAD`, `MANUAL`, `LINK`, `API` e `WEBHOOK`. Ativar API pública e webhooks só com autenticação de serviço, assinatura, idempotência, rate limit e auditoria. Sistemas externos adaptam eventos ao contrato da Intent, não o contrário.
 
-### 1. Feed “Seguindo” — concluído
+## 2.5 Arquivos, armazenamento e criptografia avançados
 
-Critério aprovado em 06 de setembro de 2026 com três contas e relacionamentos mútuos e assimétricos.
+Suportar imagens e arquivos protegidos usando OCI Object Storage e URLs temporárias quando aprovado. Evoluções possíveis: OCI Vault/KMS, rotação de chaves, envelopes portáveis, hash chains e provas criptográficas avançadas somente se necessárias. A proteção de texto existente não equivale à entrega destas capacidades.
 
-### 2. Curtidas e comentários reais
+## 2.6 Jornada do seguidor — boas-vindas e despedida
 
-- curtir e descurtir;
-- uma curtida por usuário;
-- comentários persistidos;
-- excluir o próprio comentário conforme política;
-- contadores derivados de registros reais;
-- comentários e curtidas não alteram a condição de apoio;
-- registrar eventos importantes;
-- apresentar estado vazio sem conteúdo fictício.
+O criador poderá configurar experiência opcional ao iniciar ou encerrar vínculo: mensagem de boas-vindas, Intent especial, conteúdo exclusivo, recompensa simbólica, cupom/arquivo/link quando suportado ou convite para acompanhar objetivo. Na saída: mensagem respeitosa, resumo opcional, motivo não obrigatório e caminho para voltar.
 
-### 3. Recuperação de senha
+Regras: não constranger nem dificultar saída; bloqueio, suspensão ou moderação não disparam despedida; requisitos e validade de recompensas claros; não conceder benefícios ilimitados em ciclos seguir/deixar de seguir; elegibilidade por backend, limite por pessoa e período de segurança. Identificar mensagens automáticas e permitir controle de notificações. Eventos futuros candidatos: `WELCOME_JOURNEY_STARTED`, `WELCOME_REWARD_GRANTED` e `FAREWELL_MESSAGE_AVAILABLE`; aproveitar os eventos de seguimento existentes em vez de duplicá-los. Preservar vínculo com acontecimentos, sem virar ferramenta genérica de marketing.
 
-- usar o fluxo do Firebase;
-- informar resultado sem revelar se determinado e-mail existe;
-- manter Google e e-mail/senha disponíveis.
+## 2.7 Controle temporal da audiência de seguidores
 
-## Prioridade 2 — fortalecer o ciclo da Intent
+Além do comportamento básico já existente — seguidores atuais podem acessar Intents antigas destinadas a seguidores — permitir selecionar: (a) somente Intents criadas/publicadas depois do início do vínculo ou (b) somente novos seguidores a partir da publicação. Requisitos: histórico de seguir/deixar de seguir, política temporal por Intent, autorização no backend, regras para seguir novamente, prevenção de ciclos artificiais, prévia inteligível ao criador, testes de feed, link direto e mudanças de vínculo. O comportamento existente permanece padrão até escolha expressa.
 
-### 4. Condição por data
+## 2.8 Papéis avançados: guardiões, beneficiários e destinatários
 
-- data futura obrigatória;
-- timezone explícito;
-- rejeitar datas retroativas no frontend e no backend;
-- job confiável para avaliar vencimentos;
-- testes de horário e mudança de dia.
+Separar **quem aprova** de **quem pode receber/ver** o conteúdo; prever observador autorizado quando necessário. Exemplos: testamento digital, documento aprovado por parte de três pessoas, conteúdo aberto em data para destinatários específicos ou aprovado por guardiões mas entregue a terceiro. Reaproveitar o quórum N de M e os guardiões já existentes; a evolução pendente é a separação de papéis e a combinação segura de regras.
 
-### 5. Aprovação por pessoas
+Exigir versão da regra, proteção contra alteração insegura após publicação, resumo prévio de aprovadores/destinatários/prazo, auditoria de aprovação, revelação e acesso, autorização no backend e bloqueio de acesso direto indevido. Combinação de data e aprovação relaciona-se à seção 2.12.
 
-- criador escolhe pessoas reais como aprovadores;
-- separar aprovador de destinatário;
-- regra clara: unanimidade ou N de M;
-- zero aprovadores invalida a configuração;
-- aprovação única por usuário e versão;
-- histórico e autorização no backend.
+## 2.9 Intent por localização
 
-### 6. Notificações internas essenciais
+Permitir que a condição dependa de presença em endereço/região, coordenada ou referência com raio configurável. Usos: jogo e pistas, caça ao tesouro, turismo, desafios familiares, eventos presenciais, comércio local, esportes, memórias afetivas, equipes e aulas de campo.
 
-- novo seguidor;
-- apoio recebido ou removido;
-- meta atingida;
-- Intent revelada;
-- solicitação de aprovação;
-- marcação de leitura.
+Exigir área aproximada visível antes da publicação; combinação futura com data, guardiões e destinatários; evento de presença com horário, precisão aproximada e versão da regra; geolocalização solicitada só na tentativa de validar, sem rastreamento contínuo; consentimento contextual e possibilidade de recusa sem bloquear o aplicativo inteiro. Validar no backend, considerar erro de GPS, mitigar fraudes sem prometer proteção absoluta, definir tentativas e não expor localização exata desnecessariamente.
 
-## Prioridade 3 — descoberta e reputação
+## 2.10 Plataforma e operação — somente pendências comprovadas
 
-### 7. Explorar e busca
+Reavaliar, com base no manifesto operacional atualizado, publicação por domínio/HTTPS, backup externo, ensaio periódico de restauração, ambiente de staging, observabilidade, alertas, retenção e aplicação mobile futura. **Não classificar CI/CD, Docker, backup local ou health checks como ausentes apenas por constarem em um planejamento antigo.** Não realizar simulação pesada de carga nem expansão de infraestrutura agora; isso foi adiado pelo proprietário para momento de maior consolidação.
 
-- pessoas;
-- Intents;
-- categorias;
-- assuntos;
-- filtros sem dados inventados.
+## 2.11 Grupos pessoais reutilizáveis — seleção, não comunidade (acordo de 20/09/2026)
 
-### 8. Rankings e destaques
+**Proposta futura; não implementada.** Grupo é uma lista pessoal reutilizável de pessoas (Futsal, Vôlei, Dança, Família, Trabalho, Escola) para preencher seleções existentes na criação de uma Intent comum. Não possui feed, perfil público, publicação, regra, contador de aprovação ou vida social própria. Criador seleciona nomes ou importa grupos, revisa, adiciona/remove indivíduos e elimina duplicidades. A lista final de aprovadores/destinatários é registrada **na Intent**: alterações posteriores no grupo não modificam Intents anteriores automaticamente. Permissões e validações permanecem no backend e nas regras da Intent; selecionar grupo não concede apoio, aprovação nem participação.
 
-Filtros planejados:
+Exemplo: grupo Futsal com 20 pessoas selecionado como aprovadores; a Intent exige 12 de 20 confirmações. Gestão compartilhada da lista seria evolução opcional somente se necessária, sem transformá-la em comunidade.
 
-- dia, semana, mês, ano e todo o período;
-- assunto e categoria;
-- mais realizados;
-- maior mobilização;
-- maior participação;
-- mais curtidos;
-- novos criadores;
-- em crescimento.
+## 2.12 Políticas de encerramento, prazo e mensagem alternativa (acordo de 20/09/2026)
 
-Não haverá ranking absoluto único nem números fictícios.
+**Proposta futura; não implementada.** Separar **meta atingida**, **encerramento da participação** e **realização/revelação definitiva**. Criador escolhe política e prazo. Não confundir apoio `SUPPORT` com aprovação `GUARDIANS` e não alterar retroativamente condições existentes.
 
-### 9. Reputação explicável
+### A — Encerrar apenas no prazo: futsal
 
-Dimensões separadas:
+20 aprovadores; mínimo 12; quinta às 18h. Aprovações podem oscilar até o limite, conforme regras explícitas de desistência e reposição. Atingir 12 na quarta é **provisório e não revela**. No prazo, congelar pessoas e contagem válidas, avaliar atomicamente; 12 ou mais realiza e revela; menos de 12 encerra **sem revelar o cofre** e exibe mensagem alternativa do criador («Não vai sair jogo»). Ações tardias não alteram resultado. «Confirmou, pagou» é uma condição informada pelo organizador, não prova de pagamento verificada pela plataforma.
 
-- Intents criadas;
-- Intents realizadas;
-- apoios dados;
-- apoios recebidos;
-- curtidas recebidas;
-- aprovações realizadas;
-- participação;
-- frequência;
-- mobilização por pessoas únicas;
-- confiabilidade com amostra mínima.
+### B — Encerrar imediatamente pela meta: salão de beleza
 
-> O Intent não será somente uma rede onde acontecimentos são criados. Será também uma rede onde as pessoas constroem reputação pública pela capacidade de criar, participar, mobilizar e realizar acontecimentos.
+Primeiros 20 apoios elegíveis reservam 20 brindes até terça. O 20º apoio fecha novas entradas, fixa lista de beneficiários e realiza conforme regra divulgada. Não transferir automaticamente benefício por desistência ou falta; reserva não é entrega. Exibir condições, validade, comparecimento e resultado caso o prazo máximo termine sem atingir meta. Respeitar vagas com operações atômicas, idempotência e concorrência controlada.
 
-## Prioridade 4 — comunicação social
+### Regras comuns pendentes de especificação
 
-- publicações comuns;
-- compartilhamento de Intent por link;
-- salvar e acompanhar;
-- mensagens privadas simples;
-- compartilhar uma Intent no chat;
-- moderação e denúncias;
-- bloqueio de usuários.
+Se prazo termina sem cumprir meta: apenas **mensagem alternativa de insucesso**, jamais conteúdo cifrado original, e estado não realizado. Diferenciar meta provisória, inscrições encerradas, realizado e encerrado sem realização. Definir estados, transições, versão imutável da regra após publicar, compatibilidade legada, auditoria, autorização, fuso/UTC, instante de corte e atrasos do agendador. Determinar quem pode confirmar, retirar confirmação, substituir participantes e visualizar dados. Não presumir pagamento, presença ou entrega sem evento verificável.
 
 ---
 
-# 4. Funcionalidades futuras preservadas
+# 3. Outras possibilidades ainda não concluídas
 
-## 4.1 Intent de Escolha
+Avaliar conforme necessidade e sem iniciar automaticamente: recuperação de senha e verificação de e-mail (conferir estado atual antes de declarar lacuna); notificações avançadas além do Bloco 35; compartilhamento por link; mensagens privadas e compartilhamento em conversas; moderação/denúncias e bloqueio; palpite protegido; classificação por assunto/categoria e métricas de reputação ainda não entregues; campanhas ou conteúdos adicionais dependentes de suporte real no backend.
 
-A pergunta **“O que você quer fazer acontecer?”** futuramente poderá oferecer dois caminhos:
-
-- **Eu já decidi:** outras pessoas ajudam algo definido a acontecer.
-- **Quero que escolham:** outras pessoas decidem qual resultado acontecerá.
-
-A Intent de Escolha não será uma enquete comum. Deve possuir compromisso, prazo, participação mínima, voto único, desempate, resultado e impacto na reputação.
-
-## 4.2 Intents como guardiãs de outras Intents
-
-Uma Intent poderá depender do estado ou realização de outra Intent.
-
-Exemplo: uma liberação institucional depende simultaneamente de auditoria técnica concluída e apoio mínimo alcançado.
-
-Requisitos antes da implementação:
-
-- grafo acíclico dirigido;
-- detecção de dependências circulares;
-- propagação assíncrona de eventos;
-- reavaliação idempotente;
-- visualização simples da árvore de dependências;
-- proteção contra cascatas infinitas.
-
-## 4.3 Motor universal de condições
-
-- AND, OR e NOT;
-- N de M;
-- sequência;
-- janela de tempo;
-- múltiplas etapas;
-- fontes manuais e externas;
-- simulador visual;
-- editor progressivo sem expor a DSL ao usuário comum.
-
-## 4.4 Integrações externas
-
-O modelo está conceitualmente preparado para:
-
-- `UPLOAD`;
-- `MANUAL`;
-- `LINK`;
-- `API`;
-- `WEBHOOK`.
-
-A API pública e os webhooks serão ativados somente depois de autenticação de serviços, assinatura, idempotência, rate limit e auditoria. Sistemas externos devem adaptar seus eventos ao contrato do Intent; o núcleo do Intent não será deformado para cada integração.
-
-## 4.5 Armazenamento e criptografia avançados
-
-- OCI Object Storage para imagens e arquivos;
-- URLs temporárias;
-- OCI Vault/KMS;
-- rotação de chaves;
-- envelopes portáveis;
-- hash chains;
-- provas criptográficas avançadas somente quando houver necessidade real.
-
-## 4.6 Jornada do Seguidor: boas-vindas e despedida
-
-O criador poderá preparar uma experiência automática para o início e o encerramento do vínculo com um seguidor.
-
-Ao seguir ou inscrever-se, a pessoa poderá receber:
-
-- mensagem de boas-vindas;
-- uma Intent especial de boas-vindas;
-- conteúdo exclusivo;
-- recompensa simbólica;
-- cupom, arquivo ou link, quando esse tipo de conteúdo estiver disponível;
-- convite para acompanhar uma Intent ou objetivo específico.
-
-Ao deixar de seguir ou encerrar a inscrição, poderá receber:
-
-- mensagem respeitosa de despedida;
-- resumo opcional da participação;
-- possibilidade de informar o motivo da saída, sem obrigação;
-- orientação sobre como voltar a acompanhar no futuro.
-
-### Regras de produto
-
-- boas-vindas e despedida são configuráveis e opcionais;
-- a mensagem de despedida não pode constranger, culpabilizar ou dificultar a saída;
-- bloquear uma pessoa, suspender uma conta ou moderar um vínculo não dispara mensagem;
-- recompensas devem ter validade, disponibilidade e critério explícitos;
-- seguir, deixar de seguir e repetir a ação não pode gerar recompensas ilimitadas;
-- cada campanha define se a recompensa é concedida uma única vez por pessoa;
-- deve existir período de segurança contra ciclos de seguir e deixar de seguir;
-- mensagens automáticas precisam ser claramente identificadas;
-- o usuário destinatário poderá controlar notificações desse tipo;
-- todas as decisões de elegibilidade pertencem ao backend.
-
-### Eventos futuros necessários
-
-- `USER_FOLLOWED`;
-- `WELCOME_JOURNEY_STARTED`;
-- `WELCOME_REWARD_GRANTED`;
-- `USER_UNFOLLOWED`;
-- `FAREWELL_MESSAGE_AVAILABLE`.
-
-Essa função pode evoluir para criadores, empresas, escolas, clubes e projetos sem transformar o Intent em uma ferramenta genérica de marketing. A experiência deve continuar ligada a acontecimentos, participação e relacionamento público.
-
-## 4.7 Controle temporal da audiência de seguidores
-
-O criador poderá escolher como o momento em que uma pessoa começou a segui-lo afeta o acesso às Intents exclusivas.
-
-Modos futuros planejados:
-
-1. **Todos os seguidores atuais:** comportamento existente; quem começar a seguir poderá visualizar também Intents anteriores destinadas a seguidores.
-2. **Somente a partir do vínculo:** o seguidor visualizará apenas Intents criadas ou publicadas depois de começar a seguir o criador.
-3. **Somente novos seguidores:** a Intent será destinada exclusivamente a pessoas que começarem a seguir depois de sua criação ou publicação, sem incluir seguidores que já existiam naquele momento.
-
-Requisitos de produto e segurança:
-
-- registrar histórico confiável do vínculo, incluindo `followed_at` e `unfollowed_at`;
-- armazenar em cada Intent a política temporal de audiência escolhida pelo criador;
-- realizar toda autorização no backend;
-- não depender somente do contador ou do estado atual de seguir;
-- definir o comportamento ao deixar de seguir e voltar a seguir;
-- impedir ciclos artificiais de seguir e deixar de seguir para obter conteúdo ou recompensas;
-- mostrar ao criador, em linguagem simples, quem terá acesso antes da publicação;
-- testar acesso direto, feed, compartilhamento por link e alteração posterior do vínculo;
-- preservar por padrão o comportamento atual até que o criador escolha outra política.
-
-Essa evolução complementa a **Jornada do Seguidor**, permitindo experiências voltadas a seguidores antigos, seguidores futuros ou somente ao período posterior ao início do vínculo.
-
-## 4.8 Papéis avançados: guardiões, beneficiários e destinatários
-
-A ideia original da Intent privada não se limita a “quem aprova também vê”. Em uma fase futura, o criador poderá separar claramente os papéis envolvidos em uma revelação protegida.
-
-Papéis planejados:
-
-- **Criador:** pessoa que cria a Intent, define a regra e insere o conteúdo protegido.
-- **Guardião ou aprovador:** pessoa que confirma que a condição humana foi cumprida.
-- **Beneficiário ou destinatário:** pessoa que poderá acessar o conteúdo depois da revelação.
-- **Observador autorizado:** pessoa que acompanha o estado, mas não aprova nem recebe o conteúdo final.
-
-Exemplos que devem ser suportados:
-
-- pai deixa um testamento digital protegido;
-- um arquivo criado por três pessoas só abre após todos ou parte aprovarem;
-- um conteúdo só abre em certa data e fica disponível apenas para destinatários escolhidos;
-- guardiões aprovam a abertura, mas o conteúdo final é visto por outra pessoa;
-- uma Intent privada fica disponível para um, alguns ou todos os aprovadores, conforme regra definida.
-
-Regras futuras necessárias:
-
-- separar **quem aprova** de **quem pode ver**;
-- permitir quórum `N de M`;
-- permitir condição por data, por aprovação ou por combinação de data + aprovação;
-- registrar versão da regra aprovada;
-- impedir que o criador altere destinatários ou guardiões de forma insegura depois da publicação;
-- exibir antes da criação um resumo claro de quem aprova, quem recebe e quando abre;
-- registrar eventos de aprovação, revelação e acesso;
-- manter autorização sempre no backend;
-- impedir acesso por link direto quando a pessoa não for autorizada.
-
-Essa evolução é parte central do coração do Intent: conteúdo protegido, regras humanas verificáveis e revelação controlada por acontecimentos.
-
-## 4.9 Intent por localização
-
-Uma Intent poderá depender da presença do usuário em determinado endereço ou região geográfica. Em vez de exigir um ponto exato, o criador definirá um endereço, coordenada ou local de referência e um **raio de validação** configurável.
-
-Exemplos de uso:
-
-- jogo presencial em que a próxima pista só abre ao chegar em um ponto;
-- caça ao tesouro, trilhas, gincanas, escape game urbano ou dinâmica escolar;
-- desafio familiar, como liberar um presente se o filho visitar a avó em determinado dia e endereço;
-- turismo guiado, onde cada local visitado revela uma história, pergunta ou próxima missão;
-- eventos, feiras e congressos, liberando conteúdo somente para quem esteve no local;
-- ações de comércio local, com recompensa para quem comparece fisicamente à loja;
-- integração com atividades esportivas, como abrir a próxima etapa ao chegar em um parque, quadra ou ponto de corrida;
-- experiências de memória afetiva, em que uma mensagem só abre em uma praça, casa antiga, praia ou local especial;
-- tarefas de equipe, onde cada pessoa precisa validar presença em pontos diferentes;
-- ensino prático, como aulas de campo com conteúdo liberado em locais específicos.
-
-Regras futuras necessárias:
-
-- permitir raio configurável, por exemplo 30 m, 100 m, 500 m ou valor definido pelo criador;
-- mostrar antes da publicação qual área aproximada será considerada válida;
-- permitir combinação com data, guardiões, destinatários e quórum;
-- registrar evento de presença com data, hora, precisão aproximada e versão da regra;
-- evitar armazenar localização contínua; validar apenas quando o usuário tentar cumprir a condição;
-- explicar claramente ao usuário por que a localização está sendo solicitada;
-- permitir recusa de permissão sem travar o aplicativo inteiro;
-- validar no backend se a tentativa está dentro do raio configurado;
-- considerar margem de erro do GPS, especialmente em prédios, áreas urbanas densas e zonas rurais;
-- bloquear manipulação óbvia quando possível, sem prometer segurança absoluta contra spoofing de GPS;
-- definir política para múltiplas tentativas e tentativas fora do raio;
-- preservar privacidade: não exibir localização exata de participantes sem necessidade.
-
-Essa condição amplia o Intent para acontecimentos físicos: estar em um lugar passa a ser parte da regra de revelação, não apenas um dado decorativo.
-
-## 4.10 Plataforma e operação
-
-- domínio e HTTPS;
-- publicação controlada;
-- backup externo;
-- ensaio de restauração;
-- CI/CD;
-- staging;
-- observabilidade;
-- alertas;
-- políticas de retenção;
-- aplicação mobile futura.
-
-## 4.11 Grupos pessoais reutilizáveis — seleção, não comunidade (proposta de 20/09/2026)
-
-**Status: funcionalidade futura, não implementada.** Grupo é somente uma lista pessoal reutilizável de pessoas (Futsal, Vôlei, Dança, Família, Trabalho, Escola) para preencher seleções existentes na criação de uma Intent comum. Não é comunidade: não tem feed, perfil público, publicação, regra, contador de aprovações ou vida própria. O criador seleciona pessoas uma a uma ou importa um ou mais grupos, revisa a seleção, inclui/exclui indivíduos e elimina duplicidades antes de confirmar. O conjunto final de aprovadores ou destinatários é registrado **na própria Intent**: alterações posteriores do grupo não modificam automaticamente Intents antigas. Acesso e autorização continuam no backend e na regra da Intent. Criar ou selecionar grupo não concede apoio ou aprovação.
-
-Exemplo: reutilizar grupo de 20 jogadores para preencher os 20 aprovadores; 12 de 20 confirmações são exigidas pela regra específica da Intent. Gestão compartilhada de uma lista seria evolução opcional e somente se necessária; não converter em rede de comunidades.
-
-## 4.12 Políticas de encerramento, prazo e mensagem alternativa (proposta de 20/09/2026)
-
-**Status: funcionalidade futura, não implementada; não alterar as regras existentes nem os Blocos 35–39 sem autorização.** Preservar a distinção entre **meta atingida**, **encerramento da participação** e **realização/revelação definitiva**. O criador deve escolher quando a meta se torna definitiva e, no insucesso, a mensagem alternativa. Uma condição de apoio não deve ser confundida com aprovação de guardião.
-
-### A. Encerramento apenas no prazo — futsal
-
-Exemplo: 20 aprovadores, mínimo de 12, encerramento quinta-feira às 18h. A contagem pode oscilar até o prazo: 12 confirmam na quarta, alguém desiste, outro entra. A 12ª aprovação **não** encerra nem revela antecipadamente. No instante final, o backend congela a seleção válida e avalia o quórum de maneira atômica. Com pelo menos 12, realiza e revela o conteúdo protegido. Com menos de 12, encerra **sem revelar o cofre** e mostra a mensagem alternativa do criador (por exemplo, «Não vai sair jogo»). Aprovações/retiradas posteriores não modificam retroativamente o resultado. Definir antecipadamente as possibilidades de desistência, reposição e compromisso; «confirmou, pagou» não significa pagamento comprovado pelo sistema.
-
-### B. Encerramento imediato pela meta — salão de beleza
-
-Exemplo: os primeiros 20 apoios elegíveis reservam 20 brindes, prazo máximo terça-feira. O 20º apoio válido encerra imediatamente novas entradas e fixa a lista de beneficiários; desistência ou não comparecimento posterior não transfere automaticamente o brinde. Distinguir reserva de entrega efetiva; explicar previamente condições, validade, comparecimento e desfecho se a meta não for atingida até o prazo. As operações concorrentes devem respeitar o limite de vagas, ser atômicas e idempotentes.
-
-### Regras comuns e pontos a especificar
-
-- Se o prazo terminar sem cumprir a meta, **mostrar somente a mensagem alternativa de insucesso**, nunca o conteúdo cifrado original; a Intent não é realizada.
-- Diferenciar estados de meta provisoriamente atingida, inscrições encerradas, realizado e encerrado sem realização.
-- Definir estados/transições, regras e versões imutáveis após publicação, compatibilidade de Intents antigas, auditoria e autorização.
-- Definir fuso/UTC, instante de corte, avaliação confiável e tratamento de atrasos do agendador.
-- Definir quem pode confirmar, retirar confirmação, entrar/substituir e ver dados dos demais.
-- Proteger a revelação, garantir operações atômicas e não presumir pagamento, presença ou entrega sem prova verificável.
-
-**Somente acordo de produto. Implementação mediante autorização explícita do proprietário.**
+Não confundir **acompanhar uma Intent**, **seguir um perfil**, **curtir/reagir**, **apoiar** e **aprovar**. Funcionalidades já implementadas não devem reaparecer aqui como novas tarefas.
 
 ---
 
-# 5. Fora do escopo imediato
+# 4. Fora do escopo imediato
 
-Não implementar agora:
-
-- microserviços;
-- Kubernetes;
-- blockchain;
-- ZK-Proofs;
-- pagamentos;
-- chamadas de voz ou vídeo;
-- transmissão ao vivo;
-- IA generativa dentro do produto;
-- API pública;
-- webhooks ativos;
-- aplicativo nativo;
-- reputação complexa sem dados suficientes.
-
----
-
-# 6. Próxima decisão do projeto
-
-> **Registro histórico datado de 06/09/2026; não executar como instrução vigente.**
-
-O teste humano do feed **Seguindo** foi aprovado em 06 de setembro de 2026.
-
-A próxima recomendação é iniciar **curtidas e comentários reais**, pois essa entrega transforma o feed existente em um espaço de interação social sem antecipar a complexidade de chat, ranking ou motor avançado de condições. O controle temporal da audiência de seguidores permanece planejado para uma fase futura.
+Não implementar sem decisão específica: microserviços, Kubernetes, blockchain, ZK-Proofs, pagamentos integrados, voz/vídeo, transmissão ao vivo, IA generativa no aplicativo, API pública, webhooks ativos, aplicativo nativo e reputação complexa sem dados suficientes. Essa exclusão é uma decisão de escopo, não uma afirmação de impossibilidade técnica.
 
 ---
 
