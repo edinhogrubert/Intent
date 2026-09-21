@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, Calendar, Check, CheckCircle2, Clock3, Globe, Heart, Info, LoaderCircle, Lock, MessageCircle, Share2, Sparkles, ThumbsUp, Users, Vote } from 'lucide-react';
 import { copyToClipboard, getIntentShareUrl } from '../utils/shareLink';
 import type { UserAccount } from '../types';
@@ -132,6 +132,8 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const intentRequestRef = useRef(0);
+  const historyRequestRef = useRef(0);
 
   async function handleCopyIntentLink() {
     const ok = await copyToClipboard(getIntentShareUrl(intentId));
@@ -148,14 +150,17 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
   }, [copySuccess]);
 
   async function load() {
+    const requestId = ++intentRequestRef.current;
+    const requestedIntentId = intentId;
     setLoading(true);
     setError('');
     try {
-      setIntent(await getIntent(intentId));
+      const nextIntent = await getIntent(requestedIntentId);
+      if (requestId === intentRequestRef.current && requestedIntentId === intentId) setIntent(nextIntent);
     } catch (caught) {
-      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar esta Intent.');
+      if (requestId === intentRequestRef.current && requestedIntentId === intentId) setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar esta Intent.');
     } finally {
-      setLoading(false);
+      if (requestId === intentRequestRef.current && requestedIntentId === intentId) setLoading(false);
     }
   }
 
@@ -172,32 +177,53 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     }
   }
 
+  async function refreshAfterMutation() {
+    const requestId = ++intentRequestRef.current;
+    const requestedIntentId = intentId;
+    try {
+      const nextIntent = await getIntent(requestedIntentId);
+      if (requestId === intentRequestRef.current && requestedIntentId === intentId) setIntent(nextIntent);
+      return true;
+    } catch {
+      if (requestId === intentRequestRef.current && requestedIntentId === intentId) setError('A ação foi registrada, mas a atualização da Intent está pendente. Tente recarregar.');
+      return false;
+    }
+  }
+
   async function loadHistory() {
+    const requestId = ++historyRequestRef.current;
+    const requestedIntentId = intentId;
     setHistoryLoading(true);
     setHistoryError('');
     try {
-      const page = await listIntentHistory(intentId);
-      setHistory(page.items);
-      setHistoryCursor(page.nextCursor);
+      const page = await listIntentHistory(requestedIntentId);
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) {
+        setHistory(page.items);
+        setHistoryCursor(page.nextCursor);
+      }
     } catch (caught) {
-      setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar a história desta Intent.');
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar a história desta Intent.');
     } finally {
-      setHistoryLoading(false);
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) setHistoryLoading(false);
     }
   }
 
   async function loadMoreHistory() {
     if (!historyCursor || historyLoadingMore) return;
+    const requestedIntentId = intentId;
+    const requestId = historyRequestRef.current;
     setHistoryLoadingMore(true);
     setHistoryError('');
     try {
-      const page = await listIntentHistory(intentId, historyCursor);
-      setHistory((current) => [...current, ...page.items]);
-      setHistoryCursor(page.nextCursor);
+      const page = await listIntentHistory(requestedIntentId, historyCursor);
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) {
+        setHistory((current) => [...current, ...page.items]);
+        setHistoryCursor(page.nextCursor);
+      }
     } catch (caught) {
-      setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar mais acontecimentos.');
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) setHistoryError(caught instanceof IntentApiError ? caught.message : 'Não foi possível carregar mais acontecimentos.');
     } finally {
-      setHistoryLoadingMore(false);
+      if (requestId === historyRequestRef.current && requestedIntentId === intentId) setHistoryLoadingMore(false);
     }
   }
 
@@ -233,8 +259,10 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
       const result = intent?.viewerHasSupported
         ? await removeIntentSupport(intentId)
         : await supportIntent(intentId);
-      setNotice(result.realizedNow ? 'Você realizou esta Intent!' : result.supported ? 'Seu apoio foi registrado.' : 'Seu apoio foi retirado.');
-      setIntent(await getIntent(intentId));
+      setNotice(result.realizedNow ? 'A realização foi registrada. Atualizando a Intent...' : result.supported ? 'Seu apoio foi registrado.' : 'Seu apoio foi retirado.');
+      setIntent((current) => current && current.id === intentId ? { ...current, supportCount: result.supportCount, supportGoal: result.supportGoal, viewerHasSupported: result.supported } : current);
+      await refreshAfterMutation();
+      await loadHistory();
     } catch (caught) {
       setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar o apoio.');
     } finally {
@@ -248,8 +276,10 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     setNotice('');
     try {
       const result = await approveGuardianIntent(intentId);
-      setNotice(result.realizedNow ? 'Sua aprovação realizou esta Intent!' : 'Sua aprovação foi registrada.');
-      setIntent(await getIntent(intentId));
+      setNotice(result.realizedNow ? 'A realização foi registrada. Atualizando a Intent...' : 'Sua aprovação foi registrada.');
+      setIntent((current) => current && current.id === intentId ? { ...current, guardianApprovalCount: result.approvals, viewerHasApprovedAsGuardian: true } : current);
+      await refreshAfterMutation();
+      await loadHistory();
     } catch (caught) {
       setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível registrar a aprovação.');
     } finally {

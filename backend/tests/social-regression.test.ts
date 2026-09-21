@@ -90,6 +90,13 @@ describe('criação e acesso às Intents', () => {
     expect(db.follow.findUnique).toHaveBeenCalledWith({ where: { followerId_followingId: { followerId: viewerId, followingId: creatorId } }, select: { id: true } });
   });
 
+  it('retorna viewerWatching também para uma Intent publicada', async () => {
+    db.intentWatch.findUnique.mockResolvedValue({ id: 'watch-link' });
+    await expect(getIntent(intentId, viewerId)).resolves.toMatchObject({ viewerWatching: true });
+    db.intentWatch.findUnique.mockResolvedValue(null);
+    await expect(getIntent(intentId, viewerId)).resolves.toMatchObject({ viewerWatching: false });
+  });
+
   it.each([undefined, viewerId])('bloqueia visitante sem vínculo (%s) na Intent exclusiva', async (viewer) => {
     db.intent.findUnique.mockResolvedValue({ ...intent, visibility: 'FOLLOWERS' });
     await expect(getIntent(intentId, viewer)).rejects.toMatchObject({ statusCode: 403, code: 'INTENT_FORBIDDEN' });
