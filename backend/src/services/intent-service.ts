@@ -178,8 +178,8 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
         where: { id: { in: guardianIds }, status: 'ACTIVE' },
         select: { id: true },
       });
-      if (activeGuardians.length !== guardianIds.length || guardianIds.includes(creatorId)) {
-        throw new AppError(400, 'INVALID_GUARDIANS', 'Todos os guardiões precisam ser pessoas ativas e diferentes do criador.');
+      if (activeGuardians.length !== guardianIds.length) {
+        throw new AppError(400, 'INVALID_GUARDIANS', 'Todos os guardiões precisam ser usuários ativos.');
       }
     }
     const intent = await transaction.intent.create({
@@ -418,6 +418,8 @@ export async function getIntent(intentId: string, viewerId?: string) {
   intent = await assertIntentViewAccess(intent, viewerId, prisma);
 
   const viewerIsGuardian = Boolean(viewerId && asStringArray(intent.guardianIds).includes(viewerId));
+  const guardianApprovalCount = asStringArray(intent!.guardianApprovals)
+    .filter((id) => asStringArray(intent!.guardianIds).includes(id)).length;
 
   const viewerSupport = viewerId
     ? await prisma.support.findUnique({
@@ -487,6 +489,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
       ...publicIntent,
       guardianIds: publicGuardianIds(intent, viewerId),
       guardianApprovals: publicGuardianApprovals(intent, viewerId),
+      guardianApprovalCount,
       viewerIsGuardian,
       viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
       revealContent: null,
@@ -515,6 +518,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
     ...realizedPublicIntent,
     guardianIds: publicGuardianIds(intent, viewerId),
     guardianApprovals: publicGuardianApprovals(intent, viewerId),
+    guardianApprovalCount,
     viewerIsGuardian,
     viewerHasApprovedAsGuardian: Boolean(viewerId && asStringArray(intent.guardianApprovals).includes(viewerId)),
     revealContent,
@@ -710,13 +714,15 @@ export async function approveGuardianIntent(intentId: string, guardianId: string
           },
         },
       });
-      await createNotification(transaction, {
-        userId: intent.creatorId,
-        actorId: guardianId,
-        type: 'GUARDIAN_APPROVAL_RECEIVED',
-        intentId,
-        deduplicationKey: `guardian-approval:${intentId}:${guardianId}`,
-      });
+      if (guardianId !== intent.creatorId) {
+        await createNotification(transaction, {
+          userId: intent.creatorId,
+          actorId: guardianId,
+          type: 'GUARDIAN_APPROVAL_RECEIVED',
+          intentId,
+          deduplicationKey: `guardian-approval:${intentId}:${guardianId}`,
+        });
+      }
     }
 
     let realizedNow = false;
