@@ -7,7 +7,7 @@ const { db, key } = vi.hoisted(() => ({
   key: Buffer.alloc(32, 7), // Synthetic test key, never a production credential.
   db: {
     $transaction: vi.fn(),
-    user: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
     intent: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn() },
     follow: { findUnique: vi.fn(), createManyAndReturn: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     support: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
@@ -40,6 +40,7 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (operation: (transaction: typeof db) => Promise<unknown>) => operation(db));
   db.intent.findUnique.mockResolvedValue({ ...intent });
   db.user.findUnique.mockResolvedValue(creator);
+  db.user.findMany.mockResolvedValue([]);
   db.follow.findUnique.mockResolvedValue(null);
   db.support.findMany.mockResolvedValue([]);
   db.intentReaction.findMany.mockResolvedValue([]);
@@ -329,6 +330,25 @@ describe('apoio alternável', () => {
 });
 
 describe('aprovação por guardião', () => {
+  it('permite o criador se incluir como guardião, sem aprovação automática ou auto-notificação', async () => {
+    db.user.findMany.mockResolvedValue([{ id: creatorId }]);
+    db.intent.create.mockResolvedValue({ id: intentId, creatorId, guardianIds: [creatorId] });
+    await createIntent(creatorId, {
+      title: 'Intent do criador', story: 'O criador participa', visibility: 'PRIVATE',
+      conditionType: 'GUARDIANS', guardianIds: [creatorId], guardianApprovalGoal: 1, revealContent: 'Protegido',
+    });
+    expect(db.intent.create.mock.calls[0]![0].data.guardianIds).toEqual([creatorId]);
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+
+    db.intent.findUnique.mockResolvedValue({ ...intent, conditionType: 'GUARDIANS', guardianIds: [creatorId], guardianApprovals: [], guardianApprovalGoal: 1 });
+    db.intent.update.mockResolvedValue({ ...intent, conditionType: 'GUARDIANS', guardianIds: [creatorId], guardianApprovals: [creatorId], guardianApprovalGoal: 1 });
+    db.intent.updateMany.mockResolvedValue({ count: 1 });
+    const result = await approveGuardianIntent(intentId, creatorId);
+    expect(result).toMatchObject({ approved: true, approvals: 1, realizedNow: true });
+    expect(db.domainEvent.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'GUARDIAN_APPROVED', actorId: creatorId }) }));
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
   it('cria uma notificação para o criador e não duplica no retry lógico', async () => {
     db.intent.findUnique
       .mockResolvedValueOnce({ ...intent, conditionType: 'GUARDIANS', guardianIds: [viewerId] })

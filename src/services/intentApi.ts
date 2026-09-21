@@ -60,6 +60,7 @@ export interface ApiIntent {
   guardianIds?: string[];
   guardianApprovals?: string[];
   guardianApprovalGoal: number | null;
+  guardianApprovalCount?: number;
   publishedAt: string;
   realizedAt: string | null;
   createdAt: string;

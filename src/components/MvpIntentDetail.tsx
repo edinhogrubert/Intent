@@ -75,7 +75,7 @@ function ConditionStatus({ intent }: { intent: ApiIntent }) {
     );
   }
   if (intent.conditionType === 'GUARDIANS') {
-    const approvals = intent.guardianApprovals?.length ?? 0;
+    const approvals = intent.guardianApprovalCount ?? intent.guardianApprovals?.length ?? 0;
     const goal = intent.guardianApprovalGoal ?? 1;
     return (
       <div className="mt-6 bg-[#f5f3ef] rounded-2xl p-5 flex gap-3">
@@ -83,7 +83,7 @@ function ConditionStatus({ intent }: { intent: ApiIntent }) {
         <div>
           <p className="font-bold text-sm">Aguardando guardiões</p>
           <p className="text-xs text-[#666] mt-1">
-            {approvals} de {goal} aprovação(ões). A revelação abre quando atingir o quórum.
+            {intent.status === 'REALIZED' ? 'Intent realizada.' : `${approvals} de ${goal} aprovação(ões). A Intent será realizada quando atingir o quórum.`}
           </p>
         </div>
       </div>
@@ -447,14 +447,14 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
                   {supporting ? 'Atualizando...' : intent.viewerHasSupported ? 'Apoiado — clicar para retirar' : 'Apoiar esta Intent'}
                 </button>
               )}
-              {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'GUARDIANS' && intent.viewerIsGuardian && (
+              {intent.status === 'PUBLISHED' && intent.conditionType === 'GUARDIANS' && intent.viewerIsGuardian && (
                 <button
                   onClick={() => void handleGuardianApproval()}
                   disabled={supporting || intent.viewerHasApprovedAsGuardian}
                   className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 bg-[#000666] text-white hover:bg-[#000444]"
                 >
                   {supporting ? <LoaderCircle className="w-4 h-4 animate-spin"/> : <Vote className="w-4 h-4"/>}
-                  {intent.viewerHasApprovedAsGuardian ? 'Aprovação registrada' : supporting ? 'Aprovando...' : 'Aprovar revelação'}
+                  {intent.viewerHasApprovedAsGuardian ? 'Aprovação registrada' : supporting ? 'Aprovando...' : 'Aprovar Intent'}
                 </button>
               )}
               {!isMine && intent.status === 'PUBLISHED' && intent.conditionType === 'DATE' && (
