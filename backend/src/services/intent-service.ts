@@ -496,6 +496,7 @@ export async function getIntent(intentId: string, viewerId?: string) {
       viewerHasSupported: Boolean(viewerSupport),
       reactionCounts,
       viewerReaction,
+      viewerWatching: Boolean(viewerWatch),
     };
   }
 
