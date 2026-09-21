@@ -259,8 +259,8 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
       const result = intent?.viewerHasSupported
         ? await removeIntentSupport(intentId)
         : await supportIntent(intentId);
-      setNotice(result.realizedNow ? 'Você realizou esta Intent!' : result.supported ? 'Seu apoio foi registrado.' : 'Seu apoio foi retirado.');
-      setIntent((current) => current && current.id === intentId ? { ...current, supportCount: result.supportCount, supportGoal: result.supportGoal, viewerHasSupported: result.supported, ...(result.realized ? { status: 'REALIZED' as const, realizedAt: result.realizedNow ? new Date().toISOString() : current.realizedAt } : {}) } : current);
+      setNotice(result.realizedNow ? 'A realização foi registrada. Atualizando a Intent...' : result.supported ? 'Seu apoio foi registrado.' : 'Seu apoio foi retirado.');
+      setIntent((current) => current && current.id === intentId ? { ...current, supportCount: result.supportCount, supportGoal: result.supportGoal, viewerHasSupported: result.supported } : current);
       await refreshAfterMutation();
       await loadHistory();
     } catch (caught) {
@@ -276,8 +276,8 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
     setNotice('');
     try {
       const result = await approveGuardianIntent(intentId);
-      setNotice(result.realizedNow ? 'Sua aprovação realizou esta Intent!' : 'Sua aprovação foi registrada.');
-      setIntent((current) => current && current.id === intentId ? { ...current, guardianApprovalCount: result.approvals, viewerHasApprovedAsGuardian: true, ...(result.realized ? { status: 'REALIZED' as const, realizedAt: result.realizedNow ? new Date().toISOString() : current.realizedAt } : {}) } : current);
+      setNotice(result.realizedNow ? 'A realização foi registrada. Atualizando a Intent...' : 'Sua aprovação foi registrada.');
+      setIntent((current) => current && current.id === intentId ? { ...current, guardianApprovalCount: result.approvals, viewerHasApprovedAsGuardian: true } : current);
       await refreshAfterMutation();
       await loadHistory();
     } catch (caught) {
