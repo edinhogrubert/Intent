@@ -755,7 +755,7 @@ function PublicUserProfileContent({ userId, onBack, onSelectIntent }: PublicUser
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>
                       {Math.round(
-                        (profile.stats.intentsRealized / profile.stats.publicIntentsCount) * 100,
+                        (profile.stats.realizationRate ?? 0) * 100,
                       )}
                       % de realizações como criador
                     </span>
@@ -774,6 +774,26 @@ function PublicUserProfileContent({ userId, onBack, onSelectIntent }: PublicUser
               <span className="text-xs text-[#666]">As métricas de participação consideram apenas acontecimentos públicos.</span>
             </div>
           </section>
+
+          {profile.achievements.length > 0 && (
+            <section className="rounded-2xl border border-[#e4e2de] bg-white p-5 sm:p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-5 h-5 text-[#000666]" />
+                <div>
+                  <h2 className="font-extrabold text-base text-[#1b1c1a]">Conquistas</h2>
+                  <p className="text-xs text-[#666]">Marcos objetivos derivados das Intents públicas.</p>
+                </div>
+              </div>
+              <ul className="grid gap-3 sm:grid-cols-2" aria-label="Conquistas do perfil">
+                {profile.achievements.map((achievement) => (
+                  <li key={achievement.id} className="rounded-xl border border-[#e4e2de] bg-[#fbf9f5] p-3">
+                    <p className="font-bold text-sm text-[#000666]">{achievement.name}</p>
+                    <p className="text-xs text-[#444] mt-1">{achievement.description}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Parte 4 — Navegação de Abas: Atividade Pública vs Histórico de Intents */}
           <div className="space-y-6 pt-2">

@@ -2,6 +2,62 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../errors.js';
 import { publicUserSelect, toPublicUser } from '../domain/public-user.js';
 
+export interface PublicProfileAchievement {
+  id: string;
+  name: string;
+  description: string;
+  criterion: string;
+}
+
+export function deriveAchievements(stats: {
+  intentsCreated: number;
+  intentsRealized: number;
+  realizedParticipationsCount: number;
+}): PublicProfileAchievement[] {
+  const achievements: PublicProfileAchievement[] = [];
+  if (stats.intentsCreated >= 1) {
+    achievements.push({
+      id: 'first-intent-created',
+      name: 'Primeira Intent',
+      description: 'Criou sua primeira Intent pública.',
+      criterion: 'Ao criar pelo menos uma Intent pública.',
+    });
+  }
+  if (stats.intentsRealized >= 1) {
+    achievements.push({
+      id: 'first-intent-realized',
+      name: 'Primeira Intent realizada',
+      description: 'Teve sua primeira Intent pública realizada.',
+      criterion: 'Ao realizar pelo menos uma Intent pública.',
+    });
+  }
+  if (stats.intentsRealized >= 5) {
+    achievements.push({
+      id: 'five-intents-realized',
+      name: 'Cinco Intents realizadas',
+      description: 'Teve cinco Intents públicas realizadas.',
+      criterion: 'Ao realizar pelo menos cinco Intents públicas.',
+    });
+  }
+  if (stats.intentsRealized >= 10) {
+    achievements.push({
+      id: 'ten-intents-realized',
+      name: 'Dez Intents realizadas',
+      description: 'Teve dez Intents públicas realizadas.',
+      criterion: 'Ao realizar pelo menos dez Intents públicas.',
+    });
+  }
+  if (stats.realizedParticipationsCount >= 1) {
+    achievements.push({
+      id: 'first-realized-participation',
+      name: 'Primeira participação realizada',
+      description: 'Participou de uma Intent pública realizada.',
+      criterion: 'Ao participar de pelo menos uma Intent pública realizada.',
+    });
+  }
+  return achievements;
+}
+
 export async function getPublicUserProfile(userId: string, viewerId?: string) {
   const user = await prisma.user.findFirst({
     where: { id: userId, status: 'ACTIVE' },
@@ -82,24 +138,29 @@ export async function getPublicUserProfile(userId: string, viewerId?: string) {
     }),
   ]);
 
+  const stats = {
+    publicIntentsCount: intentsCreated,
+    intentsCreated,
+    intentsRealized,
+    realizationEligibleCount: intentsCreated,
+    realizationRate: intentsCreated > 0 ? intentsRealized / intentsCreated : null,
+    totalSupportReceived,
+    totalReactionsReceived,
+    totalCommentsReceived,
+    followersCount,
+    followingCount,
+    supportedIntentsCount,
+    reactionsGivenCount,
+    commentsGivenCount,
+    realizedParticipationsCount,
+  };
+
   return {
     ...toPublicUser(user),
     isMe,
     viewerIsFollowing: Boolean(followRelation),
-    stats: {
-      publicIntentsCount: intentsCreated,
-      intentsCreated,
-      intentsRealized,
-      totalSupportReceived,
-      totalReactionsReceived,
-      totalCommentsReceived,
-      followersCount,
-      followingCount,
-      supportedIntentsCount,
-      reactionsGivenCount,
-      commentsGivenCount,
-      realizedParticipationsCount,
-    },
+    stats,
+    achievements: deriveAchievements(stats),
     intents,
   };
 }
