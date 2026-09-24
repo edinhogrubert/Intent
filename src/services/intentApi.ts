@@ -586,6 +586,8 @@ export interface ApiPublicUserProfile {
   stats: {
     intentsCreated: number;
     intentsRealized: number;
+    realizationEligibleCount: number;
+    realizationRate: number | null;
     totalSupportReceived: number;
     totalReactionsReceived: number;
     totalCommentsReceived: number;
@@ -597,6 +599,12 @@ export interface ApiPublicUserProfile {
     commentsGivenCount: number;
     realizedParticipationsCount: number;
   };
+  achievements: Array<{
+    id: string;
+    name: string;
+    description: string;
+    criterion: string;
+  }>;
   intents: Array<{ id: string; title: string; story: string; status: string;
     createdAt: string; supportCount: number }>;
 }

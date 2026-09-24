@@ -120,12 +120,14 @@ describe('perfil público HTTP', () => {
     const response = await get(path, 'Bearer synthetic-test-token');
     expect(response.status).toBe(200);
     const { data } = await response.json();
-    expect(Object.keys(data).sort()).toEqual(['id', 'username', 'displayName', 'bio', 'avatarUrl', 'createdAt', 'updatedAt', 'isMe', 'viewerIsFollowing', 'stats', 'intents'].sort());
+    expect(Object.keys(data).sort()).toEqual(['id', 'username', 'displayName', 'bio', 'avatarUrl', 'createdAt', 'updatedAt', 'isMe', 'viewerIsFollowing', 'stats', 'achievements', 'intents'].sort());
     expect(data.stats).toEqual({ intentsCreated: 3, intentsRealized: 1,
+      realizationEligibleCount: 3, realizationRate: 1 / 3,
       totalSupportReceived: 7, totalReactionsReceived: 4,
       totalCommentsReceived: 2, publicIntentsCount: 3,
       followersCount: 0, followingCount: 0, supportedIntentsCount: 7,
       reactionsGivenCount: 4, commentsGivenCount: 2, realizedParticipationsCount: 0 });
+    expect(data.achievements).toHaveLength(2);
     expect(data.intents).toEqual([]);
     expect(db.user.findFirst.mock.calls[0]![0].select).toEqual({
       id: true, username: true, displayName: true, bio: true,
@@ -1149,6 +1151,9 @@ describe('Bloco 22 — identidade social pública', () => {
     expect(response.status).toBe(200);
     const { data } = await response.json();
     for (const field of fields) expect(data.stats[field]).toBe(0);
+    expect(data.stats.realizationEligibleCount).toBe(0);
+    expect(data.stats.realizationRate).toBeNull();
+    expect(data.achievements).toEqual([]);
     expect(data).toMatchObject({ viewerIsFollowing: false, stats: { followersCount: 0, followingCount: 0 }, intents: [] });
     for (const key of ['email', 'firebaseUid', 'passwordHash', 'tokens']) expect(data).not.toHaveProperty(key);
   });
@@ -1166,9 +1171,15 @@ describe('Bloco 22 — identidade social pública', () => {
     const { data } = await response.json();
     expect(data.viewerIsFollowing).toBe(true);
     expect(data.stats).toEqual({ publicIntentsCount: 3, intentsCreated: 3, intentsRealized: 1,
+      realizationEligibleCount: 3, realizationRate: 1 / 3,
       totalSupportReceived: 7, totalReactionsReceived: 8, totalCommentsReceived: 9,
       followersCount: 10, followingCount: 11, supportedIntentsCount: 4,
       reactionsGivenCount: 5, commentsGivenCount: 6, realizedParticipationsCount: 2 });
+    expect(data.achievements).toEqual([
+      expect.objectContaining({ id: 'first-intent-created' }),
+      expect.objectContaining({ id: 'first-intent-realized' }),
+      expect.objectContaining({ id: 'first-realized-participation' }),
+    ]);
     for (const key of ['email', 'firebaseUid', 'passwordHash', 'tokens']) expect(data).not.toHaveProperty(key);
   });
 
