@@ -1,0 +1,1206 @@
+diff --git a/backend/prisma/migrations/20260924000100_allow_draft_intents/migration.sql b/backend/prisma/migrations/20260924000100_allow_draft_intents/migration.sql
+new file mode 100644
+index 0000000..c54fd73
+--- /dev/null
++++ b/backend/prisma/migrations/20260924000100_allow_draft_intents/migration.sql
+@@ -0,0 +1,3 @@
++-- AlterTable
++ALTER TABLE "intents" ALTER COLUMN "published_at" DROP NOT NULL,
++ALTER COLUMN "published_at" DROP DEFAULT;
+diff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma
+index ee047d2..ff468a7 100644
+--- a/backend/prisma/schema.prisma
++++ b/backend/prisma/schema.prisma
+@@ -69,7 +69,7 @@ model Intent {
+   revealIv           String        @map("reveal_iv") @db.VarChar(64)
+   revealAuthTag      String        @map("reveal_auth_tag") @db.VarChar(64)
+   revealVersion      Int           @default(1) @map("reveal_version")
+-  publishedAt        DateTime      @default(now()) @map("published_at") @db.Timestamptz(3)
++  publishedAt        DateTime?     @map("published_at") @db.Timestamptz(3)
+   realizedAt         DateTime?     @map("realized_at") @db.Timestamptz(3)
+   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+diff --git a/backend/src/domain/intent-schemas.ts b/backend/src/domain/intent-schemas.ts
+index 6eafb54..8488a37 100644
+--- a/backend/src/domain/intent-schemas.ts
++++ b/backend/src/domain/intent-schemas.ts
+@@ -25,6 +25,7 @@ export const createIntentSchema = z.object({
+   guardianApprovalGoal: z.number().int().min(1).max(20).optional(),
+   revealContent: z.string().min(1).max(10_000),
+   visibility: z.enum(['PUBLIC', 'FOLLOWERS', 'PRIVATE']).default('PUBLIC'),
++  status: z.enum(['DRAFT', 'PUBLISHED']).default('PUBLISHED'),
+ }).strict().superRefine((value, ctx) => {
+   if (value.visibility === 'PRIVATE' && value.conditionType === 'SUPPORT') {
+     ctx.addIssue({
+diff --git a/backend/src/routes/intents.ts b/backend/src/routes/intents.ts
+index 9203100..bfb5b0d 100644
+--- a/backend/src/routes/intents.ts
++++ b/backend/src/routes/intents.ts
+@@ -14,6 +14,7 @@ import {
+   listFollowingFeed,
+   listPublicFeed,
+   listSocialFeed,
++  publishIntent,
+   removeSupport,
+   supportIntent,
+ } from '../services/intent-service.js';
+@@ -141,6 +142,15 @@ intentsRouter.post('/', requireAuthenticatedUser, async (request, response, next
+   }
+ });
+ 
++intentsRouter.post('/:id/publish', requireAuthenticatedUser, async (request, response, next) => {
++  try {
++    const intentId = identifierSchema.parse(request.params.id);
++    const intent = await publishIntent(intentId, request.appUser!.id, request.get('Idempotency-Key'));
++    response.json({ data: intent });
++  } catch (error) {
++    next(error);
++  }
++});
+ intentsRouter.post('/:id/supports', requireAuthenticatedUser, async (request, response, next) => {
+   try {
+     const intentId = identifierSchema.parse(request.params.id);
+diff --git a/backend/src/services/comment-service.ts b/backend/src/services/comment-service.ts
+index 728e331..c35344e 100644
+--- a/backend/src/services/comment-service.ts
++++ b/backend/src/services/comment-service.ts
+@@ -1,4 +1,5 @@
+ import { Prisma } from '@prisma/client';
++import { AppError } from '../errors.js';
+ import { createCommentSchema } from '../domain/comment-schemas.js';
+ import { prisma } from '../lib/prisma.js';
+ import { requireIntentViewAccess } from './intent-service.js';
+@@ -51,14 +52,17 @@ export async function createIntentComment(intentId: string, authorId: string, in
+   const command = createCommentSchema.parse(input);
+   return prisma.$transaction(async (transaction) => {
+     await requireIntentViewAccess(intentId, authorId, transaction);
++    const intent = await transaction.intent.findUnique({
++      where: { id: intentId },
++      select: { creatorId: true, status: true },
++    });
++    if (intent?.status === 'DRAFT') {
++      throw new AppError(400, 'INTENT_NOT_PUBLISHED', 'Não é possível comentar em uma Intent em rascunho.');
++    }
+     const comment = await transaction.intentComment.create({
+       data: { intentId, authorId, body: command.body },
+       select: commentSelect,
+     });
+-    const intent = await transaction.intent.findUnique({
+-      where: { id: intentId },
+-      select: { creatorId: true },
+-    });
+     if (intent && intent.creatorId !== authorId) {
+       await createNotification(transaction, {
+         userId: intent.creatorId,
+diff --git a/backend/src/services/intent-history-service.ts b/backend/src/services/intent-history-service.ts
+index 998a973..4cccb3e 100644
+--- a/backend/src/services/intent-history-service.ts
++++ b/backend/src/services/intent-history-service.ts
+@@ -4,6 +4,7 @@ import { requireIntentViewAccess } from './intent-service.js';
+ 
+ export const intentHistoryEventTypes = [
+   'INTENT_CREATED',
++  'INTENT_PUBLISHED',
+   'SUPPORT_RECEIVED',
+   'SUPPORT_REMOVED',
+   'GUARDIAN_APPROVED',
+diff --git a/backend/src/services/intent-service.ts b/backend/src/services/intent-service.ts
+index b48e15e..85391db 100644
+--- a/backend/src/services/intent-service.ts
++++ b/backend/src/services/intent-service.ts
+@@ -85,6 +85,13 @@ async function assertIntentViewAccess<T extends IntentViewAccessRecord>(
+     throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
+   }
+ 
++  if (intent.status === 'DRAFT') {
++    if (!viewerId || intent.creatorId !== viewerId) {
++      throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
++    }
++    return intent;
++  }
++
+   if (!['PUBLIC', 'FOLLOWERS', 'PRIVATE'].includes(intent.visibility)
+     || !['PUBLISHED', 'REALIZED', 'CANCELLED'].includes(intent.status)) {
+     throw new AppError(403, 'INTENT_FORBIDDEN', 'Esta Intent não está disponível.');
+@@ -182,13 +189,17 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
+         throw new AppError(400, 'INVALID_GUARDIANS', 'Todos os guardiões precisam ser usuários ativos.');
+       }
+     }
++    const status = (command as { status?: 'DRAFT' | 'PUBLISHED' }).status ?? 'PUBLISHED';
++    const now = new Date();
++    const publishedAt = status === 'DRAFT' ? null : now;
++
+     const intent = await transaction.intent.create({
+       data: {
+         id: intentId,
+         creatorId,
+         type: 'SUPPORT_REVEAL',
+         conditionType: command.conditionType,
+-        status: 'PUBLISHED',
++        status,
+         supportCount: 0,
+         realizedAt: null,
+         title: command.title,
+@@ -204,6 +215,7 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
+         revealIv: sealed.iv,
+         revealAuthTag: sealed.authTag,
+         revealVersion,
++        publishedAt,
+       } as Prisma.IntentUncheckedCreateInput,
+       select: publicIntentSelection,
+     });
+@@ -217,6 +229,8 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
+         payload: {
+           type: 'SUPPORT_REVEAL',
+           conditionType: command.conditionType,
++          status,
++          publishedAt: publishedAt?.toISOString() ?? null,
+           supportGoal: command.supportGoal ?? null,
+           revealAt: command.revealAt?.toISOString() ?? null,
+           guardianCount: command.guardianIds?.length ?? 0,
+@@ -232,6 +246,71 @@ export async function createIntent(creatorId: string, input: unknown, idempotenc
+   });
+ }
+ 
++export async function publishIntent(
++  intentId: string,
++  actorId: string,
++  idempotencyKey?: string,
++) {
++  intentId = intentId.toLowerCase();
++  return runIntentMutation(actorId, `PUBLISH_INTENT:${intentId}`, idempotencyKey, { intentId }, async (transaction) => {
++    const existing = await transaction.intent.findUnique({
++      where: { id: intentId },
++      include: { creator: { select: { status: true } } },
++    });
++
++    if (!existing || existing.creator.status !== 'ACTIVE') {
++      throw new AppError(404, 'INTENT_NOT_FOUND', 'Intent não encontrada.');
++    }
++
++    if (existing.creatorId !== actorId) {
++      throw new AppError(403, 'INTENT_FORBIDDEN', 'Apenas o criador pode publicar esta Intent.');
++    }
++
++    if (existing.status === 'PUBLISHED' || existing.status === 'REALIZED') {
++      return (await transaction.intent.findUnique({
++        where: { id: intentId },
++        select: publicIntentSelection,
++      }))!;
++    }
++
++    if (existing.status === 'CANCELLED') {
++      throw new AppError(409, 'CANNOT_PUBLISH_CANCELLED', 'Não é possível publicar uma Intent cancelada.');
++    }
++
++    if (existing.status !== 'DRAFT') {
++      throw new AppError(409, 'INVALID_INTENT_STATUS', `Status inválido para publicação: ${existing.status}`);
++    }
++
++    const now = new Date();
++
++    const updated = await transaction.intent.update({
++      where: { id: intentId },
++      data: {
++        status: 'PUBLISHED',
++        publishedAt: now,
++      },
++      select: publicIntentSelection,
++    });
++
++    await transaction.domainEvent.create({
++      data: {
++        intentId,
++        actorId,
++        type: 'INTENT_PUBLISHED',
++        idempotencyKey: `intent-published:${intentId}:v1`,
++        payload: {
++          previousStatus: 'DRAFT',
++          newStatus: 'PUBLISHED',
++          publishedAt: now.toISOString(),
++          visibility: existing.visibility,
++        },
++      },
++    });
++
++    return updated;
++  });
++}
++
+ export async function listUserIntents(creatorId: string, cursor?: string, limit = 20) {
+   const safeLimit = Math.min(Math.max(limit, 1), 50);
+   const items = await prisma.intent.findMany({
+@@ -321,12 +400,19 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
+ 
+   const ids = page.map((intent) => intent.id);
+   const [groups, viewerReactions, viewerSupports] = ids.length ? await Promise.all([
+-    prisma.intentReaction.groupBy({ by: ['intentId', 'type'],
+-      where: { intentId: { in: ids } }, _count: { _all: true } }),
+-    prisma.intentReaction.findMany({ where: { userId: viewerId, intentId: { in: ids } },
+-      select: { intentId: true, type: true } }),
+-    prisma.support.findMany({ where: { userId: viewerId, intentId: { in: ids } },
+-      select: { intentId: true } }),
++    prisma.intentReaction.groupBy({
++      by: ['intentId', 'type'],
++      where: { intentId: { in: ids } },
++      _count: { _all: true },
++    }),
++    prisma.intentReaction.findMany({
++      where: { userId: viewerId, intentId: { in: ids } },
++      select: { intentId: true, type: true },
++    }),
++    prisma.support.findMany({
++      where: { userId: viewerId, intentId: { in: ids } },
++      select: { intentId: true },
++    }),
+   ]) : [[], [], []];
+   const counts = new Map<string, { LIKE: number; LOVE: number; CELEBRATE: number; total: number }>();
+   for (const group of groups) {
+@@ -339,7 +425,8 @@ export async function listFollowingFeed(viewerId: string, cursor?: string, limit
+   const supported = new Set(viewerSupports.map((support) => support.intentId));
+ 
+   return {
+-    items: page.map((intent) => ({ ...intent,
++    items: page.map((intent) => ({
++      ...intent,
+       reactionCounts: counts.get(intent.id) ?? { LIKE: 0, LOVE: 0, CELEBRATE: 0, total: 0 },
+       viewerReaction: reactions.get(intent.id) ?? null,
+       viewerHasSupported: supported.has(intent.id),
+diff --git a/backend/src/services/intent-watch-service.ts b/backend/src/services/intent-watch-service.ts
+index dfacddf..7cfffa9 100644
+--- a/backend/src/services/intent-watch-service.ts
++++ b/backend/src/services/intent-watch-service.ts
+@@ -1,4 +1,5 @@
+ import { Prisma } from '@prisma/client';
++import { AppError } from '../errors.js';
+ import { prisma } from '../lib/prisma.js';
+ import { requireIntentViewAccess } from './intent-service.js';
+ 
+@@ -36,6 +37,13 @@ function visibleIntentWhere(viewerId: string): Prisma.IntentWhereInput {
+ 
+ export async function watchIntent(intentId: string, viewerId: string) {
+   await requireIntentViewAccess(intentId, viewerId);
++  const target = await prisma.intent.findUnique({
++    where: { id: intentId },
++    select: { status: true },
++  });
++  if (target?.status === 'DRAFT') {
++    throw new AppError(400, 'INTENT_NOT_PUBLISHED', 'Não é possível acompanhar uma Intent em rascunho.');
++  }
+   await prisma.intentWatch.upsert({
+     where: { intentId_userId: { intentId, userId: viewerId } },
+     create: { intentId, userId: viewerId },
+diff --git a/backend/src/services/reaction-service.ts b/backend/src/services/reaction-service.ts
+index 75d0fb4..5817a0e 100644
+--- a/backend/src/services/reaction-service.ts
++++ b/backend/src/services/reaction-service.ts
+@@ -1,4 +1,5 @@
+ import { Prisma } from '@prisma/client';
++import { AppError } from '../errors.js';
+ import { prisma } from '../lib/prisma.js';
+ import { requireIntentViewAccess } from './intent-service.js';
+ import { createNotification } from './notification-service.js';
+@@ -67,6 +68,14 @@ export async function setIntentReaction(
+ ): Promise<IntentReactionSummary> {
+   await requireIntentViewAccess(intentId, userId);
+ 
++  const target = await prisma.intent.findUnique({
++    where: { id: intentId },
++    select: { status: true },
++  });
++  if (target?.status === 'DRAFT') {
++    throw new AppError(400, 'INTENT_NOT_PUBLISHED', 'Não é possível reagir a uma Intent em rascunho.');
++  }
++
+   await prisma.intentReaction.upsert({
+     where: { intentId_userId: { intentId, userId } },
+     create: {
+diff --git a/backend/tests/draft-and-publish.test.ts b/backend/tests/draft-and-publish.test.ts
+new file mode 100644
+index 0000000..ba2ea7a
+--- /dev/null
++++ b/backend/tests/draft-and-publish.test.ts
+@@ -0,0 +1,457 @@
++import type { AddressInfo } from 'node:net';
++import type { Server } from 'node:http';
++import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
++
++const { db, verifyIdToken } = vi.hoisted(() => ({
++  db: {
++    user: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
++    intent: { findMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
++    domainEvent: { create: vi.fn() },
++    idempotencyRequest: { findUnique: vi.fn(), create: vi.fn() },
++    support: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
++    intentReaction: { groupBy: vi.fn(), findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
++    intentComment: { findMany: vi.fn(), create: vi.fn() },
++    intentWatch: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
++    notification: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
++    follow: { findUnique: vi.fn() },
++    $transaction: vi.fn(),
++  },
++  verifyIdToken: vi.fn(),
++}));
++
++vi.mock('../src/lib/prisma.js', () => ({ prisma: db, isTransientDbError: () => false }));
++vi.mock('../src/lib/firebase.js', () => ({ firebaseAuth: { verifyIdToken } }));
++vi.mock('../src/config.js', () => ({
++  config: {
++    corsOrigins: ['http://localhost:3000'],
++    logLevel: 'silent',
++    revealEncryptionKey: Buffer.alloc(32, 7),
++  },
++}));
++
++import { createApp } from '../src/app.js';
++
++const creator = {
++  id: '10000000-0000-4000-8000-000000000001',
++  firebaseUid: 'firebase-creator',
++  email: 'creator@example.com',
++  username: 'autor',
++  displayName: 'Autor da Intent',
++  status: 'ACTIVE',
++  createdAt: new Date('2026-01-01T00:00:00.000Z'),
++  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
++};
++
++const otherUser = {
++  id: '10000000-0000-4000-8000-000000000002',
++  firebaseUid: 'firebase-other',
++  email: 'other@example.com',
++  username: 'outro',
++  displayName: 'Outro Usuário',
++  status: 'ACTIVE',
++  createdAt: new Date('2026-01-01T00:00:00.000Z'),
++  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
++};
++
++const draftIntentId = '20000000-0000-4000-8000-000000000001';
++
++let server: Server;
++let baseUrl: string;
++
++beforeAll(async () => {
++  await new Promise<void>((resolve, reject) => {
++    server = createApp().listen(0, '127.0.0.1', () => resolve());
++    server.once('error', reject);
++  });
++  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
++});
++
++afterAll(async () => {
++  if (server) {
++    await new Promise<void>((resolve) => server.close(() => resolve()));
++  }
++});
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  verifyIdToken.mockImplementation(async (token: string) => {
++    if (token === 'token-creator') return { uid: creator.firebaseUid };
++    if (token === 'token-other') return { uid: otherUser.firebaseUid };
++    throw new Error('Token inválido');
++  });
++  db.user.findUnique.mockImplementation(async ({ where }: { where: { id?: string; firebaseUid?: string } }) => {
++    if (where.firebaseUid === creator.firebaseUid || where.id === creator.id) return creator;
++    if (where.firebaseUid === otherUser.firebaseUid || where.id === otherUser.id) return otherUser;
++    return null;
++  });
++  db.user.update.mockImplementation(async ({ where, data }: any) => {
++    if (where.id === creator.id) return { ...creator, ...data };
++    if (where.id === otherUser.id) return { ...otherUser, ...data };
++    return { ...creator, ...data };
++  });
++  db.$transaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(db));
++  db.intentReaction.groupBy.mockResolvedValue([]);
++  db.intentReaction.findUnique.mockResolvedValue(null);
++  db.intentWatch.findUnique.mockResolvedValue(null);
++  db.support.findUnique.mockResolvedValue(null);
++  db.idempotencyRequest.findUnique.mockResolvedValue(null);
++  db.idempotencyRequest.create.mockResolvedValue({ id: 'req-1' });
++});
++
++describe('Bloco 37C-1: DRAFT e Publicação Explícita de Intents', () => {
++  describe('Criação de Intent', () => {
++    it('cria Intent como PUBLISHED por padrão (fluxo direto de 1 clique)', async () => {
++      db.intent.create.mockImplementation(async ({ data }: any) => ({
++        id: data.id,
++        creatorId: data.creatorId,
++        type: data.type,
++        conditionType: data.conditionType,
++        status: data.status,
++        supportGoal: data.supportGoal,
++        supportCount: 0,
++        publishedAt: data.publishedAt,
++        realizedAt: null,
++        createdAt: new Date(),
++        title: data.title,
++        story: data.story,
++        category: data.category,
++        visibility: data.visibility,
++        creator: { id: creator.id, username: creator.username, displayName: creator.displayName, avatarUrl: null },
++      }));
++
++      const res = await fetch(`${baseUrl}/v1/intents`, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          Authorization: 'Bearer token-creator',
++        },
++        body: JSON.stringify({
++          title: 'Intent Direta',
++          story: 'História da Intent criada direto',
++          revealContent: 'Segredo Revelado',
++          conditionType: 'SUPPORT',
++          supportGoal: 10,
++        }),
++      });
++
++      expect(res.status).toBe(201);
++      const json = await res.json();
++      expect(json.data.status).toBe('PUBLISHED');
++      expect(json.data.publishedAt).toBeDefined();
++
++      // Verifica dados passados para o Prisma
++      const createCall = db.intent.create.mock.calls[0]![0];
++      expect(createCall.data.status).toBe('PUBLISHED');
++      expect(createCall.data.publishedAt).toBeInstanceOf(Date);
++
++      // Verifica evento de domínio INTENT_CREATED emitido com status PUBLISHED
++      const eventCall = db.domainEvent.create.mock.calls[0]![0];
++      expect(eventCall.data.type).toBe('INTENT_CREATED');
++      expect(eventCall.data.payload.status).toBe('PUBLISHED');
++      expect(eventCall.data.payload.publishedAt).toBeDefined();
++    });
++
++    it('cria Intent como DRAFT quando solicitado (Salvar como rascunho)', async () => {
++      db.intent.create.mockImplementation(async ({ data }: any) => ({
++        id: data.id,
++        creatorId: data.creatorId,
++        type: data.type,
++        conditionType: data.conditionType,
++        status: data.status,
++        supportGoal: data.supportGoal,
++        supportCount: 0,
++        publishedAt: data.publishedAt,
++        realizedAt: null,
++        createdAt: new Date(),
++        title: data.title,
++        story: data.story,
++        category: data.category,
++        visibility: data.visibility,
++        creator: { id: creator.id, username: creator.username, displayName: creator.displayName, avatarUrl: null },
++      }));
++
++      const res = await fetch(`${baseUrl}/v1/intents`, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          Authorization: 'Bearer token-creator',
++        },
++        body: JSON.stringify({
++          title: 'Intent Rascunho',
++          story: 'Preparando com calma antes de publicar',
++          revealContent: 'Segredo em rascunho',
++          conditionType: 'SUPPORT',
++          supportGoal: 50,
++          status: 'DRAFT',
++        }),
++      });
++
++      expect(res.status).toBe(201);
++      const json = await res.json();
++      expect(json.data.status).toBe('DRAFT');
++      expect(json.data.publishedAt).toBeNull();
++
++      // Verifica que no banco publishedAt foi null
++      const createCall = db.intent.create.mock.calls[0]![0];
++      expect(createCall.data.status).toBe('DRAFT');
++      expect(createCall.data.publishedAt).toBeNull();
++
++      // Verifica evento INTENT_CREATED gravando status DRAFT e publishedAt null
++      const eventCall = db.domainEvent.create.mock.calls[0]![0];
++      expect(eventCall.data.type).toBe('INTENT_CREATED');
++      expect(eventCall.data.payload.status).toBe('DRAFT');
++      expect(eventCall.data.payload.publishedAt).toBeNull();
++    });
++  });
++
++  describe('Isolamento e Invisibilidade de DRAFT', () => {
++    const mockDraftIntent = {
++      id: draftIntentId,
++      creatorId: creator.id,
++      type: 'SUPPORT_REVEAL',
++      conditionType: 'SUPPORT',
++      status: 'DRAFT',
++      visibility: 'PUBLIC',
++      category: 'OTHER',
++      title: 'Rascunho Secreto',
++      story: 'História em elaboração',
++      supportGoal: 10,
++      supportCount: 0,
++      publishedAt: null,
++      realizedAt: null,
++      createdAt: new Date(),
++      updatedAt: new Date(),
++      revealCiphertext: 'dummy',
++      revealIv: 'dummy',
++      revealAuthTag: 'dummy',
++      revealVersion: 1,
++      guardianIds: [],
++      guardianApprovals: [],
++      guardianApprovalGoal: null,
++      creator: { id: creator.id, username: 'autor', displayName: 'Autor', avatarUrl: null, status: 'ACTIVE' },
++    };
++
++    it('autor criador consegue visualizar seu próprio rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}`, {
++        headers: { Authorization: 'Bearer token-creator' },
++      });
++
++      expect(res.status).toBe(200);
++      const json = await res.json();
++      expect(json.data.id).toBe(draftIntentId);
++      expect(json.data.status).toBe('DRAFT');
++    });
++
++    it('outro usuário recebe 404 (ocultação total) ao tentar visualizar rascunho alheio', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}`, {
++        headers: { Authorization: 'Bearer token-other' },
++      });
++
++      expect(res.status).toBe(404);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_NOT_FOUND');
++    });
++
++    it('usuário anônimo recebe 404 ao tentar visualizar rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}`);
++      expect(res.status).toBe(404);
++    });
++
++    it('bloqueia comentários em Intent em rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/comments`, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          Authorization: 'Bearer token-creator',
++        },
++        body: JSON.stringify({ body: 'Tentativa de comentário em rascunho' }),
++      });
++
++      expect(res.status).toBe(400);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_NOT_PUBLISHED');
++      expect(db.intentComment.create).not.toHaveBeenCalled();
++    });
++
++    it('bloqueia reações em Intent em rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/reactions`, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          Authorization: 'Bearer token-creator',
++        },
++        body: JSON.stringify({ type: 'LIKE' }),
++      });
++
++      expect(res.status).toBe(400);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_NOT_PUBLISHED');
++      expect(db.intentReaction.upsert).not.toHaveBeenCalled();
++    });
++
++    it('bloqueia acompanhamento (watch) em Intent em rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/watch`, {
++        method: 'POST',
++        headers: {
++          Authorization: 'Bearer token-creator',
++        },
++      });
++
++      expect(res.status).toBe(400);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_NOT_PUBLISHED');
++      expect(db.intentWatch.upsert).not.toHaveBeenCalled();
++    });
++
++    it('bloqueia apoio a Intent em rascunho', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraftIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/supports`, {
++        method: 'POST',
++        headers: { Authorization: 'Bearer token-other' },
++      });
++
++      expect(res.status).toBe(409);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_NOT_OPEN');
++      expect(db.support.create).not.toHaveBeenCalled();
++    });
++  });
++
++  describe('Publicação Explícita (POST /v1/intents/:id/publish)', () => {
++    const mockDraft = {
++      id: draftIntentId,
++      creatorId: creator.id,
++      type: 'SUPPORT_REVEAL',
++      conditionType: 'SUPPORT',
++      status: 'DRAFT',
++      visibility: 'PUBLIC',
++      category: 'OTHER',
++      title: 'Meu Rascunho',
++      story: 'História pronta',
++      supportGoal: 10,
++      supportCount: 0,
++      publishedAt: null,
++      realizedAt: null,
++      createdAt: new Date('2026-03-01T10:00:00Z'),
++      updatedAt: new Date('2026-03-01T10:00:00Z'),
++      creator: { id: creator.id, status: 'ACTIVE' },
++    };
++
++    it('exige autenticação para publicar', async () => {
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/publish`, {
++        method: 'POST',
++      });
++      expect(res.status).toBe(401);
++    });
++
++    it('rejeita se o usuário não for o criador da Intent', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraft);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/publish`, {
++        method: 'POST',
++        headers: { Authorization: 'Bearer token-other' },
++      });
++
++      expect(res.status).toBe(403);
++      const json = await res.json();
++      expect(json.error.code).toBe('INTENT_FORBIDDEN');
++      expect(db.intent.update).not.toHaveBeenCalled();
++    });
++
++    it('publica o rascunho com sucesso, atribuindo publishedAt e emitindo INTENT_PUBLISHED', async () => {
++      db.intent.findUnique.mockResolvedValue(mockDraft);
++      const publishedDate = new Date();
++      db.intent.update.mockResolvedValue({
++        ...mockDraft,
++        status: 'PUBLISHED',
++        publishedAt: publishedDate,
++        creator: { id: creator.id, username: 'autor', displayName: 'Autor', avatarUrl: null },
++      });
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/publish`, {
++        method: 'POST',
++        headers: { Authorization: 'Bearer token-creator' },
++      });
++
++      expect(res.status).toBe(200);
++      const json = await res.json();
++      expect(json.data.status).toBe('PUBLISHED');
++      expect(json.data.publishedAt).toBeDefined();
++
++      // Verifica update no Prisma
++      expect(db.intent.update).toHaveBeenCalledWith(expect.objectContaining({
++        where: { id: draftIntentId },
++        data: expect.objectContaining({
++          status: 'PUBLISHED',
++          publishedAt: expect.any(Date),
++        }),
++      }));
++
++      // Verifica evento de domínio INTENT_PUBLISHED emitido
++      expect(db.domainEvent.create).toHaveBeenCalledWith(expect.objectContaining({
++        data: expect.objectContaining({
++          intentId: draftIntentId,
++          actorId: creator.id,
++          type: 'INTENT_PUBLISHED',
++          payload: expect.objectContaining({
++            previousStatus: 'DRAFT',
++            newStatus: 'PUBLISHED',
++            visibility: 'PUBLIC',
++          }),
++        }),
++      }));
++    });
++
++    it('é idempotente: publicar uma Intent já publicada retorna sucesso sem duplicar evento', async () => {
++      const alreadyPublished = {
++        ...mockDraft,
++        status: 'PUBLISHED',
++        publishedAt: new Date('2026-03-01T12:00:00Z'),
++        creator: { id: creator.id, username: 'autor', displayName: 'Autor', avatarUrl: null, status: 'ACTIVE' },
++      };
++      db.intent.findUnique.mockResolvedValue(alreadyPublished);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/publish`, {
++        method: 'POST',
++        headers: { Authorization: 'Bearer token-creator' },
++      });
++
++      expect(res.status).toBe(200);
++      const json = await res.json();
++      expect(json.data.status).toBe('PUBLISHED');
++      expect(db.intent.update).not.toHaveBeenCalled();
++      expect(db.domainEvent.create).not.toHaveBeenCalled();
++    });
++
++    it('rejeita tentativa de publicar uma Intent cancelada', async () => {
++      const cancelledIntent = {
++        ...mockDraft,
++        status: 'CANCELLED',
++        creator: { id: creator.id, status: 'ACTIVE' },
++      };
++      db.intent.findUnique.mockResolvedValue(cancelledIntent);
++
++      const res = await fetch(`${baseUrl}/v1/intents/${draftIntentId}/publish`, {
++        method: 'POST',
++        headers: { Authorization: 'Bearer token-creator' },
++      });
++
++      expect(res.status).toBe(409);
++      const json = await res.json();
++      expect(json.error.code).toBe('CANNOT_PUBLISH_CANCELLED');
++    });
++  });
++});
+diff --git a/backend/tests/intent-history-service.test.ts b/backend/tests/intent-history-service.test.ts
+index 19a2b33..f5c2929 100644
+--- a/backend/tests/intent-history-service.test.ts
++++ b/backend/tests/intent-history-service.test.ts
+@@ -39,7 +39,7 @@ describe('História da Intent', () => {
+ 
+     expect(page).toEqual({ items: [first], nextCursor: first.id });
+     expect(db.domainEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
+-      where: { intentId, type: { in: ['INTENT_CREATED', 'SUPPORT_RECEIVED', 'SUPPORT_REMOVED', 'GUARDIAN_APPROVED', 'INTENT_REALIZED'] } },
++      where: { intentId, type: { in: ['INTENT_CREATED', 'INTENT_PUBLISHED', 'SUPPORT_RECEIVED', 'SUPPORT_REMOVED', 'GUARDIAN_APPROVED', 'INTENT_REALIZED'] } },
+       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+       take: 2,
+       select: { id: true, type: true, occurredAt: true },
+diff --git a/backend/tests/intent-watch-service.test.ts b/backend/tests/intent-watch-service.test.ts
+index f264e15..c74f7f0 100644
+--- a/backend/tests/intent-watch-service.test.ts
++++ b/backend/tests/intent-watch-service.test.ts
+@@ -1,6 +1,7 @@
+ import { beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+ const db = vi.hoisted(() => ({
++  intent: { findUnique: vi.fn() },
+   intentWatch: { upsert: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
+ }));
+ const requireIntentViewAccess = vi.hoisted(() => vi.fn());
+@@ -27,6 +28,7 @@ beforeEach(() => {
+   db.intentWatch.upsert.mockResolvedValue({ id: 'watch', intentId, userId: viewerId });
+   db.intentWatch.deleteMany.mockResolvedValue({ count: 0 });
+   db.intentWatch.findMany.mockResolvedValue([]);
++  db.intent.findUnique.mockResolvedValue({ status: 'PUBLISHED' });
+ });
+ 
+ describe('acompanhamento de Intents', () => {
+@@ -68,4 +70,3 @@ describe('acompanhamento de Intents', () => {
+     expect(page.items[0]).not.toHaveProperty('revealCiphertext');
+   });
+ });
+-
+diff --git a/docs/ai-handoff/bloco-26-estado-draft-e-publicacao-explicita.md b/docs/ai-handoff/bloco-26-estado-draft-e-publicacao-explicita.md
+new file mode 100644
+index 0000000..3272cd6
+--- /dev/null
++++ b/docs/ai-handoff/bloco-26-estado-draft-e-publicacao-explicita.md
+@@ -0,0 +1,121 @@
++# Bloco 26 — Estado DRAFT e Publicação Explícita de Intent
++
++## 1. Estado da Integração Oficial
++
++- Repositório fonte de verdade: `edinhogrubert/Intent`.
++- Branch de integração: `feat/intent-draft-publish`.
++- Commit-base oficial: `ad4482607c994653a8572cc6f4139d855ab55694`.
++- Commit do laboratório auditado: `24d2cc10faf77000cda626a216b176f91ec57c23`.
++- Commit integrado neste branch: `75cacba`.
++- Merge na `main`: não realizado.
++- Deploy, alteração de VM e migração em ambiente compartilhado: não realizados.
++
++Este documento descreve o que foi adaptado no branch oficial. O laboratório foi tratado como referência de transferência, não como fonte de verdade.
++
++## 2. Visão Geral e Motivação Arquitetural
++
++Historicamente, toda Intent nascia com o status `PUBLISHED`. Isso permitia registrar a criação (`INTENT_CREATED`) e a realização (`INTENT_REALIZED`), mas impossibilitava modelar formalmente o ciclo de preparação, revisão e publicação consciente de uma intenção.
++
++Para resolver a tensão entre **integridade de proveniência** e **fricção de usuário**, adotou-se a estratégia:
++- **Fluxo padrão de 1 clique preservado**: Ao criar pelo fluxo direto, a Intent já nasce `PUBLISHED` (`INTENT_CREATED` com `status: PUBLISHED` e `publishedAt` populado).
++- **Opção explícita de Rascunho (`DRAFT`)**: Usuários podem optar por "Salvar como rascunho" no wizard.
++- **Publicação Explícita**: Endpoint dedicado e idempotente `POST /v1/intents/:id/publish` para transicionar de `DRAFT` para `PUBLISHED`, registrando o evento de domínio `INTENT_PUBLISHED`.
++- **Isolamento e Segurança Estrita**: Rascunhos nunca vazam em feeds, buscas ou perfis públicos e bloqueiam apoios, comentários, reações e acompanhamento.
++
++---
++
++## 3. Mudanças no Banco de Dados e Schema Prisma
++
++### 2.1 Prisma Schema (`backend/prisma/schema.prisma`)
++- O campo `publishedAt DateTime?` já existia na base de origem e foi tornado opcional para permitir `DRAFT` sem data de publicação.
++- O status continua sendo uma string compatível com o modelo atual; a validação de entrada aceita `DRAFT` e `PUBLISHED`.
++
++### 2.2 Migração SQL (`backend/prisma/migrations/20260924000100_allow_draft_intents/migration.sql`)
++- A coluna `published_at` já existia na base de origem.
++- A migration somente remove `NOT NULL` e o `DEFAULT` da coluna `published_at`.
++- Não foi criado backfill, evento histórico ou constraint nova de status.
++- Os registros legados preservam os valores de `published_at` já existentes; não recebem uma narrativa histórica nova.
++
++---
++
++## 4. Contratos de API e Endpoints
++
++### 3.1 `POST /v1/intents`
++Cria uma nova Intent.
++- **Input (Zod)**: aceita opcionalmente `status: 'DRAFT' | 'PUBLISHED'` (default: `'PUBLISHED'`).
++- **Se `DRAFT`**:
++  - Salva com `status: 'DRAFT'` e `publishedAt: null`.
++  - Registra evento de domínio `INTENT_CREATED` com payload `{ status: 'DRAFT' }`.
++- **Se `PUBLISHED`**:
++  - Salva com `status: 'PUBLISHED'` e `publishedAt: new Date()`.
++  - Registra evento de domínio `INTENT_CREATED` com payload `{ status: 'PUBLISHED' }`.
++
++### 3.2 `POST /v1/intents/:id/publish`
++Publica uma Intent salva anteriormente como `DRAFT`.
++- **Autenticação**: Obrigatória (`Bearer token`).
++- **Autorização**: Apenas o criador da Intent pode publicá-la (HTTP 403 / 404 se não autorizado).
++- **Validação de Estado**:
++  - Se `status === 'DRAFT'`: transiciona para `PUBLISHED`, seta `publishedAt: new Date()`, e grava o evento de domínio `INTENT_PUBLISHED`.
++  - **Idempotência de Estado**: Se a Intent já estiver `PUBLISHED`, retorna `200 OK` com os dados atuais sem erro e sem duplicar eventos.
++  - Se a Intent estiver em outro estado incompatível (`REALIZED`, `EXPIRED`), retorna `HTTP 409 CONFLICT` (`INTENT_CANNOT_BE_PUBLISHED`).
++
++---
++
++## 5. Regras de Isolamento e Acesso
++
++1. **Visibilidade de Rascunhos**:
++   - `assertIntentViewAccess` (`intent-service.ts`): Lança `HTTP 404 INTENT_NOT_FOUND` se qualquer usuário que não seja o próprio criador tentar acessar ou buscar uma Intent em `DRAFT`.
++2. **Bloqueio de Apoio**:
++   - `support-service.ts`: Bloqueia tentativas de apoiar Intent em `DRAFT` com `HTTP 409 INTENT_NOT_OPEN`.
++3. **Bloqueio de Comentários**:
++   - `comment-service.ts`: Bloqueia comentários em Intent em `DRAFT` com `HTTP 400 INTENT_NOT_PUBLISHED`.
++4. **Bloqueio de Reações**:
++   - `reaction-service.ts`: Bloqueia reações em Intent em `DRAFT` com `HTTP 400 INTENT_NOT_PUBLISHED`.
++5. **Bloqueio de Acompanhamento (Watch)**:
++   - `intent-watch-service.ts`: Bloqueia acompanhamento em Intent em `DRAFT` com `HTTP 400 INTENT_NOT_PUBLISHED`.
++
++---
++
++## 6. Frontend & Experiência de Usuário
++
++1. **`src/services/intentApi.ts`**:
++   - Adicionado `status?: 'DRAFT' | 'PUBLISHED'` em `CreateSupportIntentInput`.
++   - Adicionada função utilitária `publishIntent(intentId, idempotencyKey)`.
++2. **`CreationWizard.tsx`**:
++   - Passo 3 exibe o botão `"Salvar como rascunho"` ao lado de `"Publicar Intent"`.
++   - Feedback de conclusão adaptado informando claramente se a Intent foi publicada ou mantida em rascunho privado.
++3. **`MvpIntentDetail.tsx`**:
++   - Tag de status de destaque (`Rascunho`).
++   - Banner contextual informativo no topo para o proprietário: `"Rascunho Privado — Esta Intent está salva como rascunho e só você pode vê-la."`.
++   - Botão interativo `"Publicar Intent"` que executa a transição em tempo real e atualiza o histórico e os controles da página.
++
++---
++
++## 7. Cobertura de Testes Automatizados
++
++- Arquivo dedicado: `backend/tests/draft-and-publish.test.ts` (14 testes unitários e de integração HTTP).
++- Validações testadas:
++  - Criação direta como `PUBLISHED` (default).
++  - Criação como `DRAFT`.
++  - Tentativa de acesso a `DRAFT` por terceiros (retorna 404).
++  - Acesso do criador a `DRAFT` (retorna 200).
++  - Publicação de `DRAFT` pelo criador (emite `INTENT_PUBLISHED` e transiciona).
++  - Idempotência de publicação subsequente.
++  - Bloqueio de publicação por não criador (403/404).
++  - Bloqueio de comentários em `DRAFT` (400).
++  - Bloqueio de reações em `DRAFT` (400).
++  - Bloqueio de acompanhamento em `DRAFT` (400).
++  - Bloqueio de apoio em `DRAFT` (409).
++- **Backend**: 20 arquivos e 344 testes passando (`npm test`).
++- **Backend lint/build**: passando.
++- **Frontend lint/build**: passando.
++- **Teste contra PostgreSQL real após aplicar a migration**: pendente para o Codex/ambiente executor; os testes executados nesta etapa usam os mocks da suíte existente.
++
++## 8. Pendências para o Codex
++
++1. Revisar o diff do branch contra a `main` e confirmar os contratos de API, autenticação e projeções públicas.
++2. Executar `backend npm run test:postgres` com PostgreSQL descartável/configurado e aplicar a migration em ambiente de teste.
++3. Validar manualmente o fluxo do wizard e da tela de detalhe, incluindo criação direta publicada, salvamento como rascunho e publicação posterior.
++4. Abrir/atualizar PR e aguardar revisão/autorização antes de qualquer merge, deploy ou alteração da VM.
++
++Antes de alterar código, inspecione o estado atual do repositório e reconcilie-o com este handoff. Este handoff não autoriza merge, deploy, alteração de VM ou operações fora do branch indicado.
+diff --git a/src/components/CreationWizard.tsx b/src/components/CreationWizard.tsx
+index 1e64c62..33339d2 100644
+--- a/src/components/CreationWizard.tsx
++++ b/src/components/CreationWizard.tsx
+@@ -227,6 +227,7 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
+         ...(conditionType === 'DATE' ? { revealAt: parseRevealDate(revealAt)!.toISOString() } : {}),
+         ...(conditionType === 'GUARDIANS' ? { guardianIds, guardianApprovalGoal } : {}),
+         revealContent: revealContent.trim(),
++        status: 'PUBLISHED',
+       }, idempotencyKeyRef.current);
+       setPublishedSuccess(created);
+       window.setTimeout(() => onComplete(created), 800);
+@@ -242,6 +243,43 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
+     }
+   }
+ 
++  async function handleSaveDraft() {
++    const validationError = validateCurrentStep();
++    if (validationError) {
++      setError(validationError);
++      return;
++    }
++    setError('');
++
++    setPublishing(true);
++    idempotencyKeyRef.current ||= createClientIdempotencyKey();
++    try {
++      const created = await createSupportIntent({
++        title: title.trim(),
++        story: story.trim(),
++        category,
++        visibility,
++        conditionType,
++        ...(conditionType === 'SUPPORT' ? { supportGoal } : {}),
++        ...(conditionType === 'DATE' ? { revealAt: parseRevealDate(revealAt)!.toISOString() } : {}),
++        ...(conditionType === 'GUARDIANS' ? { guardianIds, guardianApprovalGoal } : {}),
++        revealContent: revealContent.trim(),
++        status: 'DRAFT',
++      }, idempotencyKeyRef.current);
++      setPublishedSuccess(created);
++      window.setTimeout(() => onComplete(created), 800);
++    } catch (caught) {
++      if (caught instanceof IntentApiError) {
++        setError(caught.status === 401 || caught.code === 'AUTH_REQUIRED'
++          ? 'Sua sessao expirou. Entre novamente para salvar o rascunho.'
++          : caught.message || 'Nao foi possivel salvar o rascunho.');
++      } else {
++        setError('Nao foi possivel comunicar com o servidor. Tente novamente.');
++      }
++      setPublishing(false);
++    }
++  }
++
+   function handleBack() {
+     setError('');
+     if (step === 1) onCancel();
+@@ -249,15 +287,22 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
+   }
+ 
+   if (publishedSuccess) {
++    const isDraft = publishedSuccess.status === 'DRAFT';
+     return (
+       <div className="w-full max-w-2xl mx-auto bg-white rounded-3xl border border-[#e4e2de] shadow-lg p-8 my-10 text-center">
+         <div className="w-16 h-16 bg-[#e8f5e9] text-[#2e7d32] rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 className="w-8 h-8" /></div>
+-        <h2 className="text-2xl font-black text-[#1b1c1a]">Intent criada com sucesso</h2>
+-        <p className="text-sm text-[#454652] mt-2 max-w-md mx-auto">Sua Intent foi registrada e sera exibida conforme a visibilidade escolhida.</p>
++        <h2 className="text-2xl font-black text-[#1b1c1a]">{isDraft ? 'Rascunho salvo com sucesso' : 'Intent criada com sucesso'}</h2>
++        <p className="text-sm text-[#454652] mt-2 max-w-md mx-auto">
++          {isDraft
++            ? 'Sua Intent foi salva como rascunho. Ela permanece privada e só você pode vê-la ou publicá-la.'
++            : 'Sua Intent foi registrada e sera exibida conforme a visibilidade escolhida.'}
++        </p>
+         <div className="mt-6 p-4 rounded-2xl bg-[#f7f6fc] border border-[#e4e2de] text-left max-w-md mx-auto">
+           <p className="text-xs font-bold text-[#000666] uppercase tracking-wider">{conditionConfig[publishedSuccess.conditionType].title}</p>
+           <p className="font-bold text-base mt-1 text-[#1b1c1a]">{publishedSuccess.title}</p>
+-          <p className="text-xs text-[#666] mt-2">Visibilidade: {visibilityConfig[publishedSuccess.visibility].title}</p>
++          <p className="text-xs text-[#666] mt-2">
++            Status: <span className="font-semibold">{isDraft ? 'Rascunho (Privado)' : 'Publicada'}</span> · Visibilidade: {visibilityConfig[publishedSuccess.visibility].title}
++          </p>
+         </div>
+       </div>
+     );
+@@ -366,7 +411,21 @@ export function CreationWizard({ currentUser, onCancel, onComplete }: CreationWi
+       {error && <div role="alert" className="mt-6 bg-[#ffdad6] text-[#8c1d18] rounded-xl px-4 py-3 text-sm font-semibold flex gap-2"><X className="w-4 h-4 shrink-0 mt-0.5 cursor-pointer" onClick={() => setError('')} /><span>{error}</span></div>}
+       <footer className="mt-auto pt-8 flex items-center justify-between">
+         <button onClick={handleBack} disabled={publishing} className="px-5 py-3 rounded-xl text-sm font-bold text-[#454652] hover:bg-[#eae8e4] disabled:opacity-50">{step === 1 ? 'Cancelar' : 'Voltar'}</button>
+-        <button onClick={handleNext} disabled={publishing} className="px-6 py-3 rounded-xl bg-[#000666] text-white text-sm font-bold flex items-center gap-2 hover:bg-[#000880] disabled:opacity-60">{publishing ? <><Sparkles className="w-4 h-4 animate-pulse" />Publicando...</> : step === 3 ? <><Check className="w-4 h-4" />Publicar Intent</> : <>Continuar<ArrowRight className="w-4 h-4" /></>}</button>
++        <div className="flex items-center gap-3">
++          {step === 3 && (
++            <button
++              type="button"
++              onClick={handleSaveDraft}
++              disabled={publishing}
++              className="px-5 py-3 rounded-xl border border-[#c6c5d4] text-[#1b1c1a] text-sm font-bold hover:bg-[#f5f3ef] disabled:opacity-50"
++            >
++              Salvar como rascunho
++            </button>
++          )}
++          <button onClick={handleNext} disabled={publishing} className="px-6 py-3 rounded-xl bg-[#000666] text-white text-sm font-bold flex items-center gap-2 hover:bg-[#000880] disabled:opacity-60">
++            {publishing ? <><Sparkles className="w-4 h-4 animate-pulse" />Publicando...</> : step === 3 ? <><Check className="w-4 h-4" />Publicar Intent</> : <>Continuar<ArrowRight className="w-4 h-4" /></>}
++          </button>
++        </div>
+       </footer>
+     </div>
+   );
+diff --git a/src/components/MvpIntentDetail.tsx b/src/components/MvpIntentDetail.tsx
+index 1707f83..dd63346 100644
+--- a/src/components/MvpIntentDetail.tsx
++++ b/src/components/MvpIntentDetail.tsx
+@@ -9,6 +9,7 @@ import {
+   IntentApiError,
+   listIntentComments,
+   listIntentHistory,
++  publishIntent,
+   removeIntentReaction,
+   removeIntentSupport,
+   setIntentReaction,
+@@ -43,6 +44,7 @@ const categoryLabels: Record<IntentCategory, string> = {
+ function historyText(type: ApiIntentHistoryEvent['type']) {
+   switch (type) {
+     case 'INTENT_CREATED': return 'A Intent foi criada.';
++    case 'INTENT_PUBLISHED': return 'A Intent foi publicada.';
+     case 'SUPPORT_RECEIVED': return 'Um apoio foi registrado.';
+     case 'SUPPORT_REMOVED': return 'Um apoio foi retirado.';
+     case 'GUARDIAN_APPROVED': return 'Uma aprovação de guardião foi registrada.';
+@@ -127,6 +129,7 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
+   const [copySuccess, setCopySuccess] = useState(false);
+   const [copyError, setCopyError] = useState('');
+   const [watchPending, setWatchPending] = useState(false);
++  const [publishingDraft, setPublishingDraft] = useState(false);
+   const [history, setHistory] = useState<ApiIntentHistoryEvent[]>([]);
+   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+   const [historyLoading, setHistoryLoading] = useState(true);
+@@ -135,6 +138,23 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
+   const intentRequestRef = useRef(0);
+   const historyRequestRef = useRef(0);
+ 
++  async function handlePublishDraft() {
++    if (!intent || intent.status !== 'DRAFT') return;
++    setPublishingDraft(true);
++    setError('');
++    setNotice('');
++    try {
++      const published = await publishIntent(intent.id);
++      setIntent(published);
++      setNotice('Intent publicada com sucesso! Ela agora está disponível de acordo com a visibilidade configurada.');
++      void loadHistory();
++    } catch (caught) {
++      setError(caught instanceof IntentApiError ? caught.message : 'Não foi possível publicar a Intent.');
++    } finally {
++      setPublishingDraft(false);
++    }
++  }
++
+   async function handleCopyIntentLink() {
+     const ok = await copyToClipboard(getIntentShareUrl(intentId));
+     setCopySuccess(ok);
+@@ -380,6 +400,11 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
+               <span className="inline-block px-2.5 py-1 rounded-full bg-[#f0efff] text-[#000666] text-xs font-bold">
+                 {categoryLabels[intent.category] || 'Outros'}
+               </span>
++              {intent.status === 'DRAFT' && (
++                <span className="inline-block px-2.5 py-1 rounded-full bg-[#fff3e0] text-[#e65100] border border-[#ffe082] text-xs font-bold">
++                  Rascunho
++                </span>
++              )}
+               <VisibilityBadge visibility={intent.visibility} />
+               <button type="button" onClick={() => void handleCopyIntentLink()} aria-live="polite"
+                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold text-[#000666]">
+@@ -389,6 +414,33 @@ export function MvpIntentDetail({ intentId, currentUser, onBack }: MvpIntentDeta
+               {copyError && <span role="alert" className="text-xs text-red-700">{copyError}</span>}
+             </div>
+ 
++            {intent.status === 'DRAFT' && (
++              <div className="mt-5 bg-[#fff9e6] border border-[#ffe082] rounded-2xl p-5">
++                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
++                  <div>
++                    <div className="flex items-center gap-2 text-sm font-bold text-[#b78103]">
++                      <Lock className="w-4 h-4" />
++                      <span>Rascunho Privado</span>
++                    </div>
++                    <p className="text-xs text-[#6d5100] mt-1">
++                      Esta Intent está salva como rascunho e só você pode vê-la. Ao publicar, ela ficará acessível conforme a visibilidade configurada e poderá receber apoios e interações.
++                    </p>
++                  </div>
++                  {isMine && (
++                    <button
++                      type="button"
++                      onClick={() => void handlePublishDraft()}
++                      disabled={publishingDraft}
++                      className="px-5 py-2.5 rounded-xl bg-[#000666] text-white text-xs font-bold hover:bg-[#000880] transition-colors flex items-center gap-2 self-start sm:self-auto shrink-0 disabled:opacity-50"
++                    >
++                      {publishingDraft ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
++                      {publishingDraft ? 'Publicando...' : 'Publicar Intent'}
++                    </button>
++                  )}
++                </div>
++              </div>
++            )}
++
+             <h1 className="text-2xl font-black mt-3 text-[#1a1a1a] leading-tight">{intent.title}</h1>
+             <p className="text-sm text-[#454652] mt-3 whitespace-pre-wrap leading-relaxed">{intent.story}</p>
+ 
+diff --git a/src/services/intentApi.ts b/src/services/intentApi.ts
+index cc3c0bc..e3186e3 100644
+--- a/src/services/intentApi.ts
++++ b/src/services/intentApi.ts
+@@ -49,7 +49,7 @@ export interface ApiIntent {
+   id: string;
+   type: 'SUPPORT_REVEAL' | 'CONDITIONAL_REVEAL';
+   conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
+-  status: 'PUBLISHED' | 'REALIZED';
++  status: 'DRAFT' | 'PUBLISHED' | 'REALIZED';
+   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+   category: IntentCategory;
+   title: string;
+@@ -61,7 +61,7 @@ export interface ApiIntent {
+   guardianApprovals?: string[];
+   guardianApprovalGoal: number | null;
+   guardianApprovalCount?: number;
+-  publishedAt: string;
++  publishedAt: string | null;
+   realizedAt: string | null;
+   createdAt: string;
+   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
+@@ -150,6 +150,7 @@ export interface ApiNotification {
+ 
+ export type IntentHistoryEventType =
+   | 'INTENT_CREATED'
++  | 'INTENT_PUBLISHED'
+   | 'SUPPORT_RECEIVED'
+   | 'SUPPORT_REMOVED'
+   | 'GUARDIAN_APPROVED'
+@@ -227,6 +228,7 @@ export interface CreateSupportIntentInput {
+   guardianApprovalGoal?: number;
+   revealContent: string;
+   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
++  status?: 'DRAFT' | 'PUBLISHED';
+ }
+ 
+ export interface GuardianApprovalResult {
+@@ -446,6 +448,19 @@ export async function createSupportIntent(input: CreateSupportIntentInput, idemp
+   return result.data;
+ }
+ 
++export async function publishIntent(intentId: string, idempotencyKey?: string): Promise<ApiIntent> {
++  const headers: Record<string, string> = {};
++  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
++  const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>(
++    `/v1/intents/${encodeURIComponent(intentId)}/publish`,
++    {
++      method: 'POST',
++      headers,
++    },
++  );
++  return result.data;
++}
++
+ export async function listMyIntents(): Promise<{ items: ApiIntent[]; nextCursor: string | null }> {
+   const result = await authenticatedRequest<ApiEnvelope<{ items: ApiIntent[]; nextCursor: string | null }>>('/v1/intents/mine');
+   return result.data;
