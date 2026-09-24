@@ -4,6 +4,7 @@ import { requireIntentViewAccess } from './intent-service.js';
 
 export const intentHistoryEventTypes = [
   'INTENT_CREATED',
+  'INTENT_PUBLISHED',
   'SUPPORT_RECEIVED',
   'SUPPORT_REMOVED',
   'GUARDIAN_APPROVED',

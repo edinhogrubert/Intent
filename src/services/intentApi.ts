@@ -49,7 +49,7 @@ export interface ApiIntent {
   id: string;
   type: 'SUPPORT_REVEAL' | 'CONDITIONAL_REVEAL';
   conditionType: 'SUPPORT' | 'DATE' | 'GUARDIANS';
-  status: 'PUBLISHED' | 'REALIZED';
+  status: 'DRAFT' | 'PUBLISHED' | 'REALIZED';
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
   category: IntentCategory;
   title: string;
@@ -61,7 +61,7 @@ export interface ApiIntent {
   guardianApprovals?: string[];
   guardianApprovalGoal: number | null;
   guardianApprovalCount?: number;
-  publishedAt: string;
+  publishedAt: string | null;
   realizedAt: string | null;
   createdAt: string;
   creator: { id: string; username: string; displayName: string; avatarUrl: string | null };
@@ -150,6 +150,7 @@ export interface ApiNotification {
 
 export type IntentHistoryEventType =
   | 'INTENT_CREATED'
+  | 'INTENT_PUBLISHED'
   | 'SUPPORT_RECEIVED'
   | 'SUPPORT_REMOVED'
   | 'GUARDIAN_APPROVED'
@@ -227,6 +228,7 @@ export interface CreateSupportIntentInput {
   guardianApprovalGoal?: number;
   revealContent: string;
   visibility: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+  status?: 'DRAFT' | 'PUBLISHED';
 }
 
 export interface GuardianApprovalResult {
@@ -443,6 +445,19 @@ export async function createSupportIntent(input: CreateSupportIntentInput, idemp
     headers,
     body: JSON.stringify(input),
   });
+  return result.data;
+}
+
+export async function publishIntent(intentId: string, idempotencyKey?: string): Promise<ApiIntent> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+  const result = await authenticatedRequest<ApiEnvelope<ApiIntent>>(
+    `/v1/intents/${encodeURIComponent(intentId)}/publish`,
+    {
+      method: 'POST',
+      headers,
+    },
+  );
   return result.data;
 }
 

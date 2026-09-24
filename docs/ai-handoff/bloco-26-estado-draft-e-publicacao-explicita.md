@@ -111,11 +111,24 @@ Publica uma Intent salva anteriormente como `DRAFT`.
 - **Frontend lint/build**: passando.
 - **Teste contra PostgreSQL real após aplicar a migration**: pendente para o Codex/ambiente executor; os testes executados nesta etapa usam os mocks da suíte existente.
 
-## 8. Pendências para o Codex
+## 8. Resultado da integração no repositório oficial
 
-1. Revisar o diff do branch contra a `main` e confirmar os contratos de API, autenticação e projeções públicas.
-2. Executar `backend npm run test:postgres` com PostgreSQL descartável/configurado e aplicar a migration em ambiente de teste.
-3. Validar manualmente o fluxo do wizard e da tela de detalhe, incluindo criação direta publicada, salvamento como rascunho e publicação posterior.
-4. Abrir/atualizar PR e aguardar revisão/autorização antes de qualquer merge, deploy ou alteração da VM.
+A implementação foi reaplicada na branch `feat/intent-draft-publish`, baseada na `main` atual (`a2f4de8`). A migration `20260924000100_allow_draft_intents` foi aplicada em PostgreSQL 16 efêmero junto com toda a cadeia oficial.
+
+Validações concluídas:
+
+- Backend completo: 344/344 testes aprovados.
+- Testes direcionados de DRAFT/publicação e fluxos sociais: 122/122 aprovados.
+- PostgreSQL 16 efêmero: 46/46 testes aprovados; 13 migrations aplicadas.
+- Lint e build de backend e frontend: aprovados.
+- `git diff --check`: aprovado.
+
+Não houve alteração em Firebase, infraestrutura, VM, banco oficial, merge ou deploy. Nenhum evento histórico foi criado; `INTENT_PUBLISHED` só é emitido na transição real de `DRAFT` para `PUBLISHED`.
+
+## 9. Pendências para revisão
+
+1. Revisar o diff da branch e abrir PR para revisão.
+2. Validar manualmente o fluxo do wizard e da tela de detalhe, incluindo criação direta publicada, salvamento como rascunho e publicação posterior.
+3. Aguardar autorização antes de qualquer merge, deploy ou alteração da VM.
 
 Antes de alterar código, inspecione o estado atual do repositório e reconcilie-o com este handoff. Este handoff não autoriza merge, deploy, alteração de VM ou operações fora do branch indicado.
