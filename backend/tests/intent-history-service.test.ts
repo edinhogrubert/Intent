@@ -39,7 +39,7 @@ describe('História da Intent', () => {
 
     expect(page).toEqual({ items: [first], nextCursor: first.id });
     expect(db.domainEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { intentId, type: { in: ['INTENT_CREATED', 'SUPPORT_RECEIVED', 'SUPPORT_REMOVED', 'GUARDIAN_APPROVED', 'INTENT_REALIZED'] } },
+      where: { intentId, type: { in: ['INTENT_CREATED', 'INTENT_PUBLISHED', 'SUPPORT_RECEIVED', 'SUPPORT_REMOVED', 'GUARDIAN_APPROVED', 'INTENT_REALIZED'] } },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: 2,
       select: { id: true, type: true, occurredAt: true },

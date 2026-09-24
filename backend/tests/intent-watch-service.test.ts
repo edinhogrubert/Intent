@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
+  intent: { findUnique: vi.fn() },
   intentWatch: { upsert: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
 }));
 const requireIntentViewAccess = vi.hoisted(() => vi.fn());
@@ -27,6 +28,7 @@ beforeEach(() => {
   db.intentWatch.upsert.mockResolvedValue({ id: 'watch', intentId, userId: viewerId });
   db.intentWatch.deleteMany.mockResolvedValue({ count: 0 });
   db.intentWatch.findMany.mockResolvedValue([]);
+  db.intent.findUnique.mockResolvedValue({ status: 'PUBLISHED' });
 });
 
 describe('acompanhamento de Intents', () => {
@@ -68,4 +70,3 @@ describe('acompanhamento de Intents', () => {
     expect(page.items[0]).not.toHaveProperty('revealCiphertext');
   });
 });
-
