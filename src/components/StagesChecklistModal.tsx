@@ -194,7 +194,7 @@ export const StagesChecklistModal: React.FC<StagesChecklistModalProps> = ({ isOp
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Documento revisar.md</span>
+            <span>Histórico do projeto</span>
           </button>
         </div>
 
@@ -341,14 +341,14 @@ export const StagesChecklistModal: React.FC<StagesChecklistModalProps> = ({ isOp
                 <div>
                   <h4 className="text-xs font-black text-white flex items-center gap-2">
                     <FileText className="w-4 h-4 text-cyan-400" />
-                    <span>Arquivo revisar.md Criado no Projeto</span>
+                    <span>Referência histórica do diagnóstico</span>
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    O relatório técnico completo está gravado na raiz do repositório para consulta da equipe e controle de versão.
+                    Os registros do protótipo e suas fontes estão identificados no histórico documental; não certificam o estado atual.
                   </p>
                 </div>
                 <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2.5 py-1 rounded-xl border border-cyan-800">
-                  /revisar.md
+                  /documentos/07_HISTORICO.md
                 </span>
               </div>
 
