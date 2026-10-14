@@ -120,10 +120,10 @@ task_8(){
 
 task_9(){
   need_repo || { fail 9 'repo inválido'; return 1; }
-  local files=(contratos/README.md contratos/INTERFACE_EXECUTORES.md contratos/ARQUITETURA_ATUAL_VM.md docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md)
+  local files=(Agents.md documentos/00_VISAO.md documentos/01_CASOS_DE_USO.md documentos/02_REGRAS.md documentos/03_ARQUITETURA.md documentos/04_STATUS.md documentos/05_DECISOES.md documentos/06_TESTES.md documentos/07_HISTORICO.md documentos/8_Novas_funcionalidades.md documentos/9_scripts.md)
   local miss=0; for f in "${files[@]}"; do [[ -f "$REPO/$f" ]] || { echo "ausente: $f"; miss=1; }; done
   [[ $miss -eq 0 ]] || { fail 9 'continuidade ausente na VM'; return 1; }
-  ok 9 'continuidade presente na VM'
+  ok 9 'estrutura documental presente na VM; vigência exige conferência das fontes'
 }
 
 task_10(){ na 10 'preparar release pertence ao PC'; }

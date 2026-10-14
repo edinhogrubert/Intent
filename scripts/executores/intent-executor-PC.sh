@@ -157,10 +157,10 @@ task_8(){
 
 task_9(){
   need_repo || { fail 9 'repo inválido'; return 1; }
-  local files=(contratos/README.md contratos/INTERFACE_EXECUTORES.md contratos/ARQUITETURA_ATUAL_VM.md docs/ai-handoff/continuidade/ESTADO_ATUAL_INTENT.md docs/ai-handoff/continuidade/PROMPT_RETOMADA_CHATGPT.md)
+  local files=(Agents.md documentos/00_VISAO.md documentos/01_CASOS_DE_USO.md documentos/02_REGRAS.md documentos/03_ARQUITETURA.md documentos/04_STATUS.md documentos/05_DECISOES.md documentos/06_TESTES.md documentos/07_HISTORICO.md documentos/8_Novas_funcionalidades.md documentos/9_scripts.md)
   local miss=0; for f in "${files[@]}"; do [[ -f "$REPO/$f" ]] || { echo "ausente: $f"; miss=1; }; done
   [[ $miss -eq 0 ]] || { fail 9 'continuidade incompleta'; return 1; }
-  ok 9 'continuidade validada'
+  ok 9 'estrutura documental presente; vigência exige conferência das fontes'
 }
 
 task_10(){ task_2 && task_3 && task_5 && task_9 && ok 10 'release preparada; função 11 exige autorização'; }
@@ -189,7 +189,7 @@ task_14(){
 task_15(){ na 15 'rollback controlado não se aplica ao PC'; }
 
 run(){ case "$1" in 1)task_1;;2)task_2;;3)task_3;;4)task_4;;5)task_5;;6)task_6;;7)task_7;;8)task_8;;9)task_9;;10)task_10;;11)task_11;;12)task_12;;13)task_13;;14)task_14;;15)task_15;;*) echo "função desconhecida: $1"; return 1;; esac; }
-summary(){ echo '==== RESUMO PC ===='; for i in "${IDS[@]}"; do [[ -n "${STATUS[$i]:-}" ]] && printf '%2s %-4s %s\n' "$i" "${STATUS[$i]}" "${DETAIL[$i]}"; done; }
+summary(){ echo '==== RESUMO PC ===='; for i in "${IDS[@]}"; do [[ -n "${STATUS[$i]:-}" ]] && printf '%2s %-4s %s\n' "$i" "${STATUS[$i]}" "${DETAIL[$i]}"; done; return 0; }
 
 [[ "${1:-}" == list ]] && { list; exit 0; }
 [[ $# -gt 0 ]] || { list; exit 1; }
