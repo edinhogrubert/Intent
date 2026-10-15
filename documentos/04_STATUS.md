@@ -2,16 +2,18 @@
 
 ## Referência desta atualização
 
-Data:14/10/2026, America/Sao_Paulo. **Base de produto inspecionada:** main em `df02be79afaefd300e4106ecec0be0313ddb39f0`, merge da PR49, head de implementação `aa658616acaa19f622186bc2b0fbafcb6c5da5ef`, branch `feat/intent-draft-publish`.
+Conferência: 15/10/2026, America/Sao_Paulo. Repositório oficial `edinhogrubert/Intent`, branch `main`. Última integração funcional/documental conferida: `4a140976c4d88424c31787183c389a1a0f969702`, merge do [PR51](https://github.com/edinhogrubert/Intent/pull/51), implementação `3a78d9075f547f4a727802095a661352318f29f0`, branch de origem `refactor/scripts-consolidados`.
 
-Este SHA identifica a base de aplicação que fundamenta os documentos; não é afirmação de que main nunca avançará. A consolidação documental acrescenta commit posterior, consultável no Git/PR desta alteração. Antes de nova ação, consultar referências remotas e diferenças locais; não executar instrução antiga só porque este snapshot a menciona.
+**Organização concluída e integrada:** [PR50](https://github.com/edinhogrubert/Intent/pull/50) consolidou a documentação; PR51 consolidou os scripts. Ambos mergeados. [CI pós-merge do PR51](https://github.com/edinhogrubert/Intent/actions/runs/38671990885): Frontend, Backend e Scripts Oracle aprovados. Este fechamento documental acrescenta um commit posterior; seu identificador é consultável no Git, sem tentar registrar o próprio hash dentro do arquivo. Antes de nova ação, conferir HEAD remoto.
+
+Fonte de leitura: `Agents.md` na raiz → este Status para continuidade → documento pertinente em `documentos/`. Manual operacional autorizado em `script/MANUAL.md`. Não usar contratos, handoffs ou arquivos pessoais removidos como instrução vigente. A base de produto documentada é historicamente o merge PR49 `df02be79afaefd300e4106ecec0be0313ddb39f0`; não confundir essa base com HEAD atual.
 
 ## Matriz de confirmação
 
 | Superfície | Evidência / estado |
 |---|---|
-| GitHub oficial | Main e árvore completa consultadas;84 Markdown originais,74 conteúdos distintos. Código lido e histórico Git disponível |
-| Checkout desta consolidação | Clone isolado da base oficial, branch docs/consolidar-documentos; não é PC do proprietário |
+| GitHub oficial | Main consultada na API; PR50/51 mergeados. Árvore atual com12 Markdown: Agents.md, dez em documentos/ e script/MANUAL.md. Os84 Markdown antigos são histórico recuperável no Git |
+| Checkout do agente | Main sincronizada à integração conferida, árvore limpa antes deste fechamento documental; não é PC do proprietário |
 | PRs26,38,40,43,45–49 | Merge confirmado pela API GitHub; PR44 e demais entregas também constam do histórico Git |
 | Versão/tag | Clone remoto contém tags mvp-1.0.0 até mvp-1.0.23; não foi confirmada release1.0.24 implantada. Tag não equivale à versão servida; src/appVersion.ts ainda contém o label histórico mvp-1.0.4-pr5/PR5, que não é evidência de release atual |
 | PC do proprietário | Sem acesso nesta tarefa; sincronização, instalação dos executores e estado local não verificados |
@@ -37,23 +39,16 @@ Este SHA identifica a base de aplicação que fundamenta os documentos; não é 
 
 Referências de PR: https://github.com/edinhogrubert/Intent/pulls. Histórico detalhado e origem dos antigos relatórios em [Histórico](07_HISTORICO.md). Resultados anteriores de testes estão em [Testes](06_TESTES.md), identificados como relatos/documentação, sem certificação do estado atual.
 
-## Trabalho desta consolidação
+## Consolidações encerradas
 
-Escopo autorizado: onze documentos canônicos (Agents.md+dez em documentos/); remoção dos84 Markdown anteriores inclusive cópias/histórico; adaptação de caminhos documentais usados pelos dois executores, correção do retorno do resumo PC detectada em teste e referência textual do componente de diagnóstico; remoção do patch documental de DRAFT já aplicado. Sem alteração de domínio/API/Prisma/migrations/Firebase/Docker/release e sem acesso à VM.
+- **Documentos — PR50:** merge `c78bd68bcb9a09a836f2051014c9671c9eeb766c`; substituiu84 caminhos Markdown antigos, com conteúdo útil consolidado e mapa de origem em Histórico. Preservada a identidade permanente da seção2.13. Agents.md na raiz e dez documentos por assunto.
+- **Scripts — PR51:** merge `4a140976c4d88424c31787183c389a1a0f969702`;40 SH e6 auxiliares pessoais retirados de Nova pasta, com links imutáveis/hashes no catálogo. Entrada única `script/intent.sh`, módulos compartilhados, instalação por pacote completo e manual.16 SH ativos, incluindo quatro wrappers transitórios de checkout e entrypoint backend preservado.
+- **Evidências:**17 testes isolados e sintaxe global aprovados na árvore da implementação; CI do PR51 e CI pós-merge aprovados. Scripts usam mocks/temporários nas validações locais; isso não certifica recuperação real ou operação da VM. Não repetir suítes de aplicação por este fechamento exclusivamente documental.
 
-Não copiar para cá o antigo “PR26 bloqueado”, nem a restrição histórica que proibia começar26 antes de autorização passada. Não declarar deploy, tag ou bug atual com base nesses textos. As pendências futuras devem estar somente em Novas funcionalidades; lacunas de evidência operacional ficam nesta matriz.
+Não existe integração pendente dessas duas entregas. Não há tag/release de aplicação nova. PC/VM instalados, deploy, migrações, backup real e restauração não foram executados nestas consolidações.
 
-## Próximo passo e atualização
+## Próxima ação e manutenção do estado
 
-Após publicação, conferir main remota e o diff integrado. Se o proprietário quiser usar função9 dos executores nos seus ambientes, instalar a referência atualizada pelo bootstrap existente, em ação operacional própria; esta tarefa não afirma que a cópia externa ao Git já mudou. Não é necessário reconstruir aplicação por causa de Markdown.
+Para desenvolvimento, consultar main/PR atuais e o escopo residual em Novas funcionalidades antes de escolher bloco; não reimplementar entregas da tabela acima. Se houver operação autorizada de instalação PC/VM, seguir `script/instalar.sh` e o [manual](../script/MANUAL.md); o bootstrap antigo foi removido. Instalação local e instalação VM são operações distintas, sem sincronização presumida.
 
-Em próximo bloco: consultar main/PR atuais, selecionar somente escopo residual aprovado, indicar ator/revisão/ambiente e verificar origem publicada. Atualizar esta fotografia quando houver nova evidência material ou conclusão, sem gerar novo arquivo de retomada. Usar o formato de handoff em [Agents](../Agents.md). Pendência de homologação não exige refazer todas as suítes; executar a validação que falta.
-
-
-## Bloco atual — consolidação de scripts (2026-10-15 UTC)
-
-CONFIRMADO no checkout: base oficial `c78bd68bcb9a09a836f2051014c9671c9eeb766c`, branch `refactor/scripts-consolidados`. Pacote `script/` implementado, manual local e catálogo atualizado. Origens dos40 SH e6 auxiliares pessoais retirados de Nova pasta estão no catálogo com links imutáveis e hashes. Wrappers de checkout preservam duas entradas de executor e duas de deploy.
-
-Validação local: `bash script/testes/validar.sh`, sintaxe global e17 testes isolados aprovados; incluem falhas de fetch/saúde/catálogo, dump novo, espaços em caminhos, documentos, PC8 descartável, instalação/ativação e tratamento de saída explícita dos componentes. Trata-se de mocks/temporários, não de comprovação de operação em produção. CI e commit publicado devem ser consultados no PR da branch; não inferir aprovação por este registro.
-
-PC/VM instalados, deploy, migrações, backup real e restauração: não executados nesta entrega. Próximo passo após revisão/CI: integrar a branch pelo PR; instalar ferramentas em cada ambiente somente em operação própria autorizada. Nenhuma nova versão/tag de aplicação criada.
+Documentação de governança deve ser fechada na mesma entrega: atualizar estado após merge/CI, remover próximos passos já concluídos e reconciliar referências substituídas antes de comunicar conclusão. Evidência histórica permanece identificada como histórica. Registrar lacunas reais de PC/VM separadamente; não criar pendências artificiais de organização nem novos arquivos de handoff.
