@@ -134,3 +134,8 @@ Os links da origem apontam ao commit anterior fixo, não a arquivos locais remov
 Para nova mudança relevante, registrar data, título, PR/commit, comportamento alterado, motivo e evidências/limites. Não copiar todo git log nem criar arquivo por agente. Evidências volumosas permanecem em logs, CI, PR ou Git com revisão explícita. Não modificar retroativamente um resultado para fazê-lo parecer testado na revisão nova.
 
 A publicação e os resultados reais desta consolidação ficam no relatório e na PR; este registro não antecipa sucesso de CI, merge ou deploy. Consultar o commit integrado em main, em vez de tratar a baseline como HEAD eterno.
+
+
+## Consolidação operacional de scripts — 2026-10-15 UTC
+
+Consolidação dos scripts autorizada pelo proprietário após auditoria estática dos48 SH. Nova pasta removida;46 origens imutáveis/SHA256 e decisões em 9_scripts.md. Instaladores antigos substituídos por pacote completo; wrappers de checkout preservam quatro entradas antigas. Não houve instalação em PC/VM, deploy, migração ou restauração por esta alteração.

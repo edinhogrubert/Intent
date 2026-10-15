@@ -37,8 +37,8 @@ Fluxo: navegador → frontend/Nginx → `/api/` removido pelo proxy → Express 
 | backend/prisma/ | Schema e cadeia de migrations |
 | backend/tests/ e tests-postgres/ | Testes automatizados com ambientes distintos |
 | deploy/oracle/ | Compose/Nginx/Dockerfile frontend e scripts de deploy |
-| scripts/executores/ | Referências versionadas, instaladores e bootstrap PC/VM |
-| archive/intentV1/ e Nova pasta/ | Código/artefatos históricos; não importar, executar nem usar como baseline vigente |
+| script/ e scripts/executores/ | Pacote operacional modular e wrappers transitórios de checkout |
+| archive/intentV1/ | Código histórico; não importar nem usar como baseline vigente. Nova pasta foi consolidada/retirada; fontes imutáveis no catálogo. |
 
 A antiga main8db7ddd foi preservada em archive/intentV1 na consolidação de06/09. Não é versão estável de rollback; main consolidada nasceu da linha codex/mvp-backend-base. Recuperação escolhe conjunto aprovado compatível de código/dados/chave, não esse protótipo.
 
@@ -109,3 +109,8 @@ Entrypoint da API usa prisma migrate deploy com tentativas antes de subir; reini
 Preservar nomes técnicos legados por compatibilidade; renomear reveal exige escopo próprio. Não inferir genericidade DSL, commitment público, recipient ACL, armazenamento de arquivos ou uso funcional de Redis de textos históricos. Condição DATE ainda usa realização na leitura; guardiões JSON e supportGoal para compatibilidade são dívidas a avaliar, sem refatorar automaticamente.
 
 Atualizar este arquivo junto a alteração significativa de ferramentas, runtime, dados, credenciais exigidas, infraestrutura, portas, domínio/TLS, backup/restauração, publicação ou autenticação que afete operação. Declarar em PR: ArquiteturaPC/VM sem mudança, ou quais seções mudaram. Esta consolidação muda caminhos documentais, não o desenho nem a configuração executada de PC/VM.
+
+
+## Consolidação operacional de scripts — 2026-10-15 UTC
+
+Ferramentas operacionais consolidadas em `script/`, com módulos reutilizáveis PC/VM e manual local. A alteração reorganiza o repositório; não altera serviços, volumes, rede ou instalações vigentes no PC/VM. Backend entrypoint permanece junto ao Dockerfile.
