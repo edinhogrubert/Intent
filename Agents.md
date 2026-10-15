@@ -1,6 +1,6 @@
 # Intent — como trabalhar neste repositório
 
-Este arquivo fica **na raiz do repositório e na branch main**, por decisão expressa do proprietário. Respeitar a grafia `Agents.md`. A documentação canônica está somente em `documentos/`; não criar cópias, README paralelos nem novos handoffs Markdown espalhados. A consolidação substitui os antigos contratos, roadmaps e pacotes de continuidade, conforme o mapa em [Histórico](documentos/07_HISTORICO.md).
+Este arquivo fica **na raiz do repositório e na branch main**, por decisão expressa do proprietário. Respeitar a grafia `Agents.md`. A documentação canônica está em `documentos/`, com exceção expressamente autorizada do manual operacional `script/MANUAL.md`; não criar cópias, README paralelos nem novos handoffs Markdown espalhados. A consolidação substitui os antigos contratos, roadmaps e pacotes de continuidade, conforme o mapa em [Histórico](documentos/07_HISTORICO.md).
 
 ## Mapa e leitura por tarefa
 
@@ -51,6 +51,8 @@ Merge, release, PC e deploy/VM: informar separadamente, sem presumir:
 ```
 
 ## Operação e manutenção
+
+Entrada operacional consolidada: `script/intent.sh`; instalação por pacote completo em `script/instalar.sh`. Consultar [manual](script/MANUAL.md) e catálogo antes de operar. Wrappers antigos são transitórios e exigem checkout completo.
 
 Usar funções existentes dos executores com ambiente e caminho absoluto, conforme [Scripts](documentos/9_scripts.md). Não entregar chamadas abstratas PC(...)/VM(...) como comando final, inventar números nem criar script avulso se uma função existente atende. Bootstrap versionado é exceção documentada; comandos de diagnóstico internos do agente não precisam virar novo script de operação humana.
 

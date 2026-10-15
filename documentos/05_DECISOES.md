@@ -32,3 +32,8 @@ Este registro distingue decisões de produto, implementação verificada e propo
 ## Riscos e decisões que continuam em aberto
 
 Regras de prazo/insucesso, composição, destinatários, storage/KMS, localização, reputação ampliada e descoberta avançada permanecem em [Novas funcionalidades](8_Novas_funcionalidades.md). Não aprová-las implicitamente ao transportar documentação. Custódia de chave no servidor não equivale à promessa de operador incapaz de ler; commitment verificável e proofs avançadas exigem desenho próprio.
+
+
+## Consolidação operacional de scripts — 2026-10-15 UTC
+
+Adotada entrada única `script/intent.sh` com módulos compartilhados e ações por ambiente; preservar IDs1–15. Instalar conjunto completo de commit aprovado por ativação local atômica. Retirar receitas pessoais duplicadas/SHAs fixos, mantendo origem imutável no catálogo. Manual em script/MANUAL.md é exceção solicitada pelo proprietário à centralização documental.

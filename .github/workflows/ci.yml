@@ -102,5 +102,5 @@ jobs:
       - name: Obter código
         uses: actions/checkout@v4
 
-      - name: Validar sintaxe Bash
-        run: bash -n deploy/oracle/*.sh
+      - name: Validar scripts e contratos isolados
+        run: bash script/testes/validar.sh

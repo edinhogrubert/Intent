@@ -1,80 +1,39 @@
-# Intent — scripts, executores e recuperação
+# Scripts e recuperação Intent
 
-Referência única da interface operacional. Código versionado não prova instalação no PC/VM. Não executar bootstrap, deploy, backup ou restauração apenas por ler este documento. Autorização e handoff em [Agents](../Agents.md); ambientes em [Arquitetura](03_ARQUITETURA.md).
+Catálogo técnico. O [manual de uso](../script/MANUAL.md) contém instalação, comandos, parâmetros, efeitos e tratamento de falhas. `script/` substitui `Nova pasta/` por consolidação; arquivos históricos continuam recuperáveis no Git, sem receitas obsoletas executáveis na árvore ativa.
 
-## 1. Entradas humanas e interface
+| Caminho | Responsabilidade |
+|---|---|
+|[intent.sh](../script/intent.sh)|Entrada única pc/vm, números1–15, list/--plan, identidade, lock e relatórios|
+|[instalar.sh](../script/instalar.sh)|Pacote completo extraído de commit aprovado, validação e ativação atômica local|
+|[comum.sh](../script/lib/comum.sh)|Resultados, ambiente e aprovação de revisão|
+|[git.sh](../script/lib/git.sh)|Inspeção Git, consulta de tags e presença documental compartilhadas|
+|[backup.sh](../script/lib/backup.sh)|Seleção segura com espaços, checksums, catálogo e identificação de dump novo|
+|[docker.sh](../script/lib/docker.sh)|Consultas de saúde com timeout e falha propagada|
+|[pc.sh](../script/acoes/pc.sh)|Ações exclusivas PC, bundle, validações em clone descartável e tags|
+|[vm.sh](../script/acoes/vm.sh)|Ações exclusivas VM, backups externos e orquestração de deploy|
+|[deploy-api.sh](../script/acoes/deploy-api.sh)|Implementação backend centralizada, revisão aprovada e lock|
+|[deploy-frontend.sh](../script/acoes/deploy-frontend.sh)|Implementação frontend centralizada, revisão aprovada e lock|
+|[validar.sh](../script/testes/validar.sh)|Sintaxe global e contratos isolados sem produção|
+|[docker-entrypoint.sh](../backend/docker-entrypoint.sh)|POSIX junto ao Dockerfile; migrate deploy e início da API; não mover para biblioteca Bash|
 
-PC: `/home/grubert/intent-automacao/intent-executor-PC.sh`. VM: `/home/ubuntu/intent-executor-VM.sh`. Nas referências atuais, PC usa grubert/lubuntu e VM usa ubuntu/intent-app-01; outro ambiente exige adaptação versionada. O número representa intenção fixa. Nova função exige descrição em PC/VM, efeitos, N/A, instalação controlada e validação.
+Os antigos caminhos de executores PC/VM e deploy08/09 são wrappers transitórios de checkout, sem duplicação de lógica. Instaladores antigos foram removidos; usar instalar.sh. Nenhuma cópia externa instalada foi modificada. Não fazer download de apenas um wrapper/entrypoint. O instalador não acessa VM remotamente; PC e VM têm instalações e evidências distintas.
 
-Exemplos de inspeção documental, somente no ambiente correto e com executor instalado:
-
-```bash
-bash /home/grubert/intent-automacao/intent-executor-PC.sh 9
-bash /home/ubuntu/intent-executor-VM.sh 9
-```
-
-A segunda linha é para terminal já dentro da VM. A partir do PC, usar SSH com destino/chave confirmados; referência histórica:
-
-```bash
-ssh -i /home/grubert/.ssh/id_ed25519 -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ubuntu@157.151.255.227 'bash /home/ubuntu/intent-executor-VM.sh 9'
-```
-
-IP e chave não foram testados nesta consolidação. Não entregar somente “execute PC(9)” ou número sem ambiente e caminho.
-
-| Nº | Intenção | PC versionado | VM versionada | Efeito / limite |
-|---:|---|---|---|---|
-| 1 | Validar ambiente | Usuário, host, pastas e comandos | Idem | Não adapta estação automaticamente |
-| 2 | Inspecionar Git | Remoto, branch, HEAD e árvore limpa | Idem | Não prova commit da imagem em execução |
-| 3 | Verificar tag/release | Fetch e lista tags | Tenta fetch e lista tags | Tag não prova release publicada ou implantação; VM tolera falha de fetch |
-| 4 | Verificar recursos | Disco | Disco e memória | Fotografia de recursos |
-| 5 | Validar backup existente | Bundle verify e checksum se existir | Dump/checksum e catálogo quando disponível | Não prova restauração ensaiada; ver limites abaixo |
-| 6 | Criar e validar backup | Bundle --all interno, checksum e metadados | Chama rotina externa com sudo | Altera arquivos; não é operação somente leitura |
-| 7 | Sincronizar código | Fetch, checkout main, pull --ff-only | Fetch --no-tags --prune e pull da branch atual; detached só faz fetch | Altera checkout/referências; VM não troca arbitrariamente a branch |
-| 8 | Validar ambiente | Diff-check, lint/build frontend, test/build backend | Docker ps e consultas health/ready | VM8 pode imprimir saúde indisponível e retornar OK; não confundir com prova estrita |
-| 9 | Conferir estrutura documental | Presença dos onze arquivos canônicos | Idem | Não valida atualidade nem fatos; não escreve Status |
-| 10 | Preparar release | Encadeia 2/3/5/9 | N/A | Não cria release automaticamente |
-| 11 | Criar/validar tag | Exige INTENT_RELEASE_TAG e INTENT_AUTORIZO_RELEASE=SIM; tag anotada e push | Exige INTENT_RELEASE_TAG e verifica existência | Não cria release via API; autorização aplicável exigida |
-| 12 | Deploy controlado | N/A | Exige INTENT_DEPLOY_COMPONENT=api/frontend/all, Git limpo, HEAD=origin/main e backup | Executa scripts dos componentes escolhidos; autorização de produção separada |
-| 13 | Validar aplicação | N/A | Verificador externo se existir; senão Docker e health/ready/healthz estritos | Diferente de VM8; não substitui homologação completa |
-| 14 | Relatório final | HEAD/status e retomada externa se existir | HEAD/status/containers e retomada se existir | Auxiliar opcional; relatório não certifica tudo sozinho |
-| 15 | Rollback controlado | N/A | N/A/reservado; não automatizado | Não apresentar como se recuperasse banco/imagens |
-
-Executores criam diretório de relatórios e lock na inicialização, inclusive para listagem. Relatório deve informar ambiente, funções, resultado individual, erros, pendências e alterações reais. O retorno explícito do resumo PC foi corrigido nesta consolidação; o dispatcher continua retornando o rc real da operação, inclusive falhas.
-
-## 2. Referências, instalação e auxiliares
-
-| Caminho / tipo | Função e pré-condições | Efeitos |
-|---|---|---|
-| [intent-executor-PC.sh](../scripts/executores/intent-executor-PC.sh) | Entrada PC: 1–15/list; caminhos fixos | Conforme tabela; função6 ignora backup legado |
-| [intent-executor-VM.sh](../scripts/executores/intent-executor-VM.sh) | Entrada VM: 1–15/list | Conforme tabela; componentes de deploy explícitos |
-| [baixar-e-atualizar-executores.sh](../scripts/executores/baixar-e-atualizar-executores.sh) | Bootstrap no PC grubert/lubuntu; Downloads, chave SSH e comandos exigidos; INTENT_EXECUTOR_REF escolhe ref | Instala PC e tenta VM por SSH; lista funções, hashes e log em ~/Downloads/intent-relatorios; altera também a VM |
-| [instalar-executor-PC.sh](../scripts/executores/instalar-executor-PC.sh) | PC esperado; INTENT_EXECUTOR_REF ou INTENT_EXECUTOR_PC_URL | Lock, download, bash -n, cópia .bak e substituição; list |
-| [instalar-executor-VM.sh](../scripts/executores/instalar-executor-VM.sh) | VM esperada; INTENT_EXECUTOR_REF ou INTENT_EXECUTOR_VM_URL | Idem; executor instalado é externo ao checkout |
-| [08-deploy-backend.sh](../deploy/oracle/08-deploy-backend.sh) | Auxiliar VM12; root, credenciais, banco, rede e backup | Build, manutenção da API, backup, migrations no entrypoint, saúde e tentativa de rollback |
-| [09-deploy-frontend.sh](../deploy/oracle/09-deploy-frontend.sh) | Auxiliar VM12; root, checkout limpo, Docker e Compose | Preserva imagem anterior, reconstrói/recria frontend, healthz e tentativa de rollback |
-| /opt/intent/scripts/executar-backup-postgres.sh | Externo VM6/12, não versionado aqui | Dump; confirmar implementação, cron, fuso, retenção e permissões |
-| /home/grubert/intent-automacao/intent-retomada-PC.sh | Externo opcional PC14 | Relatório; instalação/conteúdo não verificados |
-| /home/ubuntu/intent-retomada-VM.sh | Externo opcional VM14 | Idem |
-| /opt/intent/source/deploy/oracle/21-verificar-intent-completo.sh | Opcional VM13; não consta na árvore oficial inspecionada | Cópia em Nova pasta não prova instalação aprovada |
-| /home/grubert/intent-automacao/intent-backup-git-PC.sh | Legado externo; sem uso pela PC6 atual | Relato anterior preso à tag1.0.23; não reativar |
-
-Bootstrap é exceção de instalação; o fluxo normal volta ao executor. Preferir ref imutável aprovada em INTENT_EXECUTOR_REF para evitar baixar versões diferentes durante a operação. O bootstrap ainda possui fallback histórico para main/docs/contratos-agentes: conferir a ref impressa. Não afirmar que arquivos recém-versionados já foram instalados no PC/VM. Não copiar chaves, tokens, .env ou sessões de outra estação.
-
-Script novo, se necessário: registrar finalidade, caminho, função/ambiente, entradas, pré-condições, efeitos, falhas, idempotência e validação. Não criar auxiliar avulso quando função existente atende. Comandos internos de investigação do agente não precisam virar novo instalador humano.
+O ambiente oficial continua PC grubert/lubuntu e VM ubuntu/intent-app-01. Endereços SSH históricos não são prova de acesso vigente. Configurações, IDs, pré-condições e efeitos estão no manual; números não foram renumerados. Função15 permanece N/A. Nenhuma rotina passa a ser homologada por sua mera inclusão no pacote.
 
 ## 3. Deploy aprovado e limites da prova
 
 Antes: confirmar revisão aprovada, árvore limpa, remoto oficial, backup e conjunto recuperável, compatibilidade de schema, imagens anteriores, recursos, rede e credenciais. Não usar reset/clean para esconder alterações; preservar commits exclusivos. Deploy key da VM deve ser somente leitura. Registrar imagens/digests API/frontend, backup, migrations e horários; HEAD alinhado não prova container reconstruído.
 
-VM12 escolhe api/frontend/all e faz backup antes dos componentes. API preserva a chave existente; não gerar chave nova em restauração. Entrypoint usa migrate deploy; não usar migrate reset/dev ou db push em produção. Script09 preserva imagem do frontend e valida healthz. Não reiniciar PostgreSQL/Redis como efeito colateral de alteração de aplicação.
+VM12 escolhe api/frontend/all. API exige a chave original previamente provisionada e valida um dump novo dentro da janela; frontend não modifica banco. Entrypoint usa migrate deploy; não usar migrate reset/dev ou db push em produção. Script09 preserva imagem do frontend e valida healthz. Não reiniciar PostgreSQL/Redis como efeito colateral de alteração de aplicação.
 
 Checks da operação aprovada: containers healthy; API /health/live e /health/ready; frontend /healthz e proxy /api/health/ready; 401 sem token quando exigido; migrations sem falhas; bindings de 3000/8080 somente em loopback e dados sem publicação IPv4/IPv6; redes corretas. Validar login, apoio, guardião, realização e conteúdo antigo conforme a mudança. Túnel SSH não equivale a portas públicas abertas; não presumir domínio ou TLS.
 
 Limites conhecidos, sem correção de escopo nesta consolidação:
 
-- Traps ERR não cobrem toda saída exit1; primeira implantação não possui imagem anterior; rotina externa e escolha de dump por data exigem conferir janela e concorrência.
-- VM5 verifica dump/checksum, mas seu fallback de pg_restore tolera falha; não prova catálogo ou restauração.
-- VM8 tolera indisponibilidade de saúde; usar resultados específicos e VM13 para confirmação estrita.
+- Primeira implantação não possui imagem anterior; rotina externa e escolha de dump por data exigem conferir janela e concorrência.
+- VM5 exige checksum e catálogo, mas não ensaia restauração.
+- VM8/13 falham quando um endpoint consultado está indisponível; não substituem homologação.
 - Função15 permanece não automatizada. Não apresentar rollback como garantia de recuperação.
 
 ## 4. Backup e restauração em manutenção autorizada
@@ -107,56 +66,56 @@ Recriar diretórios, runtime, segredos e permissões de Arquitetura. Clonar ofic
 
 Restaurar credencial Firebase autorizada do mesmo projeto, configuração, chave original e bancos; JSON web não substitui Admin. Recriar backup/cron com fuso e retenção confirmados. Restaurar dados antes da API, implantar conforme autorização e executar verificações da seção anterior. Conferir cópia fora do disco e ensaiar restauração após reconstruir. Restaurar banco não restaura contas Firebase excluídas.
 
-## 6. Artefatos históricos não operacionais
 
-Scripts em Nova pasta/, inventários .txt e md5sum são registros pessoais fora do fluxo normal. Não executar automaticamente consolidadores antigos da main, instaladores de backup ou receitas que citam Markdown removido. Para investigação histórica, consultar o commit original. Nenhum script histórico vira deploy aprovado por continuar no repositório. Código arquivado pode citar nomes antigos como registro, sem depender deles na aplicação vigente.
+## 6. Rastreabilidade da consolidação
 
-Inventário dos scripts históricos presentes na base; catálogo não é instrução de execução:
+Base inspecionada: `c78bd68bcb9a09a836f2051014c9671c9eeb766c`. Os48 SH originais foram revisados:40 em Nova pasta,5 em scripts/executores,2 deploy/oracle e1 backend. A tabela registra todos os46 itens de Nova pasta, inclusive6 auxiliares pessoais; SHA256 identifica conteúdo, e o link imutável permite recuperar o original sem manter duplicatas. Não se afirma que as receitas históricas tenham sido executadas ou instaladas.
 
-| Arquivo | Tratamento |
-|---|---|
-| `Nova pasta/20-ativar-feed-seguindo.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/21-verificar-intent-completo.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/21-verificar-intent-completo3.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/22-verificar-feed-seguindo.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/23-ativar-criacao-seguidores.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/24-implantar-estabilizacao-intent.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/24-implantar-estabilizacao-intentold.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/27-preparar-pacote-consolidado.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/27-preparar-pacote-consolidado1.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/27-preparar-pacote-consolidadoOK.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/30-etapa1-registrar-estado.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/31-etapa2-backup-completo (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/31-etapa2-backup-completo.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main1.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main2 (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main2.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main3 (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/32-etapa3-alinhar-codigo-main3.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main1.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main2 (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main2.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main3 (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/33-etapa4-validar-main3.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/34-diagnosticar-bundle.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/34-diagnosticar-bundle3.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/35-etapa5-reimplantar-main.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/36-etapa7-conferencia-final.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/baixar-e-atualizar-executores.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-atualizar-controle-release-PC.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-corrigir-continuidade-PC.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-inspecionar-executor-VM-PC.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-backup-postgres-VM (1).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-backup-postgres-VM (2).sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-backup-postgres-VM.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-backup-postgres-VMold.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-backup-postgres-VMold2.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-funcao6-PC.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-| `Nova pasta/intent-instalar-retomada-PC.sh` | Histórico pessoal; não integrar ao fluxo ativo sem nova auditoria e registro de função. |
-
-
-Auxiliares externos citados anteriormente, sem instalação confirmada: intent-atualizar-controle-release-PC.sh (intenções10/11), intent-corrigir-continuidade-PC.sh (9) e intent-instalar-backup-postgres-VM.sh (instalador histórico/VM5–6). Não multiplicar instaladores para contornar documentação.
-
-Roteiros completos da baseline anterior são recuperáveis nos links imutáveis de [Histórico](07_HISTORICO.md). Não executar exemplos antigos de função/commit/dump sem reconciliá-los com a operação aprovada.
+| Origem imutável | SHA256 | Destino / decisão |
+|---|---|---|
+| [27-preparar-pacote-consolidadoOK.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/27-preparar-pacote-consolidadoOK.sh) | `ecbff3c01fb8957a91f25ad26de6a3a5bab9e27e4806bc4e5793a832d56ee838` | Consolidação pontual retirada; não recriar cópia ampla de arquivos locais |
+| [33-etapa4-validar-main3.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main3.sh) | `adae5934c64ebf074a11f9d24f5d3a616f1afb3c58d647097b049ae455b674b7` | PC8; validação em cópia descartável descrita no manual |
+| [22-verificar-feed-seguindo.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/22-verificar-feed-seguindo.sh) | `55a44b0eec5af6c6e0f9631de1b854cafbddde89ca16f0dc50cf136a4ac6531c` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [autorun.inf](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/autorun.inf) | `ae76a646db2bd2239f9928e6bc84fc5146700ea3b61abe0c50ab40b91fcbc475` | Metadado de mídia Rufus/Ubuntu; sem uso operacional Intent |
+| [intent-instalar-retomada-PC.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-retomada-PC.sh) | `b64275fea2bef7d36c35dbaebaaeba771d488936ff69af6451ec505799e8be46` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [35-etapa5-reimplantar-main.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/35-etapa5-reimplantar-main.sh) | `1d3c8073a4588d8208da483e56535a3d6ee15cb7a996f7ce638bb5820d7a3a79` | script/acoes/deploy.sh; receita de revisão fixa retirada |
+| [24-implantar-estabilizacao-intentold.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/24-implantar-estabilizacao-intentold.sh) | `15088afbd6f2b0001ed6fbb039a0e06e613b1db01f6fdc92dc4fddb255e0fbac` | script/acoes/deploy.sh; receita de revisão fixa retirada |
+| [32-etapa3-alinhar-codigo-main2.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main2.sh) | `b2c7e2deecc94a3c1c1f850477b96590a681c47f39214ea230783bfa373f3ae8` | Funções 2/3/7/9/14; receita pontual retirada |
+| [31-etapa2-backup-completo (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/31-etapa2-backup-completo%20%281%29.sh) | `7f56dc1ff0793ef52f9e657f7504ba083c5ff22884a40ade83458eb00a7c33e0` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [21-verificar-intent-completo3.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/21-verificar-intent-completo3.sh) | `b9be948d92276c1f10ec5df946dc6bc9702c4136f60c57667bc6c6a8e8655793` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [intent-instalar-funcao6-PC.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-funcao6-PC.sh) | `12a4fd361c08e9b4e70233be9490dd1a221e34ccb2fcf0667d9a345b0b75f439` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [34-diagnosticar-bundle.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/34-diagnosticar-bundle.sh) | `f8caa86f7c904c3467e7b23df038fa2b697ca0a456a325623ea953f5460ebe60` | PC8; validação em cópia descartável descrita no manual |
+| [27-preparar-pacote-consolidado1.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/27-preparar-pacote-consolidado1.sh) | `ecbff3c01fb8957a91f25ad26de6a3a5bab9e27e4806bc4e5793a832d56ee838` | Consolidação pontual retirada; não recriar cópia ampla de arquivos locais |
+| [24-implantar-estabilizacao-intent.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/24-implantar-estabilizacao-intent.sh) | `3515b63a9a3e9da89a5193cf50500dbde40e8d3bf207b1e1801e28cb3e2f338e` | script/acoes/deploy.sh; receita de revisão fixa retirada |
+| [32-etapa3-alinhar-codigo-main3 (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main3%20%281%29.sh) | `6891ea19801b204445d1f7d25b239144cf435722ec288b0ba4e6fc94c123a34d` | Funções 2/3/7/9/14; receita pontual retirada |
+| [32-etapa3-alinhar-codigo-main.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main.sh) | `09d08e58aaa507f68e15676e45b827593fb46f9fabbee25277e347f243200184` | Funções 2/3/7/9/14; receita pontual retirada |
+| [intent-inspecionar-executor-VM-PC.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-inspecionar-executor-VM-PC.sh) | `4e912e4f1e7f96f19974f33b8e1d36e1c586ba90c8d013685d11cb2593f72474` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [32-etapa3-alinhar-codigo-main1.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main1.sh) | `09d08e58aaa507f68e15676e45b827593fb46f9fabbee25277e347f243200184` | Funções 2/3/7/9/14; receita pontual retirada |
+| [34-diagnosticar-bundle3.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/34-diagnosticar-bundle3.sh) | `cebf752524ad3839926567ef80c905c85a69bfee8f173e7429778717854b0703` | PC8; validação em cópia descartável descrita no manual |
+| [resultados_sync.txt](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/resultados_sync.txt) | `bd302cb1758f21e07b84ea1d65cd55729b4d1ab35e4843be2719ce852c47e867` | Log histórico de sincronização |
+| [31-etapa2-backup-completo.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/31-etapa2-backup-completo.sh) | `7f56dc1ff0793ef52f9e657f7504ba083c5ff22884a40ade83458eb00a7c33e0` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [revisao.txt](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/revisao.txt) | `4d2278dafc56e38394c1a7147110c2942f2265640488f11586bd3fe12f848c2e` | Log histórico de revisão/backup |
+| [intent-instalar-backup-postgres-VM (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-backup-postgres-VM%20%281%29.sh) | `48961e24f501c9f0cdbf28efefad10d234d04948054e38fc0eae9a7f3e1b18df` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [27-preparar-pacote-consolidado.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/27-preparar-pacote-consolidado.sh) | `ecbff3c01fb8957a91f25ad26de6a3a5bab9e27e4806bc4e5793a832d56ee838` | Consolidação pontual retirada; não recriar cópia ampla de arquivos locais |
+| [33-etapa4-validar-main3 (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main3%20%281%29.sh) | `adae5934c64ebf074a11f9d24f5d3a616f1afb3c58d647097b049ae455b674b7` | PC8; validação em cópia descartável descrita no manual |
+| [md5sum.txt](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/md5sum.txt) | `6c4fa091ea320c7c78bcbc928b9aba25dee15c931eb210a052065da94f9e7036` | Checksums históricos da mídia, não do pacote operacional |
+| [intent-instalar-backup-postgres-VM.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-backup-postgres-VM.sh) | `87e7de98ff5055e979808a40737708f06e341962c60127dd41c52f31d26c878a` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [33-etapa4-validar-main2 (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main2%20%281%29.sh) | `9ae6d5ab07a0f2a574cb659c549755eed4127a443e2304e2971f8831e0624daf` | PC8; validação em cópia descartável descrita no manual |
+| [30-etapa1-registrar-estado.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/30-etapa1-registrar-estado.sh) | `35a5063f62d7b497880e8a018e80bc817654ba5a98dd8d74350d267eed5ab5dd` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [intent-instalar-backup-postgres-VM (2).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-backup-postgres-VM%20%282%29.sh) | `48961e24f501c9f0cdbf28efefad10d234d04948054e38fc0eae9a7f3e1b18df` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [23-ativar-criacao-seguidores.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/23-ativar-criacao-seguidores.sh) | `01c729cc058de9dea067519adc01f81021860fa86a06bfd4de643fb05de4e17c` | script/acoes/deploy.sh; receita de revisão fixa retirada |
+| [32-etapa3-alinhar-codigo-main2 (1).sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main2%20%281%29.sh) | `b2c7e2deecc94a3c1c1f850477b96590a681c47f39214ea230783bfa373f3ae8` | Funções 2/3/7/9/14; receita pontual retirada |
+| [36-etapa7-conferencia-final.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/36-etapa7-conferencia-final.sh) | `9ff933840ed5d1104a9b1d90ab451f6f4f322d39817b9a5aa9c5108c091d6336` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [intent-corrigir-continuidade-PC.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-corrigir-continuidade-PC.sh) | `d034114797185e0e17be4e889780228d1100b1e4dc7bb7c05a445b495676f2f4` | Funções 2/3/7/9/14; receita pontual retirada |
+| [estrutura_projeto.txt](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/estrutura_projeto.txt) | `88edf504b8fda42bf7a97943e856de901729c41ae8a61a4dc6f218e5c56d24da` | Inventário histórico de árvore |
+| [intent-instalar-backup-postgres-VMold.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-backup-postgres-VMold.sh) | `2501f24781aab712e620519fcbfe92a3ea1eca70db3d34229f98b41afb243a80` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [33-etapa4-validar-main.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main.sh) | `fa791b44a594afdf08291da964c8b97a938d04d3cf01518b7f50efe0ffba0d1e` | PC8; validação em cópia descartável descrita no manual |
+| [config.yaml](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/config.yaml) | `35ab08366830a5282b1a0aad692d31b072c48b5b6049df0719a31fcab1eb0efa` | Configuração pessoal de assistente; sem uso pelo runtime Intent |
+| [intent-instalar-backup-postgres-VMold2.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-instalar-backup-postgres-VMold2.sh) | `48961e24f501c9f0cdbf28efefad10d234d04948054e38fc0eae9a7f3e1b18df` | script/lib/backup.sh e funções5/6; backup completo não presumido |
+| [32-etapa3-alinhar-codigo-main3.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/32-etapa3-alinhar-codigo-main3.sh) | `6891ea19801b204445d1f7d25b239144cf435722ec288b0ba4e6fc94c123a34d` | Funções 2/3/7/9/14; receita pontual retirada |
+| [21-verificar-intent-completo.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/21-verificar-intent-completo.sh) | `f298e2003bed5d6ef4c2b47f35a31ae3ceaffe3d5173205f0d2b222a6d04dc9d` | VM8/13 e função14; sem relatórios de sucesso pré-fixados |
+| [33-etapa4-validar-main2.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main2.sh) | `9ae6d5ab07a0f2a574cb659c549755eed4127a443e2304e2971f8831e0624daf` | PC8; validação em cópia descartável descrita no manual |
+| [intent-atualizar-controle-release-PC.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/intent-atualizar-controle-release-PC.sh) | `222e73f24429909169ef70fcda4ab446199aac837929b785daa704c1ccbe9d82` | script/instalar.sh; sem patch de texto |
+| [baixar-e-atualizar-executores.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/baixar-e-atualizar-executores.sh) | `c6a10234bb8f629207e271952d9e24658432e0971717522e315b67168dd710e2` | script/instalar.sh; sem patch de texto |
+| [33-etapa4-validar-main1.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/33-etapa4-validar-main1.sh) | `fa791b44a594afdf08291da964c8b97a938d04d3cf01518b7f50efe0ffba0d1e` | PC8; validação em cópia descartável descrita no manual |
+| [20-ativar-feed-seguindo.sh](https://github.com/edinhogrubert/Intent/blob/c78bd68bcb9a09a836f2051014c9671c9eeb766c/Nova%20pasta/20-ativar-feed-seguindo.sh) | `5e40094824f93bacc2380f1e70df1ae89425ef69eaf3c0a2b36b79284d832b54` | script/acoes/deploy.sh; receita de revisão fixa retirada |

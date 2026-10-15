@@ -92,3 +92,8 @@ Resultados reais desta alteração ficam no relatório de execução/PR e no fec
 A primeira execução funcional identificou que summary do PC retornava1 quando a última função da lista não tinha resultado, mesmo após função9 com OK. Acrescentado retorno0 explícito ao resumo, preservando o rc acumulado do dispatcher e falhas reais. Os cenários acima foram aprovados após a correção. Não confundir esse defeito preexistente com efeito da mudança de caminhos.
 
 Backend e PostgreSQL não foram reexecutados localmente: não houve alteração de domínio, schema ou migrations. CI da PR/main é evidência separada a consultar no GitHub; estes resultados locais não antecipam seu desfecho nem homologação de produção.
+
+
+## Consolidação operacional de scripts — 2026-10-15 UTC
+
+Alterações shell: executar `bash script/testes/validar.sh`; cobre sintaxe de todos os SH e contratos simulados sem serviços reais. Não confundir simulação com implantação/recuperação homologada. PC8 usa clone descartável. CI de aplicação permanece obrigatório; não repetir localmente suítes de aplicação sem delta pertinente.

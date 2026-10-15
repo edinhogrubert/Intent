@@ -48,3 +48,12 @@ Não copiar para cá o antigo “PR26 bloqueado”, nem a restrição histórica
 Após publicação, conferir main remota e o diff integrado. Se o proprietário quiser usar função9 dos executores nos seus ambientes, instalar a referência atualizada pelo bootstrap existente, em ação operacional própria; esta tarefa não afirma que a cópia externa ao Git já mudou. Não é necessário reconstruir aplicação por causa de Markdown.
 
 Em próximo bloco: consultar main/PR atuais, selecionar somente escopo residual aprovado, indicar ator/revisão/ambiente e verificar origem publicada. Atualizar esta fotografia quando houver nova evidência material ou conclusão, sem gerar novo arquivo de retomada. Usar o formato de handoff em [Agents](../Agents.md). Pendência de homologação não exige refazer todas as suítes; executar a validação que falta.
+
+
+## Bloco atual — consolidação de scripts (2026-10-15 UTC)
+
+CONFIRMADO no checkout: base oficial `c78bd68bcb9a09a836f2051014c9671c9eeb766c`, branch `refactor/scripts-consolidados`. Pacote `script/` implementado, manual local e catálogo atualizado. Origens dos40 SH e6 auxiliares pessoais retirados de Nova pasta estão no catálogo com links imutáveis e hashes. Wrappers de checkout preservam duas entradas de executor e duas de deploy.
+
+Validação local: `bash script/testes/validar.sh`, sintaxe global e17 testes isolados aprovados; incluem falhas de fetch/saúde/catálogo, dump novo, espaços em caminhos, documentos, PC8 descartável, instalação/ativação e tratamento de saída explícita dos componentes. Trata-se de mocks/temporários, não de comprovação de operação em produção. CI e commit publicado devem ser consultados no PR da branch; não inferir aprovação por este registro.
+
+PC/VM instalados, deploy, migrações, backup real e restauração: não executados nesta entrega. Próximo passo após revisão/CI: integrar a branch pelo PR; instalar ferramentas em cada ambiente somente em operação própria autorizada. Nenhuma nova versão/tag de aplicação criada.
