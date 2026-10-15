@@ -178,4 +178,6 @@ Registrar aqui benefício, decisão, evidência, riscos, condição de reavalia�
 
 ## 6. Dívidas operacionais identificadas na leitura do código
 
-Verificar em trabalho próprio as tolerâncias dos executores: VM5 não comprova restauração e pode tolerar falha de catálogo; VM8 pode registrar OK com health indisponível; VM3 tolera falha de fetch; bootstrap pode recorrer a branch histórica. Os limites estão em Scripts. A presente consolidação apenas os documenta; não afirma que produziram incidentes nem modifica sua lógica operacional.
+**Resolvido no código pelo PR51:** propagação de falhas de catálogo (VM5), saúde (VM8/13) e fetch (VM3); bootstrap antigo retirado em favor de instalação do pacote completo por commit aprovado. Não reabrir essas correções como novas tarefas sem reprodução na revisão vigente.
+
+**Ainda não verificado em operação:** instalação efetiva das ferramentas no PC/VM; rotina externa de backup; cópia fora da VM e restauração ensaiada; homologação real do deploy/recuperação. Checksum e catálogo não comprovam restauração. São lacunas de evidência operacional, não prova de falha atual. Confirmar ambiente e escopo antes de agir, conforme Status, Scripts e manual.

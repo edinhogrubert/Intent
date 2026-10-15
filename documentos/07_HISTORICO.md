@@ -146,3 +146,8 @@ Consolidação dos scripts autorizada pelo proprietário após auditoria estáti
 CONFIRMADO pela API GitHub: PR50 mergeado em `c78bd68bcb9a09a836f2051014c9671c9eeb766c`; PR51 mergeado em `4a140976c4d88424c31787183c389a1a0f969702`, implementação `3a78d9075f547f4a727802095a661352318f29f0`. CI pós-merge [38671990885](https://github.com/edinhogrubert/Intent/actions/runs/38671990885) concluído com sucesso; Frontend, Backend e Scripts Oracle aprovados.17 testes isolados da entrega de scripts aprovados, sem operação em produção.
 
 Corrigido o fechamento documental que ainda orientava integrar um PR já mergeado e instalar por bootstrap retirado. Status agora separa base histórica de produto, integrações concluídas e lacunas operacionais reais. Agents.md exige fechamento imediato após merge/CI. Não houve nova mudança de aplicação, tag, instalação PC/VM ou deploy. Não foi possível determinar a revisão usada pelo parecer externo que ainda citava a organização removida; esse parecer não comprova árvore atual.
+
+
+## Reconciliação do backlog na retomada — 15/10/2026
+
+Retirada da lista ativa de dívidas a descrição de falhas de fetch/saúde/catálogo e bootstrap antigo já corrigidas/retiradas no PR51. Preservadas somente lacunas operacionais ainda sem verificação. A referência à quantidade antiga de documentos foi alinhada à exceção autorizada do manual em script/. Alteração exclusivamente documental, sem execução PC/VM ou nova implementação de produto.
