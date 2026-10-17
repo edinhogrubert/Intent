@@ -151,3 +151,7 @@ Corrigido o fechamento documental que ainda orientava integrar um PR já mergead
 ## Reconciliação do backlog na retomada — 15/10/2026
 
 Retirada da lista ativa de dívidas a descrição de falhas de fetch/saúde/catálogo e bootstrap antigo já corrigidas/retiradas no PR51. Preservadas somente lacunas operacionais ainda sem verificação. A referência à quantidade antiga de documentos foi alinhada à exceção autorizada do manual em script/. Alteração exclusivamente documental, sem execução PC/VM ou nova implementação de produto.
+
+## Fechamento de PRs antigas — 17/10/2026
+
+CONFIRMADO na API GitHub e registrado nas conversas das PRs: [#15](https://github.com/edinhogrubert/Intent/pull/15) fechada sem merge; verificador operacional independente de setembro substituído pelo fluxo consolidado da PR51. [#28](https://github.com/edinhogrubert/Intent/pull/28) fechada sem merge; execução e sucesso do povoamento com dados fictícios para demonstração das Intents foram RELATADOS pelo proprietário em 17/10/2026, não verificados no banco nesta sessão. O fechamento não implica execução do seed, exclusão de dados ou integração do código de setembro. Preservado o histórico das PRs; nenhuma operação em PC, VM, banco, aplicação ou produção neste fechamento. CI anterior da `main`, revisão `309b0120df14dff5697ddfd37fc8bc9d51e2eec8`, concluído com sucesso na [execução 38679477291](https://github.com/edinhogrubert/Intent/actions/runs/38679477291).
