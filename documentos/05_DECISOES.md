@@ -19,6 +19,7 @@ Este registro distingue decisões de produto, implementação verificada e propo
 | D13 — Implementado, PR49 | Rascunho opcional e publicação explícita; fluxo direto continuaPUBLISHED | Privacidade DRAFT e eventoINTENT_PUBLISHED apenas em transição real; nada retroativo; schema não foi refeito |
 | D14 — Autorizado14/10/2026 | Consolidar documentação em documentos/, com Agents.md obrigatoriamente na raiz/main e excluir Markdown antigos | Substitui localização de contratos, handoffs e backlog; acordo de identidade preservado literalmente em Visão. Mapa84→novos destinos e originais íntegros no histórico Git |
 | D15 — Vigente | Reutilizar evidências de testes pertinentes e registrar revisão/ambiente | Nova execução por mudança, falha, conflito ou check obrigatório; troca de agente não basta para repetir tudo |
+| D16 — Vigente, 18/10/2026 | Fazer alterações autorizadas do Intent diretamente na `main`; não manter branches, PRs ou worktrees pendentes fora dela | Conferir árvore e revisão antes de escrever; validar e acompanhar CI após cada commit. Ideias no backlog continuam sem autorização automática para implementação. Instrução explícita do proprietário |
 
 ## Ambiguidades resolvidas na consolidação
 

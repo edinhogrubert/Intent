@@ -22,12 +22,12 @@ Ler este arquivo primeiro e somente os documentos pertinentes à tarefa. Ao reto
 
 ## Autoridade, evidência e autorização
 
-- Oficial: `edinhogrubert/Intent`, main. `edinhogrubert/intentNew` é laboratório. Conferir remoto, branch, HEAD, diferenças locais, PR e referências remotas atualizadas antes de integrar. Não inferir que commit local foi publicado.
+- Oficial: `edinhogrubert/Intent`, main. `edinhogrubert/intentNew` é laboratório e não recebe alterações deste fluxo. Conferir remoto, branch, HEAD e diferenças locais antes de escrever. Não inferir que commit local foi publicado.
 - Instruções explícitas atuais do proprietário definem o escopo autorizado. Regras estáveis ficam aqui e em Regras/Decisões; implementação efetiva deve ser conferida no código. Divergência entre regra desejada e código é uma lacuna, nunca licença para inventar implementação ou sobrescrever evolução recente.
 - Distinguir **CONFIRMADO** (evidência inspecionada, fonte/data/revisão), **RELATADO** (autor e origem), **PROPOSTO** (ação futura), **HISTÓRICO** (baseline anterior) e **NÃO VERIFICADO/BLOQUEADO** (lacuna e resolução).
 - Separar laboratório, checkout do agente, main remota, PC do proprietário e VM. Implementado, testado, integrado, mergeado, tagueado, implantado e homologado são estados diferentes.
 - Não declarar testes, CI, saúde, backup ou deploy sem evidência. Consultar apenas a superfície necessária; se não houver acesso, registrar a lacuna e continuar trabalho independente.
-- Mudanças de código seguem branch/PR e checks pertinentes. Atualizações exclusivamente documentais podem ir diretamente à main quando solicitadas. Não realizar merge, tag/release, deploy, rollback, alteração de VM, migração de produção ou exclusão fora do escopo sem autorização aplicável da sessão; não pedir novamente autorização já dada.
+- Por instrução do proprietário em 18/10/2026, alterações autorizadas do Intent são feitas diretamente na `main`; não criar branches, PRs ou worktrees para manter trabalho pendente fora dela. Conferir a revisão e árvore antes de escrever, validar o escopo e acompanhar o CI após o commit. Se uma proteção do Git impedir escrita direta, explicar o bloqueio e aguardar orientação; não abrir fluxo alternativo automaticamente. Não realizar tag/release, deploy, rollback, alteração de VM ou migração de produção sem autorização aplicável da sessão; não pedir novamente autorização já dada.
 - Preservar PostgreSQL, autenticação Firebase, autoridade do backend, privacidade e integridade histórica. Não importar mocks/localStorage, adaptações Cloud SQL ou infraestrutura do laboratório como produção.
 - Identidade permanente: [Visão, seção 2.13](documentos/00_VISAO.md#213-identidade-permanente). O conteúdo original foi transportado integralmente por autorização de reorganização e não pode desaparecer na limpeza do backlog.
 

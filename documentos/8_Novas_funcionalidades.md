@@ -1,6 +1,6 @@
 # Intent — novas funcionalidades e acordos futuros
 
-Fonte canônica de propostas e escopo residual. Transporta acordos do backlog e critérios de avaliação anteriores; não é manifesto operacional nem autorização de implementação. Estado e base em [Status](04_STATUS.md), identidade permanente em [Visão](00_VISAO.md#213-identidade-permanente). Atualizar aqui os acordos de produto; edição exclusivamente documental pode ir à main quando explicitamente solicitada. Não criar issue/branch/PR automaticamente só para registrar ideia, nem implementar por constar neste arquivo.
+Fonte canônica de propostas e escopo residual. Transporta acordos do backlog e critérios de avaliação anteriores; não é manifesto operacional nem autorização de implementação. Estado e base em [Status](04_STATUS.md), identidade permanente em [Visão](00_VISAO.md#213-identidade-permanente). Alterações autorizadas do Intent são feitas diretamente na `main`, conforme Decisão D16. Não implementar uma proposta apenas por constar neste arquivo.
 
 ## 1. Triagem da base e próximos blocos
 

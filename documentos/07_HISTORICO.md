@@ -221,3 +221,7 @@ Resolva lacunas de produto com o proprietário e registre a decisão no document
 6. Portar cenários de aceitação aplicáveis; reutilizar evidências do mesmo comportamento quando a revisão não mudou; repetir somente delta/check obrigatório.
 7. Fechar cada lacuna com decisão ou marcador explícito; atualizar o documento dono e Status/Histórico na mesma entrega.
 8. Declarar o que foi reconstruído e testado, SHA/branch, ambiente, o que continua ausente e se dados/produção foram ou não tocados.
+
+## Fluxo de alterações na main — 18/10/2026
+
+O proprietário determinou que alterações autorizadas do Intent sejam registradas diretamente na `main`, sem branches, PRs ou worktrees para manter trabalho pendente. Atualizados `Agents.md`, Decisões (D16) e o texto de governança do backlog. O escopo de cada alteração e as validações continuam exigindo confirmação; propostas do backlog não viram implementação automaticamente.
