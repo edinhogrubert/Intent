@@ -2,9 +2,9 @@
 
 ## Referência desta atualização
 
-Conferência: 15/10/2026, America/Sao_Paulo. Repositório oficial `edinhogrubert/Intent`, branch `main`. Última integração funcional/documental conferida: `4a140976c4d88424c31787183c389a1a0f969702`, merge do [PR51](https://github.com/edinhogrubert/Intent/pull/51), implementação `3a78d9075f547f4a727802095a661352318f29f0`, branch de origem `refactor/scripts-consolidados`.
+Conferência: 18/10/2026, America/Sao_Paulo. Repositório oficial `edinhogrubert/Intent`, branch `main`, HEAD `f29f68f52f939fe24da70d7089ee7de766ac55dd`. A correção de continuidade documental PC9 foi integrada pelo [PR52](https://github.com/edinhogrubert/Intent/pull/52), squash `ddae57cff95ecc8ec390937ba3afbc31e3b679e1`; CI do PR aprovado. O CI do fechamento documental da reconstrução, execução [39094576827](https://github.com/edinhogrubert/Intent/actions/runs/39094576827), também concluiu com sucesso.
 
-**Organização concluída e integrada:** [PR50](https://github.com/edinhogrubert/Intent/pull/50) consolidou a documentação; PR51 consolidou os scripts. Ambos mergeados. [CI pós-merge do PR51](https://github.com/edinhogrubert/Intent/actions/runs/38671990885): Frontend, Backend e Scripts Oracle aprovados. Este fechamento documental acrescenta um commit posterior; seu identificador é consultável no Git, sem tentar registrar o próprio hash dentro do arquivo. Antes de nova ação, conferir HEAD remoto.
+**Organização concluída e integrada:** [PR50](https://github.com/edinhogrubert/Intent/pull/50) consolidou a documentação; PR51 consolidou os scripts. Ambos mergeados. [CI pós-merge do PR51](https://github.com/edinhogrubert/Intent/actions/runs/38671990885): Frontend, Backend e Scripts Oracle aprovados. As atualizações de reconstrução e correção PC9 estão registradas no histórico abaixo. Antes de nova ação, conferir HEAD remoto.
 
 Fonte de leitura: `Agents.md` na raiz → este Status para continuidade → documento pertinente em `documentos/`. Manual operacional autorizado em `script/MANUAL.md`. Não usar contratos, handoffs ou arquivos pessoais removidos como instrução vigente. A base de produto documentada é historicamente o merge PR49 `df02be79afaefd300e4106ecec0be0313ddb39f0`; não confundir essa base com HEAD atual.
 
