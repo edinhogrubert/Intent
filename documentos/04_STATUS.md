@@ -2,7 +2,7 @@
 
 ## Referência desta atualização
 
-Conferência: 18/10/2026, America/Sao_Paulo. Repositório oficial `edinhogrubert/Intent`, branch `main`, HEAD `f29f68f52f939fe24da70d7089ee7de766ac55dd`. A correção de continuidade documental PC9 foi integrada pelo [PR52](https://github.com/edinhogrubert/Intent/pull/52), squash `ddae57cff95ecc8ec390937ba3afbc31e3b679e1`; CI do PR aprovado. O CI do fechamento documental da reconstrução, execução [39094576827](https://github.com/edinhogrubert/Intent/actions/runs/39094576827), também concluiu com sucesso.
+Conferência: 18/10/2026, America/Sao_Paulo. Repositório oficial `edinhogrubert/Intent`, branch `main`; confirmar o HEAD remoto antes de qualquer ação. A correção de continuidade documental PC9 foi integrada pelo [PR52](https://github.com/edinhogrubert/Intent/pull/52), squash `ddae57cff95ecc8ec390937ba3afbc31e3b679e1`; CI do PR aprovado. O CI do fechamento documental da reconstrução, execução [39094576827](https://github.com/edinhogrubert/Intent/actions/runs/39094576827), também concluiu com sucesso.
 
 **Organização concluída e integrada:** [PR50](https://github.com/edinhogrubert/Intent/pull/50) consolidou a documentação; PR51 consolidou os scripts. Ambos mergeados. [CI pós-merge do PR51](https://github.com/edinhogrubert/Intent/actions/runs/38671990885): Frontend, Backend e Scripts Oracle aprovados. As atualizações de reconstrução e correção PC9 estão registradas no histórico abaixo. Antes de nova ação, conferir HEAD remoto.
 
