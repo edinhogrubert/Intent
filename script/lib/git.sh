@@ -20,7 +20,7 @@ task_3(){
 
 task_9(){
   need_repo || { fail 9 'repo inválido'; return 1; }
-  local files=(Agents.md documentos/00_VISAO.md documentos/01_CASOS_DE_USO.md documentos/02_REGRAS.md documentos/03_ARQUITETURA.md documentos/04_STATUS.md documentos/05_DECISOES.md documentos/06_TESTES.md documentos/07_HISTORICO.md documentos/8_Novas_funcionalidades.md documentos/9_scripts.md script/MANUAL.md)
+  local files=(Agents.md documentos/00_VISAO.md documentos/01_CASOS_DE_USO.md documentos/02_REGRAS.md documentos/03_ARQUITETURA.md documentos/04_STATUS.md documentos/05_DECISOES.md documentos/06_TESTES.md documentos/07_HISTORICO.md documentos/8_Novas_funcionalidades.md documentos/9_scripts.md documentos/10_ESPECIFICACAO_RECONSTRUCAO.md script/MANUAL.md)
   local miss=0; for f in "${files[@]}"; do [[ -f "$REPO/$f" ]] || { echo "ausente: $f"; miss=1; }; done
   [[ $miss -eq 0 ]] || { fail 9 'continuidade incompleta'; return 1; }
   ok 9 'estrutura documental presente; vigência exige conferência das fontes'
