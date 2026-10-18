@@ -2,6 +2,8 @@
 
 Catálogo técnico. O [manual de uso](../script/MANUAL.md) contém instalação, comandos, parâmetros, efeitos e tratamento de falhas. `script/` substitui `Nova pasta/` por consolidação; arquivos históricos continuam recuperáveis no Git, sem receitas obsoletas executáveis na árvore ativa.
 
+A função PC9 verifica a presença de `Agents.md`, dos documentos canônicos `00`–`10` em `documentos/` e deste manual. Ela não verifica conteúdo, atualidade ou autoridade das fontes.
+
 | Caminho | Responsabilidade |
 |---|---|
 |[intent.sh](../script/intent.sh)|Entrada única pc/vm, números1–15, list/--plan, identidade, lock e relatórios|

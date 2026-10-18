@@ -63,3 +63,7 @@ CI CONFIRMADO para a revisão `309b0120df14dff5697ddfd37fc8bc9d51e2eec8`: [execu
 ## Especificação de reconstrução
 
 Em 18/10/2026 UTC foi inventariada estaticamente a main `0689c33781976f16fa3e55f87edfbcca91f9fa8e`, incluindo árvore frontend/API, schema e 12 migrations Prisma, rotas, serviços, testes unitários/PostgreSQL e CI. Criado o documento `10_ESPECIFICACAO_RECONSTRUCAO.md` com capacidades confirmadas, matriz de aceitação, roteiro de implementação e lacunas explícitas. Este inventário não executou suítes nem verificou PC, VM ou deploy. Consulte a conclusão/CI no histórico antes de repetir testes.
+
+## CI da especificação de reconstrução — 18/10/2026 UTC
+
+O commit `ae837100611827768c5b0388478c9ae5614a86bf` integrou o documento 10 na `main`. CI run [39094120227](https://github.com/edinhogrubert/Intent/actions/runs/39094120227): Frontend e Backend concluídos com sucesso; Scripts Oracle falhou no teste `test_every_document_is_required`, pois a lista de presença da função PC9 ainda não incluía `documentos/10_ESPECIFICACAO_RECONSTRUCAO.md`. Correção proposta em `script/lib/git.sh`; o teste local `bash script/testes/validar.sh` passou com 17/17 casos. A correção ainda precisa de CI em branch/PR antes de ser considerada integrada.

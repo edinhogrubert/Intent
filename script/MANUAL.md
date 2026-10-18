@@ -36,7 +36,7 @@ Os caminhos externos antigos não são sobrescritos automaticamente. Depois de v
 |6|Criar backup|PC bundle --all; VM rotina externa, exige exatamente um dump novo válido|
 |7|Sincronizar|Fetch/pull; altera checkout; VM detached faz somente fetch|
 |8|Validação|PC clone descartável instala dependências e roda lint/build/test; VM saúde estrita|
-|9|Documentos|Presença dos documentos e manual; não atualiza conteúdo nem certifica vigência|
+|9|Documentos|Presença de `Agents.md`, dos documentos `00`–`10` em `documentos/` e deste manual; não atualiza conteúdo nem certifica vigência|
 |10|Preparar release|PC2/3/5/9; VM N/A; não substitui CI|
 |11|Tag|PC cria/push com autorização; VM confere commit da tag; não cria release via API|
 |12|Deploy|VM somente, api/frontend/all; altera containers e pode migrar banco; PC N/A|
