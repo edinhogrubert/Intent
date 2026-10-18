@@ -62,7 +62,7 @@ CI CONFIRMADO para a revisão `309b0120df14dff5697ddfd37fc8bc9d51e2eec8`: [execu
 
 ## Especificação de reconstrução
 
-Em 18/10/2026 UTC foi inventariada estaticamente a main `0689c33781976f16fa3e55f87edfbcca91f9fa8e`, incluindo árvore frontend/API, schema e 12 migrations Prisma, rotas, serviços, testes unitários/PostgreSQL e CI. Criado o documento `10_ESPECIFICACAO_RECONSTRUCAO.md` com capacidades confirmadas, matriz de aceitação, roteiro de implementação e lacunas explícitas. Este inventário não executou suítes nem verificou PC, VM ou deploy. Consulte a conclusão/CI no histórico antes de repetir testes.
+Em 18/10/2026 UTC foi inventariada estaticamente a main `0689c33781976f16fa3e55f87edfbcca91f9fa8e`, incluindo árvore frontend/API, schema e 13 migrations Prisma, rotas, serviços, testes unitários/PostgreSQL e CI. Criado o documento `10_ESPECIFICACAO_RECONSTRUCAO.md` com capacidades confirmadas, matriz de aceitação, roteiro de implementação e lacunas explícitas. Este inventário não executou suítes nem verificou PC, VM ou deploy. Consulte a conclusão/CI no histórico antes de repetir testes.
 
 ## CI da especificação de reconstrução — 18/10/2026 UTC
 
