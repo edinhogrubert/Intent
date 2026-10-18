@@ -12,7 +12,7 @@ Fonte de leitura: `Agents.md` na raiz → este Status para continuidade → docu
 
 | Superfície | Evidência / estado |
 |---|---|
-| GitHub oficial | Main consultada na API; PR50/51 mergeados. Árvore atual com12 Markdown: Agents.md, dez em documentos/ e script/MANUAL.md. Os84 Markdown antigos são histórico recuperável no Git |
+| GitHub oficial | Main consultada na API; PR50/51 e PR52 mergeados. Árvore atual com13 Markdown: `Agents.md`, onze em `documentos/` e `script/MANUAL.md`. Os84 Markdown antigos são histórico recuperável no Git |
 | Checkout do agente | Main sincronizada à integração conferida, árvore limpa antes deste fechamento documental; não é PC do proprietário |
 | PRs26,38,40,43,45–49 | Merge confirmado pela API GitHub; PR44 e demais entregas também constam do histórico Git |
 | Versão/tag | Clone remoto contém tags mvp-1.0.0 até mvp-1.0.23; não foi confirmada release1.0.24 implantada. Tag não equivale à versão servida; src/appVersion.ts ainda contém o label histórico mvp-1.0.4-pr5/PR5, que não é evidência de release atual |
@@ -41,7 +41,7 @@ Referências de PR: https://github.com/edinhogrubert/Intent/pulls. Histórico de
 
 ## Consolidações encerradas
 
-- **Documentos — PR50:** merge `c78bd68bcb9a09a836f2051014c9671c9eeb766c`; substituiu84 caminhos Markdown antigos, com conteúdo útil consolidado e mapa de origem em Histórico. Preservada a identidade permanente da seção2.13. Agents.md na raiz e dez documentos por assunto.
+- **Documentos — PR50:** merge `c78bd68bcb9a09a836f2051014c9671c9eeb766c`; substituiu84 caminhos Markdown antigos, com conteúdo útil consolidado e mapa de origem em Histórico. Preservada a identidade permanente da seção2.13. Agents.md na raiz e onze documentos por assunto, após a inclusão do documento 10.
 - **Scripts — PR51:** merge `4a140976c4d88424c31787183c389a1a0f969702`;40 SH e6 auxiliares pessoais retirados de Nova pasta, com links imutáveis/hashes no catálogo. Entrada única `script/intent.sh`, módulos compartilhados, instalação por pacote completo e manual.16 SH ativos, incluindo quatro wrappers transitórios de checkout e entrypoint backend preservado.
 - **Evidências:**17 testes isolados e sintaxe global aprovados na árvore da implementação; CI do PR51 e CI pós-merge aprovados. Scripts usam mocks/temporários nas validações locais; isso não certifica recuperação real ou operação da VM. Não repetir suítes de aplicação por este fechamento exclusivamente documental.
 
@@ -66,4 +66,4 @@ Em 18/10/2026 UTC foi inventariada estaticamente a main `0689c33781976f16fa3e55f
 
 ## CI da especificação de reconstrução — 18/10/2026 UTC
 
-O commit `ae837100611827768c5b0388478c9ae5614a86bf` integrou o documento 10 na `main`. CI run [39094120227](https://github.com/edinhogrubert/Intent/actions/runs/39094120227): Frontend e Backend concluídos com sucesso; Scripts Oracle falhou no teste `test_every_document_is_required`, pois a lista de presença da função PC9 ainda não incluía `documentos/10_ESPECIFICACAO_RECONSTRUCAO.md`. Correção proposta em `script/lib/git.sh`; o teste local `bash script/testes/validar.sh` passou com 17/17 casos. A correção ainda precisa de CI em branch/PR antes de ser considerada integrada.
+O commit `ae837100611827768c5b0388478c9ae5614a86bf` integrou o documento 10 na `main`. CI run [39094120227](https://github.com/edinhogrubert/Intent/actions/runs/39094120227): Frontend e Backend concluídos com sucesso; Scripts Oracle falhou no teste `test_every_document_is_required`, pois a lista de presença da função PC9 ainda não incluía `documentos/10_ESPECIFICACAO_RECONSTRUCAO.md`. Correção integrada pelo PR [#52](https://github.com/edinhogrubert/Intent/pull/52), merge squash `ddae57cff95ecc8ec390937ba3afbc31e3b679e1`. Validação local `bash script/testes/validar.sh`: 17/17 casos aprovados; CI do PR [39094410576](https://github.com/edinhogrubert/Intent/actions/runs/39094410576): Frontend, Backend e Scripts Oracle aprovados.
