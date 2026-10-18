@@ -16,6 +16,7 @@ Este arquivo fica **na raiz do repositório e na branch main**, por decisão exp
 | O que mudou e de onde veio cada documento antigo? | [07 — Histórico](documentos/07_HISTORICO.md) |
 | O que ainda é proposta ou funcionalidade futura? | [8 — Novas funcionalidades](documentos/8_Novas_funcionalidades.md) |
 | Quais scripts existem e como operá-los? | [9 — Scripts](documentos/9_scripts.md) |
+| Como reconstruir o comportamento confirmado a partir do repositório? | [10 — Especificação de reconstrução](documentos/10_ESPECIFICACAO_RECONSTRUCAO.md) |
 
 Ler este arquivo primeiro e somente os documentos pertinentes à tarefa. Ao retomar desenvolvimento, consultar Status e estado remoto vigente antes de escolher bloco. Não carregar todo o histórico para toda mudança.
 

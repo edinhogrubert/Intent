@@ -58,3 +58,8 @@ Documentação de governança deve ser fechada na mesma entrega: atualizar estad
 CONFIRMADO pela API GitHub: PR [#15](https://github.com/edinhogrubert/Intent/pull/15) encerrada sem merge, pois seu verificador independente foi substituído pela consolidação operacional PR51. PR [#28](https://github.com/edinhogrubert/Intent/pull/28) encerrada sem merge do código antigo. Sobre a #28, o proprietário RELATOU que a criação de dados fictícios para povoamento de Intents já foi executada com sucesso e encontra-se funcionando; o banco, a origem exata dos dados e a VM não foram inspecionados nesta atividade. Não repetir seed, excluir dados nem reinterpretar os acontecimentos fictícios como históricos reais. Nenhuma operação de PC/VM, deploy, migração ou teste de aplicação foi executada por este fechamento.
 
 CI CONFIRMADO para a revisão `309b0120df14dff5697ddfd37fc8bc9d51e2eec8`: [execução 38679477291](https://github.com/edinhogrubert/Intent/actions/runs/38679477291) com conclusão `success`. A próxima etapa é diagnóstico do PC (checkout, alterações locais e pacote operacional) antes de qualquer instalação. A revisão HEAD deve ser novamente conferida depois destas atualizações documentais.
+
+
+## Especificação de reconstrução
+
+Em 18/10/2026 UTC foi inventariada estaticamente a main `0689c33781976f16fa3e55f87edfbcca91f9fa8e`, incluindo árvore frontend/API, schema e 12 migrations Prisma, rotas, serviços, testes unitários/PostgreSQL e CI. Criado o documento `10_ESPECIFICACAO_RECONSTRUCAO.md` com capacidades confirmadas, matriz de aceitação, roteiro de implementação e lacunas explícitas. Este inventário não executou suítes nem verificou PC, VM ou deploy. Consulte a conclusão/CI no histórico antes de repetir testes.

@@ -1,6 +1,6 @@
 # Intent — arquitetura e ambientes
 
-Arquitetura de código verificada na base de [Status](04_STATUS.md); fotografias de PC/VM abaixo são **registros históricos**, não inspeções atuais. [Scripts](9_scripts.md) concentra operação/recuperação; [Testes](06_TESTES.md) concentra comandos de validação. Atualizar esta referência quando mudar ferramenta obrigatória, módulo, configuração, diretório, rede, serviço ou mecanismo de recuperação.
+Arquitetura de código verificada na base de [Status](04_STATUS.md); fotografias de PC/VM abaixo são **registros históricos**, não inspeções atuais. [Scripts](9_scripts.md) concentra operação/recuperação; [Testes](06_TESTES.md) concentra comandos de validação. Atualizar esta referência quando mudar ferramenta obrigatória, módulo, configuração, diretório, rede, serviço ou mecanismo de recuperação. A visão integrada para reconstrução está em [10_ESPECIFICACAO_RECONSTRUCAO.md](10_ESPECIFICACAO_RECONSTRUCAO.md).
 
 ## 1. Aplicação vigente
 
@@ -114,3 +114,8 @@ Atualizar este arquivo junto a alteração significativa de ferramentas, runtime
 ## Consolidação operacional de scripts — 2026-10-15 UTC
 
 Ferramentas operacionais consolidadas em `script/`, com módulos reutilizáveis PC/VM e manual local. A alteração reorganiza o repositório; não altera serviços, volumes, rede ou instalações vigentes no PC/VM. Backend entrypoint permanece junto ao Dockerfile.
+
+
+## Inventário para reconstrução
+
+O documento [10 — Especificação de reconstrução](10_ESPECIFICACAO_RECONSTRUCAO.md) consolida o inventário de capacidades, endpoints, modelos, migrations, arquitetura mínima, ordem de implementação e lacunas, com base no commit identificado nele. Atualizar a especificação junto a mudanças de contrato; o schema Prisma, código e testes continuam fontes do detalhe exato.

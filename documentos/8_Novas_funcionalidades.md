@@ -174,7 +174,7 @@ Perspectivas diferentes agregam quando revelam riscos, produzem evidências, que
 
 ## Organização dos novos acordos
 
-Registrar aqui benefício, decisão, evidência, riscos, condição de reavaliação e responsável/data, conforme o critério acima. Uma avaliação não cria tarefa de implementação automaticamente. Não criar nova pasta documental nem mover decisões para fora dos onze documentos canônicos sem orientação do proprietário. Esta regra substitui a antiga previsão de acrescentar arquivos em gestao/; os critérios em si foram preservados.
+Registrar aqui benefício, decisão, evidência, riscos, condição de reavaliação e responsável/data, conforme o critério acima. Uma avaliação não cria tarefa de implementação automaticamente. A documentação canônica consiste em `Agents.md` na raiz e nos onze documentos desta pasta (`00`–`10`); o manual operacional permanece na pasta `script/` por sua função prática. Não criar novas pastas documentais nem mover decisões para fora dessas fontes sem orientação do proprietário. Esta regra substitui a antiga previsão de acrescentar arquivos em gestao/; os critérios em si foram preservados.
 
 ## 6. Dívidas operacionais identificadas na leitura do código
 
